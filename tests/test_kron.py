@@ -8,6 +8,8 @@ import torch
 
 from kronllm.kron import (KronCompose, apply_rope, effective_rank, kron_apply,
                           kron_materialize, rope_frequencies)
+from kronllm.model import KronTransformer
+from kronllm.testutils import make_cfg
 
 
 # ---------------------------------------------------------------------------
@@ -515,3 +517,45 @@ def test_T17_gate_is_active_and_differentiable():
     assert m.A.grad is not None and float(m.A.grad.abs().sum()) > 0.0
     # branch output must be small relative to the residual stream at init
     assert float(y.norm()) < 0.5 * float(x.norm())
+
+# ---------------------------------------------------------------------------
+# KV cache and factorised innovation application
+# ---------------------------------------------------------------------------
+def test_kv_cache_matches_full_forward():
+    """Incremental decoding with cached K/V must match a full forward."""
+    torch.manual_seed(0)
+    model = KronTransformer(make_cfg()).eval()
+    x = torch.randint(0, 256, (2, 10))
+    with torch.no_grad():
+        full = model(x)["logits"]
+        out = model(x[:, :5], use_cache=True)
+        past = out["past_kv"]
+        parts = [out["logits"]]
+        for t in range(5, 10):
+            out = model(x[:, t:t + 1], past_kv=past, use_cache=True)
+            past = out["past_kv"]
+            parts.append(out["logits"])
+        inc = torch.cat(parts, dim=1)
+    assert torch.allclose(full, inc, atol=1e-5, rtol=1e-5)
+
+
+def test_generate_cache_matches_uncached():
+    torch.manual_seed(0)
+    model = KronTransformer(make_cfg()).eval()
+    prompt = torch.randint(0, 256, (1, 4))
+    torch.manual_seed(1)
+    g1 = model.generate(prompt, max_new_tokens=8, top_k=1, use_cache=False)
+    torch.manual_seed(1)
+    g2 = model.generate(prompt, max_new_tokens=8, top_k=1, use_cache=True)
+    assert torch.equal(g1, g2)
+
+
+def test_kron_innovation_factorized_matches_dense():
+    """Applying A (x) B through its factors must equal the dense innovation."""
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=1, K=2, K_win=0, composition="sum",
+                    use_gate=False)
+    x = torch.randn(15, 64)
+    dense = x @ m.innovation()[0].t()
+    factored = m.apply_innovation(x, 0)
+    assert torch.allclose(dense, factored, atol=1e-5)

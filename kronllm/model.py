@@ -367,12 +367,20 @@ class KronBlock(nn.Module):
     def forward(self, x: torch.Tensor, state: Dict[str, Optional[torch.Tensor]],
                 layer_idx: int, cos: torch.Tensor, sin: torch.Tensor,
                 collect: bool = False, mode: str = "auto",
-                P: Optional[Dict[str, torch.Tensor]] = None
-                ) -> Tuple[torch.Tensor, Dict[str, Optional[torch.Tensor]], Dict[str, Any]]:
+                P: Optional[Dict[str, torch.Tensor]] = None,
+                past_kv: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+                use_cache: bool = False,
+                ) -> Tuple[torch.Tensor, Dict[str, Optional[torch.Tensor]],
+                           Dict[str, Any], Optional[Tuple[torch.Tensor,
+                                                           torch.Tensor]]]:
         """``P`` maps role -> precomputed ``(d_out, d_in)`` composed matrix.
 
         The matrix already contains the ReZero gate, so it is applied as
         ``y = h @ P.T`` -- one GEMM instead of ``L`` matvecs + a gate.
+
+        ``past_kv`` is the cached ``(k, v)`` of the previous tokens (already
+        RoPE-rotated); the returned 4th value is the updated cache when
+        ``use_cache`` is set, else ``None``.
         """
         B, T, _ = x.shape
         dh, nh = self.d_head, self.n_heads
@@ -404,12 +412,18 @@ class KronBlock(nn.Module):
         q = apply_rope(q, cos, sin)
         k = apply_rope(k, cos, sin)
 
+        if past_kv is not None:
+            k = torch.cat([past_kv[0], k], dim=2)
+            v = torch.cat([past_kv[1], v], dim=2)
+        k_cache, v_cache = k, v
+        n_past = k.shape[2] - q.shape[2]
+
         if self.n_kv_heads != nh:
             rep = nh // self.n_kv_heads
             k = k.repeat_interleave(rep, dim=1)
             v = v.repeat_interleave(rep, dim=1)
 
-        if collect:
+        if collect and n_past == 0:
             scale = 1.0 / math.sqrt(dh)
             scores = torch.matmul(q, k.transpose(-1, -2)) * scale
             mask = torch.ones(T, T, device=x.device, dtype=torch.bool).triu(1)
@@ -425,11 +439,7 @@ class KronBlock(nn.Module):
             cache["k_sigma_min"] = torch.linalg.svdvals(
                 k.reshape(-1, dh).float()).min().item()
 
-        if self.attn_impl == "auto":
-            out = F.scaled_dot_product_attention(q, k, v, is_causal=True)
-        else:
-            with sdpa_kernel(_ATTN_BACKENDS[self.attn_impl]):
-                out = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        out = self._attend(q, k, v, n_past)
         out = out.transpose(1, 2).reshape(B, T, self.d)
 
         o, Do = apply(self.o, "o", out)
@@ -455,7 +465,29 @@ class KronBlock(nn.Module):
             if self.ffn_silu:
                 f = F.silu(f)
         x = x + f
-        return x, state, cache
+        new_kv = (k_cache, v_cache) if use_cache else None
+        return x, state, cache, new_kv
+
+    def _attend(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor,
+                n_past: int = 0) -> torch.Tensor:
+        """SDPA with an optional KV cache and the configured backend."""
+        def call(**kw):
+            if self.attn_impl == "auto":
+                return F.scaled_dot_product_attention(q, k, v, **kw)
+            with sdpa_kernel(_ATTN_BACKENDS[self.attn_impl]):
+                return F.scaled_dot_product_attention(q, k, v, **kw)
+
+        if n_past == 0:
+            return call(is_causal=True)
+        if q.shape[2] == 1:
+            # One new query token sees every cached key.
+            return call(is_causal=False)
+        # Chunked prefill with a cache: query i (absolute position n_past+i)
+        # must not see keys beyond n_past+i.
+        qpos = torch.arange(q.shape[2], device=q.device)[:, None] + n_past
+        kpos = torch.arange(k.shape[2], device=q.device)[None, :]
+        mask = kpos <= qpos
+        return call(attn_mask=mask)
 
 
 class KronTransformer(nn.Module):
@@ -726,9 +758,13 @@ class KronTransformer(nn.Module):
 
     # -- forward ----------------------------------------------------------
     def forward(self, idx: torch.Tensor, targets: Optional[torch.Tensor] = None,
-                collect: bool = False) -> Dict[str, Any]:
+                collect: bool = False,
+                past_kv: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = None,
+                use_cache: bool = False) -> Dict[str, Any]:
         B, T = idx.shape
-        cos, sin = self._rope(T, idx.device)
+        past_len = int(past_kv[0][0].shape[2]) if past_kv else 0
+        cos, sin = self._rope(past_len + T, idx.device)
+        cos, sin = cos[:, :, past_len:], sin[:, :, past_len:]
         eff = self._effective_embeddings() if self.routed is not None else None
         x = F.embedding(idx, eff) if eff is not None else self._embed_tokens(idx)
         P_map: Dict[Tuple[int, str], torch.Tensor] = {}
@@ -741,6 +777,8 @@ class KronTransformer(nn.Module):
         stats: Dict[str, float] = {}
 
         h_norms = [x.detach().norm().item()]
+        new_kv: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = (
+            [] if use_cache else None)
         for i, block in enumerate(self.blocks):
             if D_map:
                 for role in ROLES:
@@ -748,8 +786,13 @@ class KronTransformer(nn.Module):
                         state[role] = D_map[(i, role)]
             P = ({role: P_map.get((i, role)) for role in ROLES}
                  if P_map else None)
-            x, state, cache = block(x, state, i, cos, sin, collect=collect,
-                                    mode=self.force_mode or "auto", P=P)
+            x, state, cache, kv = block(
+                x, state, i, cos, sin, collect=collect,
+                mode=self.force_mode or "auto", P=P,
+                past_kv=past_kv[i] if past_kv is not None else None,
+                use_cache=use_cache)
+            if new_kv is not None:
+                new_kv.append(kv)
             if collect:
                 stats.update({f"L{i}.{k}": v for k, v in cache.items()})
                 trace.append({
@@ -784,6 +827,8 @@ class KronTransformer(nn.Module):
             self.last_stats = stats
             out["trace"] = trace
             out["stats"] = stats
+        if use_cache:
+            out["past_kv"] = new_kv
         return out
 
     # -- introspection ----------------------------------------------------
@@ -878,20 +923,37 @@ class KronTransformer(nn.Module):
     def generate(self, idx: torch.Tensor, max_new_tokens: int = 200,
                  temperature: float = 1.0, top_k: Optional[int] = 8,
                  eot_id: Optional[int] = None,
-                 stop_at_eot: bool = False) -> torch.Tensor:
+                 stop_at_eot: bool = False,
+                 use_cache: bool = True) -> torch.Tensor:
+        """Sample tokens; with ``use_cache`` each step attends to cached K/V.
+
+        The cache holds at most ``seq_len`` tokens; once the context is full,
+        generation falls back to a full forward on the last ``seq_len`` tokens
+        (the behaviour of the uncached path).
+        """
         was_training = self.training
         eot_id = int(self.eot_id if eot_id is None else eot_id)
         self.eval()
-        for _ in range(max_new_tokens):
-            ctx = idx[:, -self.seq_len:]
-            logits = self(ctx)["logits"][:, -1, :].float()
+
+        def sample(logits: torch.Tensor) -> torch.Tensor:
             logits = logits / max(temperature, 1e-5)
             if top_k is not None and top_k > 0:
                 k = min(top_k, logits.size(-1))
                 thresh = torch.topk(logits, k, dim=-1).values[:, -1:]
                 logits = logits.masked_fill(logits < thresh, float("-inf"))
             probs = torch.softmax(logits, dim=-1)
-            nxt = torch.multinomial(probs, num_samples=1)
+            return torch.multinomial(probs, num_samples=1)
+
+        past = None
+        for _ in range(max_new_tokens):
+            if use_cache and past is not None and past[0][0].shape[2] < self.seq_len:
+                out = self(idx[:, -1:], past_kv=past, use_cache=True)
+                past = out["past_kv"]
+            else:
+                ctx = idx[:, -self.seq_len:]
+                out = self(ctx, use_cache=use_cache)
+                past = out.get("past_kv")
+            nxt = sample(out["logits"][:, -1, :].float())
             idx = torch.cat([idx, nxt], dim=1)
             if stop_at_eot and int(nxt[0, 0]) == eot_id:
                 break

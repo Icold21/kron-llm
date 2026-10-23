@@ -331,6 +331,27 @@ class KronCompose(nn.Module):
         return I4.permute(0, 1, 3, 2, 4).reshape(
             self.L, n1o * n2o, n1i * n2i)
 
+    def apply_innovation(self, x: torch.Tensor, l: int = 0) -> torch.Tensor:
+        """Apply ``I_l = sum_k A_k (x) B_k`` to ``x`` without building ``d x d``.
+
+        Uses ``(A (x) B) vec(X) = A X B^T`` per summand, i.e.
+        ``O(K * (n1_out*n1_in*n2_in + n2_out*n2_in*n1_out))`` instead of the
+        dense ``O(d_in*d_out)``.  With square factors ``n1=n2=sqrt(d)`` the
+        saving per summand is ``O(d^1.5)``; with ``K`` summands the crossover is
+        ``K * 2 * d^1.5 < d^2`` (K=6, d=320: ~1.5x).  The depth recurrence
+        still carries a dense ``prev`` term, so the full ``D_l`` application is
+        not cheaper unless the state is factorised too -- see the benchmark in
+        docs/architecture.md.
+        """
+        tokens = x.shape[0]
+        X = x.reshape(tokens, self.n1_in, self.n2_in)
+        y = torch.zeros(tokens, self.n1_out, self.n2_out,
+                        device=x.device, dtype=x.dtype)
+        for k in range(self.K):
+            y = y + torch.einsum("ip,bpq,jq->bij", self.A[l, k], X,
+                                 self.B[l, k])
+        return y.reshape(tokens, self.d_out)
+
     # -- composition ------------------------------------------------------
     def compose_product(self, D: torch.Tensor) -> torch.Tensor:
         """``P = W_L ... W_1`` with ``W_l = s Id + D_l``."""
