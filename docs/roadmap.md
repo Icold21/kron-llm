@@ -172,6 +172,21 @@ one-step arithmetic and short functions; it cannot solve general math or write
 non-trivial programs. The SFT goal is a reliable interface and a measurable
 baseline, not an assistant that knows the world.
 
+**Identity slice (optional, guarded).** A small set of examples where the model
+introduces itself as **Kron / KronLLM**, in English and Russian, with varied
+phrasings (`What is your name?`, `Кто ты?`, `What model are you?`). Keep it at
+**0.5–1 % of the SFT mix** (roughly 100–300 examples) and keep the answers
+factual and modest: a ~10M-parameter compact model, not an oracle.
+
+Guardrails:
+
+- evaluate identity accuracy on held-out phrasings in both languages;
+- measure **leakage**: the rate at which "Kron" appears on unrelated prompts;
+  if it exceeds ~1–2 %, shrink or drop the slice;
+- never let the persona claim capabilities the model does not have;
+- keep identity examples out of the math/code subsets so they do not pollute
+  those metrics.
+
 **Exit:** SFT checkpoint + evaluation table + failure gallery.
 
 ## 7. Phase 4 — SOTA comparison and Habr article (gate E)
