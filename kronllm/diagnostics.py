@@ -194,7 +194,9 @@ def spectral_report(model: nn.Module, trace: List[Dict[str, Any]],
             # the product's rank loss is due to multiplication itself.  For an
             # already-sum model this reduces to the trained sum map.
             if mod.composition == "sum":
-                S = (mod.alpha.float().view(-1, 1, 1) * D.float()).sum(dim=0)
+                w = (mod._last_w_mean if getattr(mod, "dynamic_gate", None)
+                     else mod.alpha)
+                S = (w.float().view(-1, 1, 1) * D.float()).sum(dim=0)
             else:
                 S = D.float().sum(dim=0)
             if s is not None:

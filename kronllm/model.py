@@ -354,6 +354,10 @@ class KronBlock(nn.Module):
             use_gate=bool(kc.get("gate", True)),
             composition=str(kc.get("composition", "product")),
             sum_alpha_init=float(kc.get("sum_alpha_init", 1.0)),
+            dynamic_gate=(kc.get("dynamic_gate")
+                          if L_eff == L and str(kc.get("composition",
+                                                       "product")) == "sum"
+                          else None),
         )
 
     def ffn_module(self) -> nn.Module:
@@ -576,6 +580,10 @@ class KronTransformer(nn.Module):
                 else:
                     mod = getattr(block, role)
                 if not isinstance(mod, KronCompose):
+                    continue
+                if getattr(mod, "dynamic_gate", None):
+                    # The composed map depends on the input token, so it cannot
+                    # be fused into one weight-only prelude per layer.
                     continue
                 sig = (mod.L, mod.K, mod.d_in, mod.d_out, mod.n1_in, mod.n2_in,
                        mod.n1_out, mod.n2_out, mod.anchor, mod.normalize_D,

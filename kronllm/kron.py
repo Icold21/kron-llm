@@ -131,6 +131,14 @@ def _init_gain_value(mode: "str | float", K: int, d_in: int) -> float:
 # ---------------------------------------------------------------------------
 # KronCompose
 # ---------------------------------------------------------------------------
+def _largest_factor(n: int) -> int:
+    """Largest divisor of ``n`` not exceeding ``sqrt(n)`` (≥ 1)."""
+    for k in range(int(n ** 0.5), 0, -1):
+        if n % k == 0:
+            return k
+    return 1
+
+
 class KronCompose(nn.Module):
     """Kronecker-parameterised linear layer with depth recurrence.
 
@@ -165,6 +173,7 @@ class KronCompose(nn.Module):
         use_gate: bool = True,
         composition: str = "product",
         sum_alpha_init: float = 1.0,
+        dynamic_gate: Optional[str] = None,
     ) -> None:
         super().__init__()
         d_out = d_in if d_out is None else d_out
@@ -188,6 +197,16 @@ class KronCompose(nn.Module):
             raise ValueError(
                 f"composition must be 'product' or 'sum', got {composition!r}")
         self.sum_alpha_init = float(sum_alpha_init)
+        self.dynamic_gate = (str(dynamic_gate).lower() if dynamic_gate else None)
+        if self.dynamic_gate is not None:
+            if self.dynamic_gate not in {"dense", "kron"}:
+                raise ValueError(
+                    "dynamic_gate must be None/'dense'/'kron', got "
+                    f"{dynamic_gate!r}")
+            if self.composition != "sum":
+                raise ValueError("dynamic_gate requires composition='sum'")
+            if L < 2:
+                raise ValueError("dynamic_gate requires L >= 2")
 
         self.anchor = bool(anchor) and self.square
         self.stop_gradient = stop_gradient
@@ -207,6 +226,24 @@ class KronCompose(nn.Module):
         # parameter count of the product runs stay unchanged.
         self.alpha = (nn.Parameter(torch.full((L,), self.sum_alpha_init))
                       if self.composition == "sum" else None)
+
+        # Input-dependent softmax gate over the L sum-composition terms:
+        #   w_t = L * softmax(g(x_t)),  P_t = sI + sum_l w_{t,l} D_l.
+        # The L*softmax normalisation keeps the mean weight at 1, so at
+        # initialisation (zero gate) it is exactly the static alpha=1 sum.
+        if self.dynamic_gate == "dense":
+            self.w_gate = nn.Linear(d_in, L, bias=True)
+            nn.init.zeros_(self.w_gate.weight)
+            nn.init.zeros_(self.w_gate.bias)
+        elif self.dynamic_gate == "kron":
+            g1 = _largest_factor(L)
+            self.gate_shape = (g1, L // g1)
+            self.w_gate_A = nn.Parameter(torch.zeros(g1, n1_in))
+            self.w_gate_B = nn.Parameter(torch.zeros(L // g1, n2_in))
+            self.w_gate_b = nn.Parameter(torch.zeros(L))
+        if self.dynamic_gate is not None:
+            self.register_buffer("_last_w_mean", torch.ones(L),
+                                 persistent=False)
 
         if self.anchor:
             # For a product, s_init denotes the effective post-composition
@@ -252,6 +289,11 @@ class KronCompose(nn.Module):
             total += 1
         if self.alpha is not None:
             total += self.alpha.numel()
+        if self.dynamic_gate == "dense":
+            total += sum(p.numel() for p in self.w_gate.parameters())
+        elif self.dynamic_gate == "kron":
+            total += (self.w_gate_A.numel() + self.w_gate_B.numel()
+                      + self.w_gate_b.numel())
         return total
 
     # -- state ------------------------------------------------------------
@@ -304,16 +346,20 @@ class KronCompose(nn.Module):
             P = torch.addmm(s * P, D[l], P)
         return P
 
-    def compose_sum(self, D: torch.Tensor) -> torch.Tensor:
-        """``P = s Id + sum_l alpha_l D_l`` (sum composition).
+    def compose_sum(self, D: torch.Tensor,
+                    weights: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """``P = s Id + sum_l w_l D_l`` (sum composition).
 
-        Unlike the product, the sum keeps every channel's contribution
-        additive; ``alpha`` lets the model re-weight channels independently.
+        ``w`` is ``alpha`` for the static sum, or the last mean softmax gate
+        weights for the dynamic variant (diagnostics only; the forward pass
+        applies the per-token weights directly).
         """
         assert self.alpha is not None
-        P = self.alpha[0] * D[0]
+        w = (weights if weights is not None else
+             (self._last_w_mean if self.dynamic_gate is not None else self.alpha))
+        P = w[0] * D[0]
         for l in range(1, self.L):
-            P = P + self.alpha[l] * D[l]
+            P = P + w[l] * D[l]
         if self.s is not None:
             P = P + self.s * cached_eye(self.d_in, D.device, D.dtype)
         return P
@@ -384,10 +430,27 @@ class KronCompose(nn.Module):
         #                  cheaper in FLOPs than the sequential form.
         tokens = B * T
         if self.composition == "sum":
-            # The sum is cheap even for a single token, so there is no reason
-            # to keep a separate sequential path.
-            P = self.compose_sum(D)
-            y = torch.matmul(xm.reshape(tokens, self.d_in), P.transpose(0, 1))
+            if self.dynamic_gate is not None:
+                xf = xm.reshape(tokens, self.d_in)
+                if self.dynamic_gate == "dense":
+                    logits = self.w_gate(xf)
+                else:
+                    z = torch.einsum("bpq,ip,jq->bij", xm,
+                                     self.w_gate_A, self.w_gate_B)
+                    logits = z.reshape(tokens, self.L) + self.w_gate_b
+                # L * softmax keeps the mean weight at 1 (uniform init ==
+                # the static alpha=1 sum).
+                w = self.L * torch.softmax(logits, dim=-1)
+                self._last_w_mean = w.mean(dim=0).detach()
+                y = xf * self.s if self.s is not None else torch.zeros_like(xf)
+                for l in range(self.L):
+                    y = y + w[:, l:l + 1] * torch.matmul(
+                        xf, D[l].transpose(0, 1))
+            else:
+                # The sum is cheap even for a single token, so there is no
+                # reason to keep a separate sequential path.
+                P = self.compose_sum(D)
+                y = torch.matmul(xm.reshape(tokens, self.d_in), P.transpose(0, 1))
         else:
             if mode == "auto":
                 use_matrix = (self.square and self.L > 1
@@ -421,7 +484,8 @@ class KronCompose(nn.Module):
                 f"K_win={self.K_win}, anchor={self.anchor}, "
                 f"composition={self.composition}, s={s}, "
                 f"tau={float(self.tau.mean()):.4g}, gate={gate}"
-                f"{alpha}")
+                f"{alpha}"
+                + (f", dyn_gate={self.dynamic_gate}" if self.dynamic_gate else ""))
 
 
 # ---------------------------------------------------------------------------

@@ -133,6 +133,82 @@ def test_T3d_sum_identity_when_D_is_zero():
 
 
 # ---------------------------------------------------------------------------
+# T17 -- input-dependent softmax gate over the sum-composition terms
+# ---------------------------------------------------------------------------
+def _sum_compose(**kw):
+    args = dict(d_in=64, d_out=64, n1_in=8, n2_in=8, L=4, K=2, K_win=0,
+                s_init=1.0, anchor=True, rezero_eps=0.0, stop_gradient=False,
+                normalize_D=True, innovation_scale=1.0, use_gate=False,
+                composition="sum")
+    args.update(kw)
+    return KronCompose(args["d_in"], args["d_out"], args["n1_in"],
+                       args["n2_in"], L=args["L"], K=args["K"],
+                       K_win=args["K_win"], s_init=args["s_init"],
+                       anchor=args["anchor"], rezero_eps=args["rezero_eps"],
+                       stop_gradient=args["stop_gradient"],
+                       normalize_D=args["normalize_D"],
+                       innovation_scale=args["innovation_scale"],
+                       use_gate=args["use_gate"],
+                       composition=args["composition"],
+                       dynamic_gate=kw.get("dynamic_gate"))
+
+
+def test_T17_dynamic_gate_uniform_equals_static_sum():
+    """A zero-initialised gate must reproduce the static alpha=1 sum exactly."""
+    torch.manual_seed(0)
+    static = _sum_compose()
+    dyn = _sum_compose(dynamic_gate="dense")
+    dyn.load_state_dict(static.state_dict(), strict=False)
+    with torch.no_grad():
+        dyn.w_gate.weight.zero_()
+        dyn.w_gate.bias.zero_()
+    x = torch.randn(2, 5, 64)
+    y_static, _ = static(x, None, layer_idx=0)
+    y_dyn, _ = dyn(x, None, layer_idx=0)
+    # Same map, different summation order (one GEMM vs L weighted GEMMs).
+    assert torch.allclose(y_static, y_dyn, atol=1e-4, rtol=1e-4)
+    assert torch.allclose(dyn._last_w_mean, torch.ones(4), atol=1e-7)
+
+
+def test_T17_dynamic_gate_weights_depend_on_input():
+    torch.manual_seed(0)
+    dyn = _sum_compose(dynamic_gate="dense")
+    with torch.no_grad():
+        dyn.w_gate.weight.normal_(0.0, 0.5)
+        dyn.w_gate.bias.zero_()
+    x1 = torch.zeros(1, 3, 64)
+    x2 = torch.randn(1, 3, 64)
+    dyn(x1, None, layer_idx=0)
+    w1 = dyn._last_w_mean.clone()
+    dyn(x2, None, layer_idx=0)
+    w2 = dyn._last_w_mean.clone()
+    assert not torch.allclose(w1, w2), "gate weights must depend on the input"
+    assert abs(float(w1.sum()) - 4.0) < 1e-5   # L * softmax -> mean weight 1
+
+
+def test_T17_kron_gate_shapes_and_gradients():
+    torch.manual_seed(0)
+    dyn = _sum_compose(dynamic_gate="kron")
+    g1, g2 = dyn.gate_shape
+    assert g1 * g2 == 4
+    assert dyn.w_gate_A.shape == (g1, 8)
+    assert dyn.w_gate_B.shape == (g2, 8)
+    x = torch.randn(2, 6, 64, requires_grad=False)
+    y, _ = dyn(x, None, layer_idx=0)
+    y.square().mean().backward()
+    for p in (dyn.w_gate_A, dyn.w_gate_B, dyn.w_gate_b):
+        assert p.grad is not None and torch.isfinite(p.grad).all()
+    assert dyn.A.grad is not None and torch.isfinite(dyn.A.grad).all()
+
+
+def test_T17_dynamic_gate_rejects_product_composition():
+    import pytest
+    with pytest.raises(ValueError):
+        KronCompose(64, 64, 8, 8, L=4, K=2, composition="product",
+                    dynamic_gate="dense")
+
+
+# ---------------------------------------------------------------------------
 # T4 -- recurrence D_i = I_i + sigma(theta) * D_{i-1}
 # ---------------------------------------------------------------------------
 def test_T4_depth_recurrence():

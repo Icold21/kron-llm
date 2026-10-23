@@ -84,6 +84,9 @@ DEFAULTS: Dict[str, Any] = {
             "stop_gradient": True,   # E8 flips this
             "composition": "product",  # E14 uses "sum": sI + sum_l alpha_l D_l
             "sum_alpha_init": 1.0,
+            # E15/E16: input-dependent softmax weights over the L sum terms.
+            # None (static alpha) | "dense" (d x L linear) | "kron" (Kron gate).
+            "dynamic_gate": None,
             "anchor": True,          # E4 turns the s*I anchor off
             # Per-role anchor, interpreted as the *effective* (post L-fold)
             # value: s = s_init ** (1/L).  See README "Deviations".
@@ -247,6 +250,26 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
         "overrides": {
             "model.kron.composition": "sum",
             "model.kron.stop_gradient": False,
+        },
+    },
+    # E15/E16: the same sum, but the channel weights are generated from the
+    # input by a softmax gate instead of being learned constants.  "dense" uses
+    # a d x L linear layer; "kron" uses a factorised gate whose output is a
+    # g1 x g2 Kronecker grid (g1*g2 == L), matching the project's style.
+    "E15": {
+        "desc": "E14 + input-dependent softmax gate (dense d x L)",
+        "overrides": {
+            "model.kron.composition": "sum",
+            "model.kron.stop_gradient": False,
+            "model.kron.dynamic_gate": "dense",
+        },
+    },
+    "E16": {
+        "desc": "E14 + input-dependent softmax gate (Kron g1 x g2)",
+        "overrides": {
+            "model.kron.composition": "sum",
+            "model.kron.stop_gradient": False,
+            "model.kron.dynamic_gate": "kron",
         },
     },
     # ------------------------------------------------------------------
