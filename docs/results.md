@@ -322,7 +322,7 @@ Spearman correlation is 0.042. The product remains the default; E14 is a
 negative result, not a shipped model. It shows that removing rank compression
 is not sufficient to improve quality.
 
-## 10. Quality-scale follow-ups (Q4/Q5/Q6)
+## 10. Quality-scale follow-ups (Q4/Q5/Q6/Q7)
 
 Q4 = Q2 + full backprop. At the matched 4,000-step point it reaches **0.9248
 bpb** (val loss 1.9653, PPL 7.137) versus Q2's **0.962**, at identical cost:
@@ -346,12 +346,19 @@ tokenizer: the matrix layers are identical to Q4; the only extra parameters are
 393K in the embedding. Q2 remains the shipped model until Q6 is re-run to the
 same 10,000-step budget.
 
-Q5 = Q4 + `K=24` (7,747,832 parameters) at the same activation footprint;
-running now (2,000 steps).
+Q5 = Q4 + `K=24` (7,747,832 parameters) at the same activation footprint. It
+is a **negative result**: **0.9530 bpb** at step 4,000 versus Q4's 0.9248,
+despite 3.7× the parameters. The spectral diagnostics show why: `cos_prev_max =
+0.99999` (neighbouring layers are nearly identical; Q4: 0.896), `eff_rank(P) =
+124.0` (Q4: 140.2), and `Var_l σ(θ_l) = 0.0328`. More Kronecker summands at
+fixed width/depth do not buy quality; they collapse layer diversity.
 
 Q7 = Q6 + kron-structured embedding (`E = Σ_k A_k ⊗ B_k`, §5.2 of
 [architecture.md](architecture.md)): the embedding+head budget drops from
-565,248 to 90,112 parameters (1,998,072 total) at the same rank ceiling. It
-runs 4,000 steps against Q6 to test whether the composed table keeps the same
-information. All follow-ups are recorded in `current_progress.md` as they
-finish.
+565,248 to 90,112 parameters (1,998,072 total) at the same rank ceiling. It is
+also a **negative result**: **0.9533 bpb** at step 4,000 versus Q6's 0.8489
+(**12 % worse**), with the same spectral geometry (`eff_rank(P) = 140.5`,
+`Var_l σ(θ_l) = 0.00462`). The dense factorised table stays the default. The
+Kronecker table code is kept and tested, but it needs a better initialisation
+or training scheme before it is useful at this scale. Both follow-ups are
+recorded in `current_progress.md`.

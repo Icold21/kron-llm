@@ -235,7 +235,11 @@ All values are ≤ 1,000,000 (the maximum is E0 at 97.0 % of the limit).
   capacity, not data**.
 
 So 200K stories (10 % of the corpus) is a deliberate choice, not a limitation.
-To prepare a different amount:
+TinyStories is the **development bench**: it is what makes the ablations cheap
+and comparable, and it stays as a regression check for the frozen architecture.
+It is **not** the production corpus and will not be part of the final
+pretraining mix; the planned bilingual English–Russian corpus is described in
+[docs/roadmap.md](docs/roadmap.md). To prepare a different amount:
 
 ```bash
 python scripts/prepare_data.py --max-stories 500000     # more stories
@@ -486,6 +490,13 @@ layers are identical to Q4, and the only extra parameters are 393K in the
 factorised embedding (2,473,208 total). To stay inside 6 GB, the loss is
 computed in checkpointed row chunks (`model.loss_chunk`), so the
 `32 × 192 × 4096` logits tensor is never materialised. Peak VRAM 4.28 GB.
+
+**Kronecker embedding (Q7) is a negative result.** Replacing the `V × r` table
+with `Σ_k A_k ⊗ B_k` cuts the embedding from 565K to 90K parameters at the same
+rank ceiling, but at step 4,000 it reaches **0.9533 bpb** versus Q6's 0.8489 —
+**12 % worse**. The dense factorised table stays the default. The code is kept
+(test-covered) for vocabularies where the dense table is unaffordable, but it
+needs a better initialisation or training scheme before it can be used.
 
 `python scripts/run_experiments.py --rebuild-summary` builds
 `results/summary.csv` from `results/E*.json`; single runs are started as
@@ -948,7 +959,7 @@ kronllm/
   tokenizer.py     ByteTokenizer + byte-level BPE, bits_per_byte, corpus encoding
   quantization.py  int8/int4 per-channel post-training quantisation
   hf.py            Hugging Face PreTrainedModel / AutoClass wrapper
-  config.py        DEFAULTS + EXPERIMENTS E0-E14, Q1-Q5, D1, S1
+  config.py        DEFAULTS + EXPERIMENTS E0-E14, Q1-Q7, D1, S1
   train.py         training loop, param groups, diagnostics, CSV log with bpb
   diagnostics.py   spectral_report (eff_rank D/W/P, cos, τ, γ), σ(θ),
                    routed_report (Q3 usage/rank), gradients
@@ -1017,23 +1028,24 @@ artifacts/
 
 | step | why | expected effect |
 |---|---|---|
-| **Q7: Kronecker embedding** (queued) | the `V × r` table becomes `Σ_k A_k ⊗ B_k`: 49K instead of 524K parameters at the same rank ceiling, so a wide vocab stops eating the 10M budget | embedding budget scales with `K·(v1·r1 + v2·r2)`; Q7 tests whether the composed table keeps Q6's quality |
-| **Q5: `K=24` at Q2's activation footprint** (running) | spends the 10M parameter ceiling on Kronecker summands without increasing activation memory | ~7.75M params, still 6 GB, more expressive `D_l` |
+| **Architecture freeze at ~10M** | Q5 (`K=24`) lost 3 % and collapsed layer diversity, so the budget must go to width/depth/context, not more summands | a `B1` config that passes the Phase-0 gate in [docs/roadmap.md](docs/roadmap.md) |
+| **Bilingual tokenizer + corpus** | TinyStories is only the development bench; the product corpus is EN–RU | 8K–16K BPE, measured fertility per language, contamination report |
+| **Q6 long run (10,000 steps)** | Q6 is at 0.849 after 4,000; Q2 is 0.839 after 10,000, so the shipped comparison is not like-for-like yet | a clean Q6-vs-Q2 curve and a possible new shipped model |
 | **Orthogonal anchor** (`O_l` Householder + `D_l`) | keeps `W_l` full-rank and stable while allowing larger `D_l` | tests H2 without the near-identity compromise; higher risk |
 | **E1 / dense-2M controls** | isolate attention vs FFN and parameter count | the missing controls behind the current claims |
 | **`σ` before normalisation**: `D = τ·rms_norm(σ·Î + prev)` | today `σ` multiplies an already normalised `D`, so its gradient is ~250× smaller than the factors' and H3 is untestable | `σ` starts controlling the scale of memory → `Var σ(θ)` grows by orders of magnitude |
-| **More data** (200K → 2.1M TinyStories stories) | Q2 sees 61M tokens ≈ 1 epoch, while the full corpus is ~620M tokens | the main remaining quality lever after Q2: expected −0.04…−0.08 bpb |
 | **KV cache + `torch.compile`** | generation is currently O(T²) per token | ×10–20 sampling speed at no quality cost |
-| **Distillation from Q2 into 500–700K** | 2.08M → ~600K at a similar bpb | a compact artefact for CPU and edge deployment |
+| **Distillation from the 10M base** | a smaller student at a similar bpb | a compact artefact for CPU and edge deployment |
 | **Vector gate `γ` per layer** (`γ` is a scalar today) | `γ` learned to 0.05–0.19, i.e. the model already switches layers off | a soft per-layer depth selector |
 | **Separate the Q1/Q2 contributions** (tokenizer / capacity / steps) | §8.3–8.4 compare several changes at once | a clean answer to "what exactly produced the bpb" |
 
-E14 rules out a sum-composition scaling run for now: it is 4.9 % worse than the
-product at 3.1× the FLOPs/token. Q4 confirmed full backprop at quality scale
-(0.9248 vs 0.962 bpb at step 4,000), and Q6 confirmed the tokenizer is the
-cheapest remaining win (0.8489 bpb at 4,000 steps, 8.2 % better than Q4).
-The next bets are parameter scaling at fixed activation memory (Q5) and a
-Kronecker-compressed embedding table (Q7).
+E14 ruled out a sum-composition scaling run (4.9 % worse at 3.1× the FLOPs).
+Q4 confirmed full backprop (0.9248 vs 0.962 bpb at step 4,000) and Q6 confirmed
+the tokenizer (0.8489 at 4,000 steps, 8.2 % better than Q4). Q5 and Q7 are
+negative: `K=24` lost 3 % and collapsed layer diversity (`cos_prev_max =
+0.99999`), and the Kronecker embedding lost 12 %. The horizon is therefore:
+freeze the architecture under 10M, move to the bilingual corpus, and keep
+TinyStories only as a sanity bench — see [docs/roadmap.md](docs/roadmap.md).
 
 ### Long-term horizon
 

@@ -9,14 +9,26 @@ not after every run; entries are written in detail.
 
 ## In progress
 
-- **Q5** (Q4 + `K=24`, 7,747,832 params): running, 2,000 steps at the same
-  activation footprint; step 1,000 reached bpb **1.292** (Q4: 1.244). Final
-  result pending.
-- **Q7** (Q6 + kron embedding, `E = Σ_k A_k ⊗ B_k`): implemented and CPU-tested;
-  embedding+head budget 565,248 → **90,112** params (1,998,072 total) at the
-  same rank ceiling; queued after Q5. GPU run pending.
+- **Architecture freeze (gate A):** Q5 and Q7 are closed as negative, so the
+  10M budget must go to width/depth/context, not more Kronecker summands or a
+  compressed embedding table. Next: allocation runs at matched activation
+  footprint, then `seq_len=256`.
+- **Bilingual data + tokenizer (roadmap Phase 1):** 8K BPE on mixed EN/RU with
+  fertility and contamination reports. TinyStories remains only the bench.
 
 ## Results
+
+## 2026-10-23T19:15+03:00 — Q7 kron embedding: negative
+
+- val loss **2.6155**, PPL **13.67**, bpb **0.9533** (1,998,072 params)
+- Q6 at the same step: bpb **0.8489**; the compressed table is **12 % worse**
+  despite an identical rank ceiling
+- embedding+head budget 565,248 → **90,112** params; the matrix layers are
+  unchanged (`eff_rank(P)` **140.5**, `Var sigma(theta)` **0.00462**)
+- 0.930 s/step, peak **4.27 GB**; the dense factorised table stays the
+  default, and the kron table is kept only as tested code for large vocabularies
+- both Q5 and Q7 are now cleaned from `runs/`; conclusions live in
+  `docs/results.md` and `docs/roadmap.md`
 
 ## 2026-10-23T16:55+03:00 — Q6 BPE-4096: tokenizer is the win
 
@@ -61,9 +73,3 @@ not after every run; entries are written in detail.
   ratio **1.70**; `Var sigma(theta)` **0.00248**, `cos_prev_max` **0.761**
 - full backprop does **not** remove the product's rank compression; H3 is not
   confirmed
-
-## 2026-10-23T08:52+03:00 — E8 at step 3,000
-
-- val loss **1.0742**, PPL **2.93**, bpb **1.550**
-- 190,108 params, ~0.42 s/step; full backprop enabled
-- still running to the end of the 3-epoch schedule

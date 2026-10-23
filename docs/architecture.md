@@ -172,9 +172,16 @@ would carry a stale training graph).
 For Q7 (`V=4096, r=128, v1=v2=64, r1=16, r2=8, K=32`) the factors cost
 `32·(1024+512) = 49,152` parameters versus `524,288` for the dense factor --
 a 10.7× reduction, with the model dropping from 2,473,208 to 1,998,072
-parameters. The ratio improves as the vocabulary grows. Whether the composed
-table stores the *same information* as the dense factor is exactly what Q7
-tests at equal steps against Q6.
+parameters. The ratio improves as the vocabulary grows.
+
+**Q7 result: negative.** At step 4,000 the composed table reaches **0.9533
+bpb** versus the dense factor's **0.8489** (12 % worse) at the same rank
+ceiling, with the same spectral geometry. The factors are a harder
+optimisation problem than a free table, and the dense factorised table stays
+the default. The module remains available (and test-covered) for vocabularies
+where the dense table is unaffordable, but it needs a better initialisation
+(for example, warm-starting the factors to approximate a trained dense table)
+before it is competitive.
 
 ## 6. Batched prelude (`KronBank`)
 

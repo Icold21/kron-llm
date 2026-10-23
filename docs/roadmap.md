@@ -21,6 +21,21 @@ The point of the Kronecker parameterisation is not to beat a dense model of the
 same size on raw quality; it is to make a **10M model trainable inside 6 GB**
 and small enough to inspect, quantise and run on ordinary hardware.
 
+### TinyStories is a development bench, not the product corpus
+
+Every architecture comparison so far (the E and Q series) runs on TinyStories
+because it is small, fast, and gives a clean bits-per-byte signal. That is its
+entire role:
+
+- **now:** cheap, comparable ablations (one run = tens of minutes);
+- **later:** a regression/sanity bench for the frozen architecture;
+- **never:** part of the final pretraining mix.
+
+The production corpus is the curated bilingual English–Russian set in Phase 1.
+Once that set exists, every freeze/scale decision moves to its held-out splits;
+TinyStories is kept only to catch regressions in the code path (same config,
+expected bpb), not to choose the final model.
+
 ## 2. Where we are (2026-10-23)
 
 | result | status |
@@ -29,7 +44,7 @@ and small enough to inspect, quantise and run on ordinary hardware.
 | Q4 (full backprop) | win: 0.9248 vs Q2 0.962 at step 4,000 |
 | Q6 (BPE-4096) | win: **0.8489 bpb** at step 4,000, 4.28 GB peak |
 | Q5 (`K=24`, 7.75M) | **negative**: 0.9530 at 4k, layer collapse (`cos_prev_max` 0.99999) |
-| Q7 (Kronecker embedding) | pending; embedding budget 565K → 90K parameters |
+| Q7 (Kronecker embedding) | **negative**: 0.9533 at 4k vs Q6 0.8489; the dense table stays |
 | E14 (sum composition) | negative: rank is not the quality bottleneck |
 
 The architecture is **not frozen** yet. Scaling `K` is closed at this budget;
@@ -48,7 +63,9 @@ Freeze one recipe when it satisfies all of:
 Open questions to settle before the gate:
 
 - allocation of the 10M budget: width/depth vs more Kronecker summands;
-- embedding storage at a 8K–16K bilingual vocabulary (Q7 is the first data point);
+- embedding storage at an 8K–16K bilingual vocabulary: the Kron embedding
+  (Q7) lost 12 % at V=4096, so 8K with a dense factorised table is the default
+  until a better compression or initialisation exists;
 - context length: 192 today; 256 may be needed for Q/A paragraphs;
 - whether the product composition remains the default (E14 says yes for now).
 
@@ -69,6 +86,8 @@ sweep. No further architecture work until Phase 3 produces a scaling point.
 Pipeline: language ID → URL/domain filtering → MinHash near-dedup →
 quality filter (length, repetition, punctuation, perplexity) → PII and licence
 checks → decontamination against the evaluation sets → fixed mixing ratio.
+TinyStories is **not** part of the pretraining shards; it is kept only as the
+development bench described above.
 
 Start with **50/50 by bytes**, then tune on held-out bpb per language. Target
 **0.5–2B tokens**; the compute-optimal point for 10M parameters is ~200M, but
@@ -79,7 +98,9 @@ bpb-vs-tokens curve decides where to stop.
 
 Train a byte-level BPE on a mixed sample of both languages.
 
-- vocabulary **8K–16K** (16K is affordable only with the Kronecker embedding);
+- vocabulary **8K by default**, 16K only if the dense factorised embedding
+  still fits the 10M budget (Q7's Kronecker table is not adopted: it lost 12 %
+  bpb at V=4096);
 - target fertility: **≈4.0 bytes/token EN**, **≈3.0–3.5 bytes/token RU**;
 - special tokens reserved for the Q/A format (user, assistant, end);
 - evaluate on held-out text in both languages, not on the training sample.
@@ -99,7 +120,7 @@ backprop, RMSNorm, qk-norm, BPE, `seq_len` 256.
 | throughput | ~7k tokens/s at 2.5M; expect 4–7k at 10M |
 | wall clock | ~20–80 h on the 1660 Ti |
 | checkpoints | 25 / 50 / 100 % + best-bpb |
-| evaluation | bpb EN/RU, generation samples, VRAM, tokens/s |
+| evaluation | bpb EN/RU, generation samples, VRAM, tokens/s; TinyStories only as a regression check |
 
 **Kill criterion:** if the 10M model is not better than the 2.5M model at
 matched tokens, the budget allocation is wrong; stop and return to Phase 0
@@ -133,7 +154,45 @@ reliable interface, not an assistant that knows the world.
 
 **Exit:** SFT checkpoint + evaluation table + failure gallery.
 
-## 7. Phase 4 — distillation (optional, gate E)
+## 7. Phase 4 — SOTA comparison and Habr article (gate E)
+
+Before distillation, the fine-tuned model must be positioned against the
+strongest available Kronecker/efficient small models. This phase produces the
+final pre-production article for **Habr**; distillation comes after it, so the
+article is not blocked on an optional experiment.
+
+**What is compared**
+
+- our frozen 10M model, base and SFT;
+- published Kronecker-structured and efficient small LMs with runnable
+  checkpoints, evaluated on the same held-out EN/RU bytes;
+- dense controls at matched parameter count and matched FLOPs/token;
+- the 2.5M model from Phase 0, to show what the 10M scale buys.
+
+**Protocol**
+
+- bits per byte on raw held-out text, so different tokenizers remain comparable;
+- identical hardware and evaluation harness; batch-1 generation and training
+  throughput at the same batch size;
+- report parameters, FLOPs/token, peak VRAM, tokens/s, fp32/int8 checkpoint
+  size, and the Phase-3 Q/A metrics;
+- no cherry-picking: include the negative results (Q5, Q7, E14) and the cases
+  where our model loses.
+
+**Deliverables**
+
+- `docs/comparison.md` with the table and the exact commands behind every row;
+- the Habr article draft (Russian): architecture, 6 GB capability, all
+  ablations including failures, comparison table, honest limitations, roadmap;
+- an artifact bundle: int8 checkpoint, config, evaluation script.
+
+**Gate:** every claim in the article maps 1:1 to a row in the comparison table,
+and the table is reproducible from a clean checkout. If the model is not
+competitive, the article says so — the negative results are part of the value.
+
+**Exit:** final pre-production article + reproducible comparison table.
+
+## 8. Phase 5 — distillation (optional, gate F)
 
 Teacher: a 1.5–8B open model, run through an API or 4-bit locally.
 
@@ -146,26 +205,27 @@ Teacher: a 1.5–8B open model, run through an API or 4-bit locally.
 **Exit:** a student that is better than SFT-only on the Q/A metrics, or a
 documented negative result.
 
-## 8. Phase 5 — packaging
+## 9. Phase 6 — packaging
 
 - int8 post-training quantisation (near-lossless on Q2: +0.0004 bpb);
 - CPU and single-GPU inference through the Hugging Face wrapper;
 - model card with data, licence, evaluation and known failure modes;
 - keep only the final artifacts (no near-duplicate checkpoints).
 
-## 9. Risks
+## 10. Risks
 
 | risk | mitigation |
 |---|---|
 | 10M is too small for useful Q/A | keep expectations at format/skills; distillation and retrieval are the escape hatches |
-| Russian tokenizer fertility is poor | train on mixed text, measure bytes/token per language, prefer 16K vocab |
+| Russian tokenizer fertility is poor | train on mixed text, measure bytes/token per language, 8K default |
 | data licensing | only permissive sources; record provenance per shard |
 | contamination | decontaminate against all evaluation sets before training |
 | catastrophic forgetting in SFT | small LR, short schedule, mix a fraction of pretraining text |
 | 6 GB ceiling | fixed activation footprint, chunked loss, int8 evaluation |
 | architecture overfitting to TinyStories | validate the final recipe on the bilingual held-out sets |
+| SOTA comparison is unfair or incomplete | fixed protocol, matched bytes/FLOPs, all commands published, negative results included |
 
-## 10. Rough timeline
+## 11. Rough timeline
 
 | phase | wall clock |
 |---|---|
@@ -173,8 +233,9 @@ documented negative result.
 | Phase 1 (data + tokenizer) | 3–5 days, mostly CPU |
 | Phase 2 (10M pretraining) | 3–4 days GPU |
 | Phase 3 (Q/A SFT) | 1 day |
-| Phase 4 (distillation, optional) | 1–2 days |
-| Phase 5 (packaging) | 1–2 days |
+| Phase 4 (SOTA comparison + Habr article) | 2–3 days |
+| Phase 5 (distillation, optional) | 1–2 days |
+| Phase 6 (packaging) | 1–2 days |
 
 These are research estimates, not commitments; every phase can send the project
 back one step, and that is a valid outcome as long as it is recorded.
