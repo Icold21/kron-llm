@@ -25,6 +25,7 @@ is reproducible with the commands in §6 of the [README](../README.md).
 | Q1 | BPE-1024 | 926,468 | 800,900 | 192 / 20 | 5 / 4 | 192 / 64 | 4,200 |
 | Q2 | BPE-1024 | 2,079,992 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 10,000 |
 | Q4 | BPE-1024 | 2,079,992 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 4,000 |
+| Q6 | BPE-4096 | 2,473,208 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 4,000 |
 | Q3 (pilot) | BPE-1024 | 3,544,104 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 400 |
 | Q3warm | BPE-1024 | 3,544,104 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 24 | 500 |
 | Q3long | BPE-1024 | 3,544,104 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 24 | 2,000 |
@@ -32,8 +33,8 @@ is reproducible with the commands in §6 of the [README](../README.md).
 | S1 | BPE-1024 | 2,079,992 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 400 |
 
 The fp32 checkpoints are **0.87 MB** (E2/E8/E14), **3.90 MB** (Q1),
-**4.31 MB** (D1), **8.55 MB** (Q2/Q4), **8.55 MB** (S1), and **14.41 MB**
-(Q3/Q3warm/Q3long).
+**4.31 MB** (D1), **8.55 MB** (Q2/Q4), **10.13 MB** (Q6), **8.55 MB** (S1),
+and **14.41 MB** (Q3/Q3warm/Q3long).
 
 ## 2. Quality
 
@@ -46,6 +47,7 @@ The fp32 checkpoints are **0.87 MB** (E2/E8/E14), **3.90 MB** (Q1),
 | Q1 | 2.0735 | nats/token | 7.953 | **0.976** | best checkpoint, step 4,000 |
 | Q2 | 1.7833 | nats/token | 5.95 | **0.839** | 10,000 steps |
 | Q4 | 1.9653 | nats/token | 7.137 | **0.9248** | full backprop, step 4,000 |
+| Q6 | 2.3292 | nats/token | 10.27 | **0.8489** | BPE-4096, step 4,000 |
 | Q3 (pilot) | 4.4275 | nats/token | 83.7 | 2.083 | routed, step 400; not adopted |
 | Q3warm | 1.7502 | nats/token | 5.76 | **0.824** | routed, warm-started from Q2; not shipped |
 | Q3long | 2.7145 | nats/token | 15.10 | 1.277 | routed from scratch, step 2,000; no jump |
@@ -54,26 +56,28 @@ The fp32 checkpoints are **0.87 MB** (E2/E8/E14), **3.90 MB** (Q1),
 
 Validation curves (`runs/<id>/log.csv`):
 
-| step | E2 bpb | Q1 bpb | Q2 bpb | Q4 bpb |
-|---|---|---|---|---|
-| 500 | 1.768 | 1.525 | 1.482 | 1.490 |
-| 1,000 | 1.659 | 1.266 | 1.245 | 1.244 |
-| 1,500 | — | 1.149 | 1.132 | 1.115 |
-| 2,000 | — | 1.083 | 1.068 | 1.046 |
-| 2,500 | — | 1.044 | 1.037 | 1.001 |
-| 3,000 | — | 1.016 | 1.004 | 0.963 |
-| 3,500 | — | 0.994 | 0.980 | 0.939 |
-| 4,000 | — | **0.976** | 0.962 | **0.9248** |
-| 4,500 | — | — | 0.946 | — |
-| 5,000 | — | — | 0.928 | — |
-| 6,000 | — | — | 0.902 | — |
-| 8,000 | — | — | 0.859 | — |
-| 10,000 | — | — | **0.839** | — |
+| step | E2 bpb | Q1 bpb | Q2 bpb | Q4 bpb | Q6 bpb |
+|---|---|---|---|---|---|
+| 500 | 1.768 | 1.525 | 1.482 | 1.490 | 1.271 |
+| 1,000 | 1.659 | 1.266 | 1.245 | 1.244 | 1.102 |
+| 1,500 | — | 1.149 | 1.132 | 1.115 | 1.008 |
+| 2,000 | — | 1.083 | 1.068 | 1.046 | 0.952 |
+| 2,500 | — | 1.044 | 1.037 | 1.001 | 0.911 |
+| 3,000 | — | 1.016 | 1.004 | 0.963 | 0.880 |
+| 3,500 | — | 0.994 | 0.980 | 0.939 | 0.860 |
+| 4,000 | — | **0.976** | 0.962 | 0.9248 | **0.8489** |
+| 4,500 | — | — | 0.946 | — | — |
+| 5,000 | — | — | 0.928 | — | — |
+| 6,000 | — | — | 0.902 | — | — |
+| 8,000 | — | — | 0.859 | — | — |
+| 10,000 | — | — | **0.839** | — | — |
 
 The E2 run stops at 2,500 steps (0.45 epochs). Q1 was stopped at step 4,200 to
 spend the remaining time on Q2; its best checkpoint is step 4,000. Q2 sees 61.4M
 tokens (≈ 1.04 epochs of the BPE corpus) in 10,000 steps. Q4 stops at the
-matched 4,000-step point and beats Q2 at every shared evaluation.
+matched 4,000-step point and beats Q2 at every shared evaluation. Q6 reaches
+0.8489 at step 4,000, within 1.2 % of Q2's 10,000-step result in 40 % of the
+steps.
 
 ## 3. Cost
 
@@ -86,6 +90,7 @@ matched 4,000-step point and beats Q2 at every shared evaluation.
 | Q1 | 540 | 22.8k | 11.2 | 3.66 | ~3.5 GB |
 | Q2 | 1,055 | 5.8k | 36.2 | 11.9 | 4.22 GB |
 | Q4 | 820 | 7.5k | 36.2 | 11.9 | 4.31 GB |
+| Q6 | 869 | 7.1k | 37.0 | 9.35 | 4.28 GB |
 | D1 | 178 | 69k | 3.31 | 1.08 | 1.44 GB |
 | S1 | 844 | 7.3k | 36.2 | 11.9 | 4.22 GB |
 
@@ -174,6 +179,11 @@ Q4 at step 4,000 keeps the Q2 geometry: `eff_rank(D) = 248.9 / 320`,
 `eff_rank(P) = 140.2`, `τ = 0.0884`, `gate = 0.107`, `cos(W_i, W_{i−1}) =
 0.896`, `Var_l σ(θ_l) = 0.00558`, Spearman 0.307. Full backprop improves
 quality without changing the spectral picture.
+
+Q6 keeps the same matrix geometry with a wider tokenizer: `eff_rank(P) =
+139.4`, `eff_rank(D) = 248.7 / 320`, `τ = 0.0869`, `gate = 0.107`,
+`cos(W_i, W_{i−1}) = 0.848`, `Var_l σ(θ_l) = 0.00438`, Spearman 0.341. The
+quality gain comes from 3.96 bytes/token, not from a different spectral regime.
 
 ## 5. Hypotheses
 
@@ -325,13 +335,19 @@ runs. Q2 remains the shipped model because it trained longer (10,000 steps,
 Q6 = Q4 + BPE-4096. BPE-1024 compresses to 3.07 bytes/token; BPE-4096 reaches
 **3.96 bytes/token** on the same corpus, and the factorised embedding
 (`V × rank`) makes the wider vocabulary cheap: 2,473,208 parameters total,
-34.5 MFLOP/token at batch 64. The loss is computed in row chunks
+37.0 MFLOP/token at batch 32. The loss is computed in row chunks
 (`model.loss_chunk = 1024`) so the `32 × 192 × 4096` logits tensor is never
-materialised; without that the wider vocabulary exceeds the 6 GB card. Runs
-4,000 steps against Q4's 0.9248 bpb.
+materialised; without that the wider vocabulary exceeds the 6 GB card.
+
+At step 4,000 Q6 reaches **0.8489 bpb** (val loss 2.3292, PPL 10.27) versus
+Q4's **0.9248** — **8.2 % better** at matched steps and 4.28 GB peak VRAM. It
+is within 1.2 % of Q2's 10,000-step 0.839 in 4,000 steps. The gain is the
+tokenizer: the matrix layers are identical to Q4; the only extra parameters are
+393K in the embedding. Q2 remains the shipped model until Q6 is re-run to the
+same 10,000-step budget.
 
 Q5 = Q4 + `K=24` (7,747,832 parameters) at the same activation footprint;
-queued after Q6.
+running now (2,000 steps).
 
 Q7 = Q6 + kron-structured embedding (`E = Σ_k A_k ⊗ B_k`, §5.2 of
 [architecture.md](architecture.md)): the embedding+head budget drops from

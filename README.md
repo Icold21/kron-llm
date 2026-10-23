@@ -18,13 +18,13 @@ single consumer GPU and generate on CPU. On TinyStories, the 926K model reaches
 
 | property | value |
 |---|---|
-| Models | 190,108 · 926,468 · 2,079,992 parameters |
+| Models | 190,108 · 926,468 · 2,079,992 · 2,473,208 parameters |
 | Matrix parameterisation | Kronecker products, 4 channels × 2–8 summands; product or sum |
-| Tokenizer | byte-level BPE, 1,024 tokens, 3.05 bytes/token |
+| Tokenizer | byte-level BPE, 1,024–4,096 tokens, 3.07–3.96 bytes/token |
 | Context | 192 tokens |
-| Validation quality | **0.976 bpb** (Q1, 926K) · **0.839** (Q2, 2.08M) |
+| Validation quality | **0.976 bpb** (Q1, 926K) · **0.839** (Q2, 2.08M) · **0.849** (Q6, 2.47M, 4k steps) |
 | Checkpoint size | 8.55 MB fp32 → 2.45 MB int8 → 1.42 MB int4 (Q2/S1) |
-| Training footprint | Fits a single **6 GB** consumer GPU (Q2 peaks at 4.22 GB) |
+| Training footprint | Fits a single **6 GB** consumer GPU (Q2 4.22 GB, Q6 4.28 GB peak) |
 | Inference | CPU or one consumer GPU; no custom kernels |
 | License | MIT |
 
@@ -40,8 +40,8 @@ the organising goal.
 **What is in this repository.** The full pipeline: data preparation, BPE
 tokenizer, training, evaluation, spectral diagnostics, sampling, Dolly Q/A
 fine-tuning, int8/int4 post-training quantisation, an experimental routed dense
-embedding (Q3), a Hugging Face `PreTrainedModel` wrapper, a 28-cell acceptance
-notebook and 66 tests.
+embedding (Q3), a Kronecker-structured embedding (Q7), a Hugging Face
+`PreTrainedModel` wrapper, a 28-cell acceptance notebook and 71 tests.
 
 **Quick start** (details in §6):
 
@@ -457,10 +457,11 @@ the two assumptions behind the product: stop-gradient and multiplication.
 | **Q1** (Kron, BPE) | 926,468 | 800,900 | 2.0735 | 7.953 | **0.976** | 4,200 |
 | **Q2** (Kron, BPE) | 2,079,992 | 1,890,360 | 1.7833 | 5.95 | **0.839** | 10,000 |
 | **Q4** (full backprop, BPE) | 2,079,992 | 1,890,360 | 1.9653 | 7.137 | **0.9248** | 4,000 |
+| **Q6** (BPE-4096, full backprop) | 2,473,208 | 1,890,360 | 2.3292 | 10.27 | **0.8489** | 4,000 |
 
 `val loss`/`PPL` in this table are in different units (nats/byte for
-E0/E2/E8/E14, nats/token for Q1/Q2/Q4), so only the last column can be compared
-across rows.
+E0/E2/E8/E14, nats/token for Q1/Q2/Q4/Q6), so only the last column can be
+compared across rows.
 
 **Full backprop (E8).** Removing the stop-gradient from the depth recurrence
 improves quality: at the matched 2,500-step point E8 reaches **1.586 bpb**
@@ -476,6 +477,15 @@ the product's rank compression; H3 is still not confirmed.
 **0.9248 bpb** at step 4,000 versus Q2's **0.962** at the same step, at
 identical cost (2,079,992 parameters, 36.2 MFLOP/token, 4.31 GB peak VRAM).
 The stop-gradient stays off in all following runs.
+
+**Wider tokenizer (Q6).** BPE-4096 raises the compression from 3.07 to
+**3.96 bytes/token**. Q6 reaches **0.8489 bpb** at step 4,000 versus Q4's
+0.9248 — **8.2 % better** — and nearly matches Q2's 10,000-step 0.839 in a
+quarter of the steps. The gain is the tokenizer, not new capacity: the matrix
+layers are identical to Q4, and the only extra parameters are 393K in the
+factorised embedding (2,473,208 total). To stay inside 6 GB, the loss is
+computed in checkpointed row chunks (`model.loss_chunk`), so the
+`32 × 192 × 4096` logits tensor is never materialised. Peak VRAM 4.28 GB.
 
 `python scripts/run_experiments.py --rebuild-summary` builds
 `results/summary.csv` from `results/E*.json`; single runs are started as
@@ -875,6 +885,7 @@ T13/T14 require CUDA and are skipped without a GPU.
 | E14 (byte, sum) | 190,348 | 0.87 MB | 11.5 | 11.5 |
 | Q1 (BPE) | 926,468 | 3.90 MB | 11.2 | 3.66 |
 | Q2 (BPE) | 2,079,992 | 8.55 MB | 36.2 | 11.9 |
+| Q6 (BPE-4096) | 2,473,208 | 10.13 MB | 37.0 | 9.35 |
 
 The 2.08M model is an **8.55 MB** fp32 file; int8 and int4 bring it to
 **2.45 MB** and **1.42 MB** (§8.7). Generation needs no custom kernels: the
@@ -895,6 +906,8 @@ times will vary):
 | E2, 4 heads (d_head=32) | 339 | 96k |
 | **Q1, bs=64, seq=192** | **540** | **22.8k** |
 | **Q2, bs=32, seq=192** | **1,055** | **5.8k** |
+| **Q4, bs=32, seq=192** | **820** | **7.5k** |
+| **Q6, bs=32, seq=192** | **869** | **7.1k** |
 
 Q2 is 3.2× more expensive per byte than Q1 — the price of 2.08M parameters at
 Q1's activation footprint. In bytes per second Q2 is 3× slower than Q1, but one
@@ -1004,9 +1017,8 @@ artifacts/
 
 | step | why | expected effect |
 |---|---|---|
-| **Q6: BPE-4096 tokenizer** (running) | BPE-1024 gives 3.07 bytes/token; a wider vocab raises bpb and generation bytes/s for ~393k extra parameters | −0.03…−0.06 bpb at the same steps, more bytes/s |
 | **Q7: Kronecker embedding** (queued) | the `V × r` table becomes `Σ_k A_k ⊗ B_k`: 49K instead of 524K parameters at the same rank ceiling, so a wide vocab stops eating the 10M budget | embedding budget scales with `K·(v1·r1 + v2·r2)`; Q7 tests whether the composed table keeps Q6's quality |
-| **Q5: `K=24` at Q2's activation footprint** (queued) | spends the 10M parameter ceiling on Kronecker summands without increasing activation memory | ~7.75M params, still 6 GB, more expressive `D_l` |
+| **Q5: `K=24` at Q2's activation footprint** (running) | spends the 10M parameter ceiling on Kronecker summands without increasing activation memory | ~7.75M params, still 6 GB, more expressive `D_l` |
 | **Orthogonal anchor** (`O_l` Householder + `D_l`) | keeps `W_l` full-rank and stable while allowing larger `D_l` | tests H2 without the near-identity compromise; higher risk |
 | **E1 / dense-2M controls** | isolate attention vs FFN and parameter count | the missing controls behind the current claims |
 | **`σ` before normalisation**: `D = τ·rms_norm(σ·Î + prev)` | today `σ` multiplies an already normalised `D`, so its gradient is ~250× smaller than the factors' and H3 is untestable | `σ` starts controlling the scale of memory → `Var σ(θ)` grows by orders of magnitude |
@@ -1018,8 +1030,10 @@ artifacts/
 
 E14 rules out a sum-composition scaling run for now: it is 4.9 % worse than the
 product at 3.1× the FLOPs/token. Q4 confirmed full backprop at quality scale
-(0.9248 vs 0.962 bpb at step 4,000), so the next bets are the tokenizer (Q6)
-and parameter scaling at fixed activation memory (Q5).
+(0.9248 vs 0.962 bpb at step 4,000), and Q6 confirmed the tokenizer is the
+cheapest remaining win (0.8489 bpb at 4,000 steps, 8.2 % better than Q4).
+The next bets are parameter scaling at fixed activation memory (Q5) and a
+Kronecker-compressed embedding table (Q7).
 
 ---
 

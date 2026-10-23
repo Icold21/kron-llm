@@ -4,14 +4,42 @@ Rolling log of the most recent results, newest first. At most five entries are
 kept. Pruning is triggered only by overflow: with five or fewer entries nothing
 is removed, regardless of age. When a new result would make six, entries younger
 than one hour are kept temporarily; the oldest is removed once it is at least
-one hour old. This file is committed and pushed after every result.
+one hour old. This file is committed and pushed only at important milestones,
+not after every run; entries are written in detail.
 
 ## In progress
 
-- **Q4** (Q2 + full backprop, no stop-gradient): 2,079,992 params; starting
-  for 4,000 steps to compare against Q2's 0.962 bpb at step 4,000.
+- **Q5** (Q4 + `K=24`, 7,747,832 params): running, 2,000 steps at the same
+  activation footprint; step 1,000 reached bpb **1.292** (Q4: 1.244). Final
+  result pending.
+- **Q7** (Q6 + kron embedding, `E = Σ_k A_k ⊗ B_k`): implemented and CPU-tested;
+  embedding+head budget 565,248 → **90,112** params (1,998,072 total) at the
+  same rank ceiling; queued after Q5. GPU run pending.
 
 ## Results
+
+## 2026-10-23T16:55+03:00 — Q6 BPE-4096: tokenizer is the win
+
+- val loss **2.3292**, PPL **10.27**, bpb **0.8489** (2,473,208 params)
+- Q4 at the matched step 4,000: bpb **0.9248**; Q6 is **8.2 % better** and
+  within 1.2 % of Q2's 10,000-step 0.839 in 40 % of the steps
+- tokenizer compression **3.07 → 3.96 bytes/token**; matrix layers are
+  identical to Q4, the only extra parameters are 393K in the factorised
+  embedding — this is a tokenizer gain, not new architectural capacity
+- the first attempt OOMed (the `32×192×4096` logits tensor is ~100 MB fp32);
+  the loss now runs in checkpointed row chunks (`model.loss_chunk=1024`)
+- 0.869 s/step, 58 min, peak VRAM **4.28 GB**; diagnostics `eff_rank(P)`
+  **139.4**, `Var sigma(theta)` **0.00438**, `cos_prev_max` **0.848**
+- Q2 remains the shipped checkpoint until Q6 is trained to 10,000 steps
+
+## 2026-10-23T10:30+03:00 — Q4 full backprop at 2M: win
+
+- val loss **1.9653**, PPL **7.137**, bpb **0.9248** (2,079,992 params)
+- Q2 at the matched step 4,000: bpb **0.962**; full backprop is **3.9 %
+  better** at the same cost (36.2 MFLOP/token, 4.31 GB peak VRAM)
+- `eff_rank(P)` **140.2**, `Var sigma(theta)` **0.00558**; the stop-gradient
+  stays off for all following runs
+- 0.820 s/step, 54.7 min; Q4 is the new 2M reference
 
 ## 2026-10-23T09:32+03:00 — E14 sum composition: final
 
@@ -39,9 +67,3 @@ one hour old. This file is committed and pushed after every result.
 - val loss **1.0742**, PPL **2.93**, bpb **1.550**
 - 190,108 params, ~0.42 s/step; full backprop enabled
 - still running to the end of the 3-epoch schedule
-
-## 2026-10-23T08:46+03:00 — E8 live at step 2,000
-
-- val loss **1.1476**, PPL **3.15**, bpb **1.656**
-- 190,108 params, 0.414 s/step; run continues to 2,500
-- full backprop is enabled (`model.kron.stop_gradient=False`)
