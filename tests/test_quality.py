@@ -154,12 +154,12 @@ def test_qk_norm_forward_finite():
 # ---------------------------------------------------------------------------
 # budget
 # ---------------------------------------------------------------------------
-def test_q2_fits_the_6gb_budget_by_design():
+def test_q2_keeps_q1_activation_footprint():
     """Q2 trades parameters for width/depth at a *constant* activation footprint.
 
     Activation memory scales as n_layers * d_model * batch_size, so Q2 is built
-    to keep exactly Q1's product while doubling the parameter count.  If this
-    invariant breaks, the 6 GB card is either wasted or blown.
+    to keep exactly Q1's product while doubling the parameter count. If this
+    invariant breaks, Q2 silently loses its compactness advantage.
     """
     cfg_q2 = experiment_config("Q2")
     cfg_q1 = experiment_config("Q1")

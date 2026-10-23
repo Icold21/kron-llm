@@ -53,6 +53,116 @@ class DenseFFN(nn.Module):
         return self.fc2(F.silu(self.fc1(x)))
 
 
+class RoutedEmbedding(nn.Module):
+    """Dense token embeddings selected by a sparse top-k router.
+
+    The token id is first mapped to a small routing code
+    ``route[id] in R^{route_dim}``.  A linear router turns that code into
+    ``v_eff`` logits; the top-k logits are softmaxed and used to mix the
+    corresponding rows of a dense bank ``bank[v_eff, d_model]``.  The effective
+    embedding table is therefore dense in width but sparse in computation:
+
+    ``E_eff[v] = sum_{i in topk(v)} softmax(logits[v])_i * bank[i]``
+
+    This avoids the low-rank bottleneck of the factorised embedding (the output
+    is a full ``d_model`` vector, not an ``r``-dimensional projection) while
+    keeping the stored table at ``v_eff * d_model`` instead of ``V * d_model``.
+    The same ``E_eff`` is reused by the tied output head, so the head adds no
+    parameters.
+
+    Args:
+        vocab_size: Number of token ids.
+        d_model: Embedding width.
+        v_eff: Number of virtual embedding rows (default 5,000).
+        route_dim: Width of the routing code (default 6).
+        top_k: Number of bank rows mixed per token (default 10).
+        temperature: Softmax temperature on the selected logits.
+
+    Raises:
+        ValueError: If ``top_k`` is outside ``[1, v_eff]`` or ``route_dim`` is
+            not positive.
+    """
+
+    def __init__(self, vocab_size: int, d_model: int, v_eff: int = 5000,
+                 route_dim: int = 6, top_k: int = 10,
+                 temperature: float = 1.0) -> None:
+        super().__init__()
+        if route_dim <= 0:
+            raise ValueError(f"route_dim must be positive, got {route_dim}")
+        if not 1 <= top_k <= v_eff:
+            raise ValueError(f"top_k must be in [1, {v_eff}], got {top_k}")
+        self.vocab_size = int(vocab_size)
+        self.d = int(d_model)
+        self.v_eff = int(v_eff)
+        self.route_dim = int(route_dim)
+        self.top_k = int(top_k)
+        self.temperature = float(temperature)
+
+        self.route = nn.Embedding(self.vocab_size, self.route_dim)
+        self.route_proj = nn.Linear(self.route_dim, self.v_eff, bias=False)
+        self.bank = nn.Embedding(self.v_eff, self.d)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        """Initialise the router and the bank with matching output scale.
+
+        The bank rows are scaled by ``sqrt(top_k)`` so that the weighted
+        average of ``top_k`` rows has the same standard deviation as a plain
+        embedding row (the softmax weights sum to one and are close to uniform
+        at initialisation).
+        """
+        nn.init.normal_(self.route.weight, mean=0.0, std=0.1)
+        nn.init.normal_(self.route_proj.weight, mean=0.0,
+                        std=1.0 / math.sqrt(self.route_dim))
+        nn.init.normal_(self.bank.weight, mean=0.0,
+                        std=0.02 * math.sqrt(self.top_k))
+
+    def set_top_k(self, top_k: int) -> None:
+        """Change the number of bank rows mixed per token.
+
+        Args:
+            top_k: New value, must be in ``[1, v_eff]``.
+
+        Raises:
+            ValueError: If ``top_k`` is outside the valid range.
+        """
+        if not 1 <= int(top_k) <= self.v_eff:
+            raise ValueError(f"top_k must be in [1, {self.v_eff}], got {top_k}")
+        self.top_k = int(top_k)
+
+    def route_logits(self) -> torch.Tensor:
+        """Return the router logits for every vocabulary entry.
+
+        Returns:
+            A ``(vocab_size, v_eff)`` tensor.
+        """
+        codes = self.route.weight
+        return self.route_proj(codes) / max(self.temperature, 1e-5)
+
+    def effective_embeddings(self) -> torch.Tensor:
+        """Build the dense ``(vocab_size, d_model)`` effective embedding table.
+
+        Returns:
+            The top-k mixture of bank rows for every token id.
+        """
+        logits = self.route_logits()
+        values, indices = logits.topk(self.top_k, dim=-1)
+        weights = F.softmax(values, dim=-1)
+        rows = self.bank(indices)                 # (V, k, d)
+        return (rows * weights.unsqueeze(-1)).sum(dim=-2)
+
+    def forward(self, idx: torch.Tensor) -> torch.Tensor:
+        """Look up the routed embedding of ``idx``.
+
+        Args:
+            idx: Integer token ids of any shape.
+
+        Returns:
+            A float tensor with shape ``idx.shape + (d_model,)``.
+        """
+        return F.embedding(idx, self.effective_embeddings())
+
+
 def _kron_out_dims(d_out: int, n2: int) -> Tuple[int, int]:
     """Split ``d_out`` into ``(n1, n2)`` reusing ``n2`` when possible."""
     if d_out % n2 == 0:
@@ -274,7 +384,30 @@ class KronTransformer(nn.Module):
         self.eot_id = int(dc.get("eot_id") or (self.vocab_size - 1))
 
         self.embed_rank = int(mc.get("embed_rank") or 0)
-        if self.embed_rank > 0:
+        mode = str(mc.get("embed_mode", "auto")).lower()
+        if mode == "auto":
+            mode = "factorised" if self.embed_rank > 0 else "dense"
+        if mode not in {"factorised", "dense", "routed"}:
+            raise ValueError(
+                f"embed_mode must be auto/factorised/dense/routed, got {mode!r}")
+        self.embed_mode = mode
+        self.routed: Optional[RoutedEmbedding] = None
+        if mode == "routed":
+            rc = mc.get("routed", {})
+            self.routed = RoutedEmbedding(
+                self.vocab_size, self.d,
+                v_eff=int(rc.get("v_eff", 5000)),
+                route_dim=int(rc.get("route_dim", 6)),
+                top_k=int(rc.get("top_k", 10)),
+                temperature=float(rc.get("temperature", 1.0)),
+            )
+            self.embed_rank = 0
+            self.embed = None
+            self.embed_up = None
+            self.lm_head = None
+        elif mode == "factorised":
+            if self.embed_rank <= 0:
+                raise ValueError("factorised embedding requires embed_rank > 0")
             # ALBERT-style factorised (tied) embedding: V x r then r x d.
             # Keeps the embedding from eating the parameter budget:
             #   V*r + r*d  instead of  V*d
@@ -282,6 +415,7 @@ class KronTransformer(nn.Module):
             self.embed_up = nn.Linear(self.embed_rank, self.d, bias=False)
             self.lm_head = None
         else:
+            self.embed_rank = 0
             self.embed = nn.Embedding(self.vocab_size, self.d)
             self.embed_up = None
             self.lm_head = nn.Linear(self.d, self.vocab_size, bias=False)
@@ -298,7 +432,10 @@ class KronTransformer(nn.Module):
         self.force_mode: Optional[str] = None
         self.use_bank = bool(mc.get("batched_prelude", True))
         self._prelude_cache = None
+        self._eff_cache: Optional[torch.Tensor] = None
         self.apply(self._init_weights)
+        if self.routed is not None:
+            self.routed.reset_parameters()
         self._banks: List[KronBank] = self._build_banks() if self.use_bank else []
 
     # -- init -------------------------------------------------------------
@@ -367,6 +504,7 @@ class KronTransformer(nn.Module):
 
     def train(self, mode: bool = True):
         self._prelude_cache = None          # weights may change -> recompute
+        self._eff_cache = None
         return super().train(mode)
 
     # -- rope -------------------------------------------------------------
@@ -378,13 +516,44 @@ class KronTransformer(nn.Module):
         return self._rope_cache[key]
 
     # -- embedding / head --------------------------------------------------
+    def _effective_embeddings(self) -> torch.Tensor:
+        """Return the routed ``(V, d)`` table, cached in evaluation mode."""
+        if not self.training and self._eff_cache is not None:
+            return self._eff_cache
+        assert self.routed is not None
+        eff = self.routed.effective_embeddings()
+        if not self.training:
+            self._eff_cache = eff
+        return eff
+
+    def set_route_top_k(self, top_k: int) -> None:
+        """Change the number of embedding rows mixed per token.
+
+        Args:
+            top_k: New value, must be in ``[1, v_eff]``.
+
+        Raises:
+            RuntimeError: If the model does not use routed embeddings.
+        """
+        if self.routed is None:
+            raise RuntimeError("set_route_top_k requires embed_mode='routed'")
+        self.routed.set_top_k(top_k)
+        self._eff_cache = None
+
     def _embed_tokens(self, idx: torch.Tensor) -> torch.Tensor:
+        if self.routed is not None:
+            return F.embedding(idx, self._effective_embeddings())
         x = self.embed(idx)
         if self.embed_up is not None:
             x = self.embed_up(x)
         return x
 
-    def _logits(self, x: torch.Tensor) -> torch.Tensor:
+    def _logits(self, x: torch.Tensor,
+                eff: Optional[torch.Tensor] = None) -> torch.Tensor:
+        if eff is not None:
+            # The routed table is the input embedding and the tied head at the
+            # same time: logits[v] = h . E_eff[v].
+            return torch.matmul(x, eff.t())
         if self.embed_up is not None:
             # tied: h (d) -> r via U (shape d x r) -> V via E^T (r x V).
             # Costs d*r + r*V instead of d*V.
@@ -397,7 +566,8 @@ class KronTransformer(nn.Module):
                 collect: bool = False) -> Dict[str, Any]:
         B, T = idx.shape
         cos, sin = self._rope(T, idx.device)
-        x = self._embed_tokens(idx)
+        eff = self._effective_embeddings() if self.routed is not None else None
+        x = F.embedding(idx, eff) if eff is not None else self._embed_tokens(idx)
 
         P_map: Dict[Tuple[int, str], torch.Tensor] = {}
         D_map: Dict[Tuple[int, str], torch.Tensor] = {}
@@ -428,7 +598,7 @@ class KronTransformer(nn.Module):
             h_norms.append(x.detach().norm().item())
 
         x = self.norm_f(x)
-        logits = self._logits(x)
+        logits = self._logits(x, eff)
 
         out: Dict[str, Any] = {"logits": logits}
         if targets is not None:
@@ -456,7 +626,8 @@ class KronTransformer(nn.Module):
         """Parameters in matrix transforms (Q,K,V,O,FFN), excluding norms/embed."""
         total = 0
         for name, p in self.named_parameters():
-            if "norm" in name or "embed" in name or "lm_head" in name:
+            if ("norm" in name or "embed" in name or "lm_head" in name
+                    or "route" in name or "bank" in name):
                 continue
             total += p.numel()
         return total
@@ -512,7 +683,13 @@ class KronTransformer(nn.Module):
             else:
                 hidden = int(round(d * float(mc.get("dense_ffn_mult", 1.0))))
                 macs += 2 * d * hidden
-        if self.embed_up is not None:
+        if self.routed is not None:
+            # Router logits + top-k bank mixture + tied effective head, all
+            # amortised over the tokens in the forward pass.
+            macs += (self.vocab_size * self.routed.route_dim * self.routed.v_eff
+                     + self.vocab_size * self.routed.top_k * d
+                     + d * self.vocab_size) / tokens
+        elif self.embed_up is not None:
             r = float(self.embed_rank)
             macs += d * r + r * self.vocab_size      # factorised tied head
         else:

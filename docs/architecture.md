@@ -55,9 +55,9 @@ parameters, not in rank: one channel costs `K(n₁² + n₂²)` instead of `d²`
 | scales `τ_l` | `L` |
 | ReZero gate `γ` | `1` |
 
-For Q2 (`L=4, K=6, n₁=16, n₂=20`): `4·6·(256+400) + 8 + 1 = 15 753` parameters
+For Q2 (`L=4, K=6, n₁=16, n₂=20`): `4·6·(256+400) + 8 + 1 = 15,753` parameters
 per module. A block has five roles (q, k, v, o, ffn), and Q2 has 24 blocks:
-`120 · 15 753 = 1 890 360` matrix parameters.
+`120 · 15,753 = 1,890,360` matrix parameters.
 
 ## 3. Depth recurrence
 
@@ -106,7 +106,32 @@ logits = h · Uᵀ · Eᵀ
 ```
 
 so the head is tied to the embedding and costs no extra parameters. For Q2
-(`V=1024, r=128, d=320`) this is `172 032` parameters instead of `327 680`.
+(`V=1024, r=128, d=320`) this is `172,032` parameters instead of `327,680`.
+
+### 5.1 Routed dense embedding (Q3, experimental)
+
+The factorised table has an `r`-dimensional bottleneck. Q3 replaces it with a
+top-k mixture of a dense bank:
+
+```
+r_v   = route[v]                       # (route_dim,)
+logits = r_v W_route                   # (v_eff,)
+w      = softmax(topk(logits, k))      # (k,)
+E_eff[v] = sum_i w_i * bank[i]         # (d,)
+```
+
+`route` is `(V, route_dim)`, `W_route` is `(route_dim, v_eff)` and `bank` is
+`(v_eff, d)`. The effective table `E_eff` is dense in width but never stored:
+it is rebuilt from the selected rows on each forward pass (and cached in
+`eval()`). The same `E_eff` is used as the tied output head,
+`logits = h @ E_eff.T`, so the head adds no parameters.
+
+For Q3 (`V=1024, v_eff=5000, route_dim=6, k=10, d=320`) the embedding costs
+`6,144 + 30,000 + 1,600,000 = 1,636,144` parameters and the model totals
+`3,544,104`. Gradients reach the selected bank rows through the mixture weights
+and the router through the selected logits; the top-k indices themselves are
+discrete. `model.set_route_top_k(k)` changes `k` at generation time and
+invalidates the effective-table cache.
 
 ## 6. Batched prelude (`KronBank`)
 
@@ -155,14 +180,15 @@ The following properties are enforced by the test suite:
 | T19 | the factorised tied embedding has `V·r + r·d` parameters |
 | T20 | QK-norm has unit per-head RMS and costs `2·d_head·N` |
 | T23 | the prelude cache does not change the output |
+| T28 | the routed table equals the softmax-weighted top-k bank mixture |
+| T29 | routed gradients reach the bank and router; top-k is adjustable |
 
 ## 9. Design constraints
 
-* **6 GB of VRAM.** Activation memory grows as `N · d · batch · seq`. Q1 and Q2
-  were designed to have exactly the same activation footprint
-  (`20·192·64 = 24·320·32 = 245 760`), which is why Q2's extra parameters are
-  almost free in memory: peak VRAM is 3.5 GB and 4.22 GB respectively.
-* **No tensor cores on TU116.** fp16 autocast is 2.4× slower than fp32 on this
-  card, so `amp` defaults to `none`.
-* **One GPU.** No DDP, no gradient checkpointing, no CUDA graphs (capture fails
-  on `baddbmm` in this environment).
+* **Compactness first.** Activation memory grows as `N · d · batch · seq`. Q1 and
+  Q2 were designed to have exactly the same activation footprint
+  (`20·192·64 = 24·320·32 = 245,760`), so Q2's extra parameters add almost no
+  training memory. Q2 peaks at 4.22 GB, so the family fits a 6 GB consumer GPU.
+* **One GPU, fp32.** fp16 autocast is 2.4× slower than fp32 on the reference
+  GPU, so `amp` defaults to `none`. No DDP, no gradient checkpointing, no CUDA
+  graphs (capture fails on `baddbmm` in this environment).

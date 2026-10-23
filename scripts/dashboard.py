@@ -460,7 +460,7 @@ def build_ui() -> gr.Blocks:
                     lr = gr.Number(value=0.0, label="lr (0 = from config)")
                     amp = gr.Checkbox(
                         value=False,
-                        label="AMP fp16 (on TU116 without tensor cores ~2.4x slower)")
+                        label="AMP fp16 (slower than fp32 on the reference GPU)")
                     overrides = gr.Textbox(
                         label="extra overrides (k=v, one per line)",
                         placeholder="model.kron.L=6\nmodel.kron.K=4",

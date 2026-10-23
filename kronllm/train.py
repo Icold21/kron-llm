@@ -19,7 +19,8 @@ from .config import save_config
 from .data import ByteDataset, open_dataset
 from .tokenizer import bits_per_byte, load_tokenizer
 from .diagnostics import (aggregate_eval_stats, comparison_report, grad_report,
-                          sigma_theta_report, spectral_report, theta_grad_norm)
+                          routed_report, sigma_theta_report, spectral_report,
+                          theta_grad_norm)
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +110,8 @@ def build_param_groups(model: nn.Module, tc: Mapping[str, Any]) -> List[dict]:
             scale_params.append(p)
         elif name.endswith(".s"):
             s_params.append(p)
-        elif "norm" in name or "embed" in name or "lm_head" in name:
+        elif ("norm" in name or "embed" in name or "lm_head" in name
+              or "route" in name or "bank" in name):
             no_decay.append(p)
         else:
             decay.append(p)
@@ -175,7 +177,9 @@ def evaluate(model: nn.Module, ds: ByteDataset, batch_size: int,
     if total_tokens == 0:
         return {"val_loss": float("nan"), "val_ppl": float("nan")}
     loss = total_loss / total_tokens
-    return {"val_loss": loss, "val_ppl": math.exp(min(loss, 50.0))}
+    result = {"val_loss": loss, "val_ppl": math.exp(min(loss, 50.0))}
+    result.update(routed_report(model))
+    return result
 
 
 @torch.no_grad()
@@ -191,6 +195,7 @@ def diagnostics(model: nn.Module, ds: ByteDataset, batch_size: int,
     result.update(aggregate_eval_stats(out["stats"]))
     result.update({k: v for k, v in sigma_theta_report(model).items()
                    if not isinstance(v, dict)})
+    result.update(routed_report(model))
     result["theta_grad_norm"] = theta_grad_norm(model)
     if spectral:
         spec = spectral_report(model, out["trace"])

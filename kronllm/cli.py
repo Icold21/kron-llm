@@ -188,14 +188,18 @@ def cmd_quantize(args: argparse.Namespace) -> None:
 
 # ---------------------------------------------------------------------------
 def cmd_budget(args: argparse.Namespace) -> None:
-    """Print the parameter budget of every experiment (must stay <= 1M)."""
+    """Print the parameter budget of the E-series (all models with ``--all``)."""
     from .config import EXPERIMENTS, experiment_config
     from .model import KronTransformer
 
     limit = int(args.limit)
+    if args.all:
+        ids = list(EXPERIMENTS)
+    else:
+        ids = [exp_id for exp_id in EXPERIMENTS if exp_id.startswith("E")]
     print(f"{'E':>4} {'total':>10} {'matrix':>10} {'<=1M':>6}  description")
     worst = 0
-    for exp_id in EXPERIMENTS:
+    for exp_id in ids:
         model = KronTransformer(experiment_config(exp_id))
         worst = max(worst, model.n_params)
         ok = "ok" if model.n_params <= limit else "FAIL"
@@ -263,6 +267,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     bd = sub.add_parser("budget", help="print the parameter budget of E0..E13")
     bd.add_argument("--limit", type=int, default=1_000_000)
+    bd.add_argument("--all", action="store_true",
+                    help="also print Q1-Q3, D1 and S1 (deliberately above 1M)")
     bd.set_defaults(func=cmd_budget)
     return p
 

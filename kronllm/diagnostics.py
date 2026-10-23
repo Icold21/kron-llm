@@ -100,6 +100,50 @@ def theta_grad_norm(model: nn.Module) -> float:
 # spectral analysis of W_{i,l} -- D2.1, D2.4, D3.x, H2
 # ---------------------------------------------------------------------------
 @torch.no_grad()
+def routed_report(model: nn.Module) -> Dict[str, float]:
+    """Measure router usage and effective-table diversity for a routed model.
+
+    The report is intentionally cheap enough to run at every validation point:
+    it materialises the ``(vocab_size, d_model)`` effective table once and does
+    one small SVD.  Non-routed models return an empty dict, so the same training
+    loop can log both families.
+
+    Args:
+        model: A ``KronTransformer`` or compatible module.
+
+    Returns:
+        A mapping with router usage perplexity, used-row counts, the fraction of
+        tokens whose own bank row is top-1, the effective rank of the table, and
+        the router-logit standard deviation.  Empty for a factorised model.
+    """
+    routed = getattr(model, "routed", None)
+    if routed is None:
+        return {}
+
+    logits = routed.route_logits()
+    top = torch.topk(logits, k=routed.top_k, dim=-1).indices
+    counts = torch.bincount(top.flatten(), minlength=routed.v_eff).float()
+    probs = counts / counts.sum()
+    nz = probs[probs > 0]
+    usage_ppl = torch.exp(-(nz * nz.log()).sum())
+
+    top1 = top[:, 0]
+    own = (top1[:routed.vocab_size] ==
+           torch.arange(routed.vocab_size, device=top1.device)).float().mean()
+
+    effective = routed.effective_embeddings()
+    table_rank = effective_rank(torch.linalg.svdvals(effective))
+    return {
+        "route_usage_ppl": float(usage_ppl),
+        "route_unique_rows": int((counts > 0).sum()),
+        "route_top1_unique": int(torch.unique(top1).numel()),
+        "route_own_top1": float(own),
+        "route_eff_rank": float(table_rank),
+        "route_logit_std": float(logits.std()),
+    }
+
+
+@torch.no_grad()
 def spectral_report(model: nn.Module, trace: List[Dict[str, Any]],
                     max_layers: Optional[int] = None) -> Dict[str, Any]:
     """SVD of every ``D_{i,l}`` and of the composed map ``P_i``.
@@ -145,6 +189,14 @@ def spectral_report(model: nn.Module, trace: List[Dict[str, Any]],
             else:
                 P_exc = P
             eff_exc = float(effective_rank(torch.linalg.svdvals(P_exc)))
+            # Rank of the sum-composition alternative on the same trained D_l.
+            # This is a diagnostic, not a trained model: it isolates how much of
+            # the product's rank loss is due to multiplication itself.
+            S = D.float().sum(dim=0)
+            if s is not None:
+                S = S + float(s) * torch.eye(S.shape[0], device=S.device,
+                                               dtype=S.dtype)
+            eff_sum = float(effective_rank(torch.linalg.svdvals(S)))
             cos_p = float("nan")
             if role in prev_p:
                 a, b = P.flatten(), prev_p[role].flatten()
@@ -156,6 +208,12 @@ def spectral_report(model: nn.Module, trace: List[Dict[str, Any]],
                 sv_d = torch.linalg.svdvals(Dl)
                 eff_d = float(effective_rank(sv_d))
                 d_rms = float(Dl.pow(2).mean().sqrt())
+                d_norm = float(Dl.norm())
+                s_abs = abs(s_val) if math.isfinite(s_val) else float("nan")
+                d_over_s = d_rms / s_abs if s_abs > 0 else float("nan")
+                fro_over_s = d_norm / s_abs if s_abs > 0 else float("nan")
+                sigma_max_d = float(sv_d.max())
+                smax_d_over_s = sigma_max_d / s_abs if s_abs > 0 else float("nan")
                 W = Dl if s is None else float(s) * torch.eye(
                     Dl.shape[0], device=Dl.device, dtype=Dl.dtype) + Dl
                 sv_w = torch.linalg.svdvals(W)
@@ -170,7 +228,11 @@ def spectral_report(model: nn.Module, trace: List[Dict[str, Any]],
                     "layer": i, "role": role, "channel": l,
                     "s": s_val, "tau": tau_val, "gate": gate_val,
                     "D_rms": d_rms,
-                    "D_norm": float(Dl.norm()),
+                    "D_norm": d_norm,
+                    "D_over_s": d_over_s,
+                    "D_fro_over_s": fro_over_s,
+                    "sigma_max_D": sigma_max_d,
+                    "sigma_max_D_over_s": smax_d_over_s,
                     "eff_rank_D": eff_d,
                     "eff_rank_W": float(effective_rank(sv_w)),
                     "rank_excess": float(effective_rank(sv_w)) - eff_d,
@@ -179,6 +241,8 @@ def spectral_report(model: nn.Module, trace: List[Dict[str, Any]],
                     "cos_prev": cos,
                     "eff_rank_P": eff_p,
                     "eff_rank_excess": eff_exc,
+                    "eff_rank_sum": eff_sum,
+                    "sum_over_prod": eff_sum / max(eff_p, 1e-9),
                     "cos_prev_P": cos_p,
                 })
 
@@ -194,8 +258,16 @@ def spectral_report(model: nn.Module, trace: List[Dict[str, Any]],
         summary["rank_excess"] = mean("rank_excess")
         summary["eff_rank_P"] = mean("eff_rank_P")
         summary["eff_rank_excess"] = mean("eff_rank_excess")
+        summary["eff_rank_sum"] = mean("eff_rank_sum")
+        summary["sum_over_prod"] = mean("sum_over_prod")
         summary["D_norm_mean"] = mean("D_norm")
         summary["D_rms"] = mean("D_rms")
+        finite = lambda key: [r[key] for r in rows if math.isfinite(r[key])]  # noqa: E731
+        mean_finite = lambda key: (sum(finite(key)) / len(finite(key))  # noqa: E731
+                                   if finite(key) else float("nan"))
+        summary["D_over_s"] = mean_finite("D_over_s")
+        summary["D_fro_over_s"] = mean_finite("D_fro_over_s")
+        summary["sigma_max_D_over_s"] = mean_finite("sigma_max_D_over_s")
         summary["tau_mean"] = mean("tau")
         summary["gate_mean"] = mean("gate")
         coss = [r["cos_prev"] for r in rows if not math.isnan(r["cos_prev"])]

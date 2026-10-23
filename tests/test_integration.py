@@ -134,10 +134,10 @@ def test_T14_step_time():
     ms = (time.time() - t0) / n * 1000
     print(f"forward+backward: {ms:.1f} ms/step "
           f"({torch.cuda.get_device_name(0)})")
-    # Spec target is 100 ms on a 1660 Ti.  TU116 has no tensor cores and
-    # Windows/WDDM adds ~45 us per kernel launch, so the launch-bound Kron
-    # composition measures ~120 ms at batch=32.  Throughput peaks at
-    # batch=128 (~93k tok/s), which is what the default config uses.
+    # The specification targets 100 ms on the reference GPU. Windows/WDDM adds
+    # ~45 us per kernel launch, so the launch-bound Kron composition measures
+    # ~120 ms at batch=32. Throughput peaks at batch=128 (~93k tok/s), which is
+    # what the default config uses.
     assert ms < 160, f"{ms:.1f} ms/step > 160 ms"
 
 

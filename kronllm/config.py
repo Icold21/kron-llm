@@ -47,6 +47,15 @@ DEFAULTS: Dict[str, Any] = {
         # ALBERT-style factorised (tied) embedding: V x r then r x d.
         # 0 -> plain V x d table.  Keeps the embedding ~12% of the budget.
         "embed_rank": 0,
+        # "auto" -> factorised when embed_rank > 0, dense otherwise.
+        # "routed" -> top-k mixture of a dense (v_eff, d) bank (Q3).
+        "embed_mode": "auto",
+        "routed": {
+            "v_eff": 5000,
+            "route_dim": 6,
+            "top_k": 10,
+            "temperature": 1.0,
+        },
         # Intra-layer RMSNorm on q/k per head: removes logit drift and lets the
         # model use a higher lr at this scale.
         "qk_norm": False,
@@ -100,7 +109,7 @@ DEFAULTS: Dict[str, Any] = {
         "min_lr": 3e-5,
         "weight_decay": 0.1,
         "grad_clip": 1.0,
-        "amp": "none",   # TU116 has no tensor cores: fp16 is *slower* here
+        "amp": "none",   # fp16 autocast is slower than fp32 on the reference GPU
         "log_every": 100,
         "eval_every": 500,
         "eval_batches": 64,
@@ -240,7 +249,8 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
             "model.kron.n2": 16,
             "model.kron.K": 5,
             "training.seq_len": 192,
-            # batch 96 OOMs at 6 GB with d=192/N=20; 64 x 192 = 12.3k tok/step
+            # batch 96 is too large for the reference GPU at d=192/N=20;
+            # 64 x 192 = 12.3k tokens per step.
             "training.batch_size": 64,
             "training.lr": 5e-4,
             "training.min_lr": 5e-5,
@@ -274,12 +284,12 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
             "training.warmup_steps": 300,
             "training.eval_every": 500,
             "training.early_stop_patience": 99,
-            "training.max_steps": 2500,
+            # Exactly Q1's token budget: 4200 x 64 x 192 = 51.6M tokens.
+            "training.max_steps": 4200,
         },
     },
-    # Q1 was stopped at step ~4200 (val bpb 0.976) to spend the remaining GPU
-    # time on a 2.2x larger model instead -- the parameter ceiling is set by
-    # the 6 GB card, not by the 1M budget.
+    # Q1 was stopped at step ~4200 (val bpb 0.976) to spend the remaining time
+    # on a 2.2x larger model; the design goal is quality, not the 1M budget.
     "Q2": {
         "desc": "BPE-1024, d=320/N=24, K=6, qk-norm (~2.08M params)",
         "overrides": {
@@ -297,7 +307,7 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
             "model.kron.K": 6,
             "training.seq_len": 192,
             # N*d*bs is held at Q1's level (24*320*32 == 20*192*64), so the
-            # activation footprint stays ~3.5 GB inside the 6 GB card.
+            # activation footprint stays the same as Q1's.
             "training.batch_size": 32,
             "training.lr": 4e-4,
             "training.min_lr": 4e-5,
@@ -307,6 +317,25 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
             # 10000 x 32 x 192 = 61M tokens ~ 1 epoch of the BPE corpus
             "training.max_steps": 10000,
         },
+    },
+}
+
+# Q3: dense routed embeddings on top of Q2.  Each token has a 6-d routing code;
+# a linear router selects the top-10 rows of a 5000 x 320 bank and mixes them
+# with softmax weights.  The effective V x d table is reused by the tied head,
+# so the head stays parameter-free.  ~3.54M parameters.
+EXPERIMENTS["Q3"] = {
+    "desc": "Q2 + routed dense embeddings (v_eff=5000, top-k=10, ~3.54M params)",
+    "overrides": {
+        **EXPERIMENTS["Q2"]["overrides"],
+        "model.embed_mode": "routed",
+        "model.embed_rank": 0,
+        "model.routed.v_eff": 5000,
+        "model.routed.route_dim": 6,
+        "model.routed.top_k": 10,
+        "model.routed.temperature": 1.0,
+        "training.lr": 3e-4,
+        "training.min_lr": 3e-5,
     },
 }
 
