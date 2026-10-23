@@ -23,15 +23,19 @@ Domain mix inside each language (target, by bytes):
 
 | domain | share | why |
 |---|---:|---|
-| mathematics | 30 % | dense reasoning, formulas, proofs |
-| science / scientific articles | 25 % | formal prose, terminology, long context |
+| mathematics | 25 % | dense reasoning, formulas, proofs |
+| science / scientific articles | 20 % | formal prose, terminology, long context |
+| code | 15 % | precise syntax, structured reasoning, transfer to math |
 | logic | 10 % | proofs, definitions, structured argument |
-| literature | 20 % | long-range coherence, style, vocabulary |
+| literature | 15 % | long-range coherence, style, vocabulary |
 | general encyclopedic | 15 % | world knowledge and coverage |
 
 The domain mix is **not** a replacement for general text: a corpus made only of
 proofs and classics produces a model that writes like a textbook. The 15 %
 encyclopedic slice is the anchor; if generation samples look narrow, raise it.
+Code is capped at 15 % because its token distribution (indentation, operators,
+identifiers) differs sharply from natural language; it is there to sharpen
+structure, not to turn the model into a code model.
 
 ## 2. Sources and licences
 
@@ -43,6 +47,7 @@ Only public-domain or permissively licensed material. Every shard records
 | mathematics | OpenStax, ProofWiki, public-domain textbooks | public-domain textbooks, open lecture notes | check each item; prefer CC-BY / CC-BY-SA / public domain |
 | science | arXiv (CC-BY subset), PubMed Central OA | CyberLeninka (item-level check), open university repositories | arXiv licences vary per paper; only CC-BY or explicit permission |
 | logic | Lean/Coq docs, public-domain logic texts | public-domain logic textbooks | documentation under permissive licences |
+| code | permissively licensed repositories (MIT/Apache/BSD), Python docs and exercises | same, plus Russian-language programming tutorials with a clear licence | licence detection per file; no copyleft-only or unlicensed code |
 | literature | Project Gutenberg, Wikisource | public-domain classics (Tolstoy, Dostoevsky, Chekhov), Wikisource | author died >70 years / US public domain |
 | encyclopedic | Wikipedia dumps (CC-BY-SA) | Wikipedia RU dumps (CC-BY-SA) | attribution required |
 | instructions (SFT only) | Dolly-15k, open instruct sets | Saiga / open Russian instruct sets | never used for pretraining |
@@ -58,7 +63,9 @@ A shard with an unknown licence does not enter the mix.
 2. **Language ID** — fastText `lid.176` (or equivalent); keep items with
    confidence ≥ 0.9 and the expected language; drop mixed-language pages.
 3. **Normalisation** — Unicode NFKC, whitespace cleanup, remove navigation,
-   boilerplate, references-only pages and markup residues.
+   boilerplate, references-only pages and markup residues. Code **keeps its
+   indentation and line structure**; aggressive whitespace collapsing would
+   destroy the signal it is meant to teach.
 4. **Quality filter** — minimum length, punctuation/letter ratio, digit and
    symbol ratio, repeated n-gram ratio, compression ratio; optional perplexity
    filter with a small reference model.
@@ -95,7 +102,10 @@ At ~7k tokens/s, 1B tokens is ≈40 h of GPU time and 2B is ≈80 h.
 - token share per language (must stay near the 45–47 % Russian target);
 - duplicate and contamination rates;
 - per-domain bpb on the held-out slices — a domain that is much worse than the
-  average points to a data problem, not an architecture problem.
+  average points to a data problem, not an architecture problem;
+- code validity: after decoding a held-out code slice, measure the fraction of
+  samples that parse (Python `ast.parse`) and the character-level round-trip
+  after tokenization.
 
 ## 6. Immediate steps
 

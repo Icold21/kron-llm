@@ -145,16 +145,32 @@ teacher-generated Q/A pairs, all filtered for format, duplication and answer
 quality. Start with 10–50k examples; the model is 10M parameters, so quality
 and consistency matter more than volume.
 
+Three task families are in scope:
+
+| family | example | metric |
+|---|---|---|
+| structured Q/A | question about a short passage | format compliance, answer bpb, token F1 |
+| math word problems | one-step arithmetic with a numeric answer | exact match on the final number |
+| short code | function from a docstring, in a fenced block | `pass@1` on unit tests, syntax validity |
+
+Math data: GSM8K-style problems (licence-checked) plus synthetic arithmetic
+with controlled templates. Code data: docstring→function pairs from
+permissively licensed repositories and small exercises; code prompts keep the
+fence and indentation, and the answer is executed in a sandbox for evaluation.
+
 Metrics:
 
 - **format compliance** (does it emit the assistant turn and stop?);
 - exact match / token F1 on extractive tasks;
+- exact match on the final number for math;
+- `pass@1` on unit tests and `ast.parse` validity for code;
 - answer bpb on held-out Q/A;
 - generation checks at `T=1.0`, `top_k=5–10`.
 
-Honest scope: a 10M model can learn format, style, translation patterns and
-simple extraction; it cannot store broad factual knowledge. The SFT goal is a
-reliable interface, not an assistant that knows the world.
+Honest scope: a 10M model can learn format, style, translation patterns,
+one-step arithmetic and short functions; it cannot solve general math or write
+non-trivial programs. The SFT goal is a reliable interface and a measurable
+baseline, not an assistant that knows the world.
 
 **Exit:** SFT checkpoint + evaluation table + failure gallery.
 
@@ -179,7 +195,7 @@ article is not blocked on an optional experiment.
 - identical hardware and evaluation harness; batch-1 generation and training
   throughput at the same batch size;
 - report parameters, FLOPs/token, peak VRAM, tokens/s, fp32/int8 checkpoint
-  size, and the Phase-3 Q/A metrics;
+  size, and the Phase-3 metrics (Q/A, math exact match, code `pass@1`);
 - no cherry-picking: include the negative results (Q5, Q7, E14) and the cases
   where our model loses.
 
