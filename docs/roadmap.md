@@ -1,0 +1,180 @@
+# Roadmap: from architecture search to a 10M bilingual Q/A model
+
+This is the long-term plan behind the current ablation series. It is a living
+document: the architecture search in the README is Phase 0, and every later
+phase has a gate that must be passed before the next one starts.
+
+## 1. Target
+
+| property | target |
+|---|---|
+| Parameters | **~10M soft ceiling** (current base: 2.47M at 0.849 bpb) |
+| Training hardware | one **6 GB** consumer GPU (currently a GTX 1660 Ti) |
+| Languages | **English + Russian**, one shared tokenizer |
+| Data | curated, deduplicated, licence-checked pretraining corpus |
+| Post-training | **structured Q/A** supervised fine-tuning |
+| Optional | distillation from a larger teacher |
+| Deployment | fp32 / int8, CPU or one consumer GPU, no custom kernels |
+| Quality metric | bits per byte on held-out EN and RU, plus Q/A task metrics |
+
+The point of the Kronecker parameterisation is not to beat a dense model of the
+same size on raw quality; it is to make a **10M model trainable inside 6 GB**
+and small enough to inspect, quantise and run on ordinary hardware.
+
+## 2. Where we are (2026-10-23)
+
+| result | status |
+|---|---|
+| Q2 (2.08M, BPE-1024) | **shipped**, 0.839 bpb on TinyStories EN |
+| Q4 (full backprop) | win: 0.9248 vs Q2 0.962 at step 4,000 |
+| Q6 (BPE-4096) | win: **0.8489 bpb** at step 4,000, 4.28 GB peak |
+| Q5 (`K=24`, 7.75M) | **negative**: 0.9530 at 4k, layer collapse (`cos_prev_max` 0.99999) |
+| Q7 (Kronecker embedding) | pending; embedding budget 565K → 90K parameters |
+| E14 (sum composition) | negative: rank is not the quality bottleneck |
+
+The architecture is **not frozen** yet. Scaling `K` is closed at this budget;
+the remaining levers are width/depth, tokenizer size, embedding storage and
+context length.
+
+## 3. Phase 0 — architecture freeze (gate A)
+
+Freeze one recipe when it satisfies all of:
+
+1. Best validation bpb at matched tokens among the ≤10M candidates.
+2. Stable across at least two seeds (Δ bpb < 0.01).
+3. Peak VRAM ≤ 6 GB with batch ≥ 16 at `seq_len` 192–256.
+4. Every winning component has a trained ablation behind it, not an intuition.
+
+Open questions to settle before the gate:
+
+- allocation of the 10M budget: width/depth vs more Kronecker summands;
+- embedding storage at a 8K–16K bilingual vocabulary (Q7 is the first data point);
+- context length: 192 today; 256 may be needed for Q/A paragraphs;
+- whether the product composition remains the default (E14 says yes for now).
+
+**Exit:** `kronllm/config.py` gets a `B1` config, a model card, and a seed
+sweep. No further architecture work until Phase 3 produces a scaling point.
+
+## 4. Phase 1 — bilingual data and tokenizer (gate B)
+
+### 4.1 Corpus
+
+| source | role |
+|---|---|
+| Wikipedia EN / RU | encyclopedic prose, clean, licence-checked |
+| FineWeb-edu / CulturaX | filtered web text, quality-scored |
+| public-domain books EN / RU | long-form narrative |
+| instruction sets (later) | Q/A fine-tuning only, never pretraining |
+
+Pipeline: language ID → URL/domain filtering → MinHash near-dedup →
+quality filter (length, repetition, punctuation, perplexity) → PII and licence
+checks → decontamination against the evaluation sets → fixed mixing ratio.
+
+Start with **50/50 by bytes**, then tune on held-out bpb per language. Target
+**0.5–2B tokens**; the compute-optimal point for 10M parameters is ~200M, but
+small models usually keep improving past it, so the run is checkpointed and the
+bpb-vs-tokens curve decides where to stop.
+
+### 4.2 Tokenizer
+
+Train a byte-level BPE on a mixed sample of both languages.
+
+- vocabulary **8K–16K** (16K is affordable only with the Kronecker embedding);
+- target fertility: **≈4.0 bytes/token EN**, **≈3.0–3.5 bytes/token RU**;
+- special tokens reserved for the Q/A format (user, assistant, end);
+- evaluate on held-out text in both languages, not on the training sample.
+
+**Exit:** tokenizer artifacts + meta, fertility report, contamination report,
+and a fixed 10M-token held-out set per language.
+
+## 5. Phase 2 — pretraining at 10M (gate C)
+
+Recipe inherited from the frozen Phase-0 config: product composition, full
+backprop, RMSNorm, qk-norm, BPE, `seq_len` 256.
+
+| item | plan |
+|---|---|
+| parameters | 8–10M |
+| tokens | 0.5–2B (checkpointed; curve decides) |
+| throughput | ~7k tokens/s at 2.5M; expect 4–7k at 10M |
+| wall clock | ~20–80 h on the 1660 Ti |
+| checkpoints | 25 / 50 / 100 % + best-bpb |
+| evaluation | bpb EN/RU, generation samples, VRAM, tokens/s |
+
+**Kill criterion:** if the 10M model is not better than the 2.5M model at
+matched tokens, the budget allocation is wrong; stop and return to Phase 0
+rather than spending more GPU hours.
+
+**Exit:** a bilingual base model, its scaling curve, and a reproducible config.
+
+## 6. Phase 3 — structured Q/A SFT (gate D)
+
+Format (special tokens, loss masked on the prompt):
+
+```
+<|user|> ... <|assistant|> ... <|end|>
+```
+
+Data: translated Dolly-15k, open Russian instruction sets, and
+teacher-generated Q/A pairs, all filtered for format, duplication and answer
+quality. Start with 10–50k examples; the model is 10M parameters, so quality
+and consistency matter more than volume.
+
+Metrics:
+
+- **format compliance** (does it emit the assistant turn and stop?);
+- exact match / token F1 on extractive tasks;
+- answer bpb on held-out Q/A;
+- generation checks at `T=1.0`, `top_k=5–10`.
+
+Honest scope: a 10M model can learn format, style, translation patterns and
+simple extraction; it cannot store broad factual knowledge. The SFT goal is a
+reliable interface, not an assistant that knows the world.
+
+**Exit:** SFT checkpoint + evaluation table + failure gallery.
+
+## 7. Phase 4 — distillation (optional, gate E)
+
+Teacher: a 1.5–8B open model, run through an API or 4-bit locally.
+
+1. Generate answers on curated prompts; filter by format and teacher confidence.
+2. Sequence-level distillation: train the student on teacher outputs.
+3. Optional logit distillation if teacher and student share a tokenizer or a
+   mapping is cheap.
+4. Compare against the Phase-3 SFT model at equal tokens and equal inference cost.
+
+**Exit:** a student that is better than SFT-only on the Q/A metrics, or a
+documented negative result.
+
+## 8. Phase 5 — packaging
+
+- int8 post-training quantisation (near-lossless on Q2: +0.0004 bpb);
+- CPU and single-GPU inference through the Hugging Face wrapper;
+- model card with data, licence, evaluation and known failure modes;
+- keep only the final artifacts (no near-duplicate checkpoints).
+
+## 9. Risks
+
+| risk | mitigation |
+|---|---|
+| 10M is too small for useful Q/A | keep expectations at format/skills; distillation and retrieval are the escape hatches |
+| Russian tokenizer fertility is poor | train on mixed text, measure bytes/token per language, prefer 16K vocab |
+| data licensing | only permissive sources; record provenance per shard |
+| contamination | decontaminate against all evaluation sets before training |
+| catastrophic forgetting in SFT | small LR, short schedule, mix a fraction of pretraining text |
+| 6 GB ceiling | fixed activation footprint, chunked loss, int8 evaluation |
+| architecture overfitting to TinyStories | validate the final recipe on the bilingual held-out sets |
+
+## 10. Rough timeline
+
+| phase | wall clock |
+|---|---|
+| Phase 0 (architecture freeze) | 1–2 weeks of GPU runs |
+| Phase 1 (data + tokenizer) | 3–5 days, mostly CPU |
+| Phase 2 (10M pretraining) | 3–4 days GPU |
+| Phase 3 (Q/A SFT) | 1 day |
+| Phase 4 (distillation, optional) | 1–2 days |
+| Phase 5 (packaging) | 1–2 days |
+
+These are research estimates, not commitments; every phase can send the project
+back one step, and that is a valid outcome as long as it is recorded.

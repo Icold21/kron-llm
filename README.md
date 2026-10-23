@@ -1035,6 +1035,15 @@ cheapest remaining win (0.8489 bpb at 4,000 steps, 8.2 % better than Q4).
 The next bets are parameter scaling at fixed activation memory (Q5) and a
 Kronecker-compressed embedding table (Q7).
 
+### Long-term horizon
+
+The plan beyond these ablations — freeze the architecture, build a curated
+English–Russian corpus and a shared tokenizer, pretrain at ~10M parameters
+inside 6 GB, then structured Q/A SFT and optional distillation — is in
+[docs/roadmap.md](docs/roadmap.md). Each phase has an explicit gate and kill
+criteria, so a failed phase sends the project back instead of silently
+accumulating compute.
+
 ---
 
 ## 15. License and citation
