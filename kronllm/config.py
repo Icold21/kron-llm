@@ -521,6 +521,11 @@ EXPERIMENTS["E21"] = {
                   "training.recurse_random": True,
                   "model.pass_embedding": True},
 }
+EXPERIMENTS["E22"] = {
+    "desc": "6 unique blocks x4 (24 effective, ~111K params)",
+    "overrides": {"model.n_unique_blocks": 6, "model.recurse": 4,
+                  "training.batch_size": 64},
+}
 
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
