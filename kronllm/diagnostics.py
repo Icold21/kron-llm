@@ -180,19 +180,23 @@ def spectral_report(model: nn.Module, trace: List[Dict[str, Any]],
             gate_val = float(mod.gate) if mod.gate is not None else float("nan")
 
             # composition-level numbers
-            P = mod.compose_product(D).float()
+            P = mod.compose(D).float()
             sv_p = torch.linalg.svdvals(P)
             eff_p = float(effective_rank(sv_p))
             if s is not None:
                 eye = torch.eye(P.shape[0], device=P.device, dtype=P.dtype)
-                P_exc = P - (float(s) ** mod.L) * eye
+                P_exc = P - float(mod.anchor_term) * eye
             else:
                 P_exc = P
             eff_exc = float(effective_rank(torch.linalg.svdvals(P_exc)))
             # Rank of the sum-composition alternative on the same trained D_l.
             # This is a diagnostic, not a trained model: it isolates how much of
-            # the product's rank loss is due to multiplication itself.
-            S = D.float().sum(dim=0)
+            # the product's rank loss is due to multiplication itself.  For an
+            # already-sum model this reduces to the trained sum map.
+            if mod.composition == "sum":
+                S = (mod.alpha.float().view(-1, 1, 1) * D.float()).sum(dim=0)
+            else:
+                S = D.float().sum(dim=0)
             if s is not None:
                 S = S + float(s) * torch.eye(S.shape[0], device=S.device,
                                                dtype=S.dtype)

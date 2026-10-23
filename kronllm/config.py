@@ -69,6 +69,8 @@ DEFAULTS: Dict[str, Any] = {
             "n1": 8,
             "n2": 16,
             "stop_gradient": True,   # E8 flips this
+            "composition": "product",  # E14 uses "sum": sI + sum_l alpha_l D_l
+            "sum_alpha_init": 1.0,
             "anchor": True,          # E4 turns the s*I anchor off
             # Per-role anchor, interpreted as the *effective* (post L-fold)
             # value: s = s_init ** (1/L).  See README "Deviations".
@@ -226,6 +228,13 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
     "E13": {
         "desc": "E2 + K=8 (budget-scaling point, ~651K params)",
         "overrides": {"model.kron.K": 8},
+    },
+    "E14": {
+        "desc": "E2 + sum composition (sI + sum_l alpha_l D_l), full backprop",
+        "overrides": {
+            "model.kron.composition": "sum",
+            "model.kron.stop_gradient": False,
+        },
     },
     # ------------------------------------------------------------------
     # Q-series: quality first.  Same Kron skeleton, but the budget is spent

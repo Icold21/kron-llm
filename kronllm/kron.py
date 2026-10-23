@@ -163,6 +163,8 @@ class KronCompose(nn.Module):
         normalize_D: bool = True,
         gate_init: float = 0.1,
         use_gate: bool = True,
+        composition: str = "product",
+        sum_alpha_init: float = 1.0,
     ) -> None:
         super().__init__()
         d_out = d_in if d_out is None else d_out
@@ -181,6 +183,12 @@ class KronCompose(nn.Module):
         # L-fold composition is only defined for square maps.
         assert self.square or L == 1, "non-square KronCompose requires L == 1"
 
+        self.composition = str(composition).lower()
+        if self.composition not in {"product", "sum"}:
+            raise ValueError(
+                f"composition must be 'product' or 'sum', got {composition!r}")
+        self.sum_alpha_init = float(sum_alpha_init)
+
         self.anchor = bool(anchor) and self.square
         self.stop_gradient = stop_gradient
         self.rezero_eps = rezero_eps
@@ -194,9 +202,21 @@ class KronCompose(nn.Module):
         self.tau = nn.Parameter(torch.full((L,), float(innovation_scale)))
         # ReZero gate: the branch starts as a small perturbation
         self.gate = nn.Parameter(torch.tensor(float(gate_init))) if use_gate else None
+        # Per-channel mixing coefficients for the sum composition.  The
+        # product composition keeps ``alpha=None`` so old checkpoints and the
+        # parameter count of the product runs stay unchanged.
+        self.alpha = (nn.Parameter(torch.full((L,), self.sum_alpha_init))
+                      if self.composition == "sum" else None)
 
         if self.anchor:
-            s0 = float(s_init) ** (1.0 / L) if s_init_effective else float(s_init)
+            # For a product, s_init denotes the effective post-composition
+            # anchor, so each factor gets its L-th root.  A sum has no L-fold
+            # product: s_init is already the coefficient of the identity term.
+            if self.composition == "sum":
+                s0 = float(s_init)
+            else:
+                s0 = (float(s_init) ** (1.0 / L)
+                      if s_init_effective else float(s_init))
             if s_learnable:
                 self.s = nn.Parameter(torch.tensor(s0))
             else:
@@ -220,6 +240,8 @@ class KronCompose(nn.Module):
         with torch.no_grad():
             self.theta.normal_(0.0, 0.1)
             self.tau.fill_(self.innovation_scale)
+            if self.alpha is not None:
+                self.alpha.fill_(self.sum_alpha_init)
 
     @property
     def n_params(self) -> int:
@@ -228,6 +250,8 @@ class KronCompose(nn.Module):
             total += 1
         if self.gate is not None:
             total += 1
+        if self.alpha is not None:
+            total += self.alpha.numel()
         return total
 
     # -- state ------------------------------------------------------------
@@ -280,6 +304,35 @@ class KronCompose(nn.Module):
             P = torch.addmm(s * P, D[l], P)
         return P
 
+    def compose_sum(self, D: torch.Tensor) -> torch.Tensor:
+        """``P = s Id + sum_l alpha_l D_l`` (sum composition).
+
+        Unlike the product, the sum keeps every channel's contribution
+        additive; ``alpha`` lets the model re-weight channels independently.
+        """
+        assert self.alpha is not None
+        P = self.alpha[0] * D[0]
+        for l in range(1, self.L):
+            P = P + self.alpha[l] * D[l]
+        if self.s is not None:
+            P = P + self.s * cached_eye(self.d_in, D.device, D.dtype)
+        return P
+
+    def compose(self, D: torch.Tensor) -> torch.Tensor:
+        """Compose the depth state with the configured operation."""
+        if self.composition == "sum":
+            return self.compose_sum(D)
+        return self.compose_product(D)
+
+    @property
+    def anchor_term(self) -> Optional[torch.Tensor]:
+        """Identity coefficient in the composed map (``s`` or ``s**L``)."""
+        if self.s is None:
+            return None
+        if self.composition == "sum":
+            return self.s
+        return self.s ** self.L
+
     @torch.no_grad()
     def materialize(self, D: torch.Tensor) -> torch.Tensor:
         """Dense ``(L, d, d)`` factor matrices ``W_l = s Id + D_l``."""
@@ -330,23 +383,29 @@ class KronCompose(nn.Module):
         #                  tokens in the batch, so for B*T >> L*d it is ~L x
         #                  cheaper in FLOPs than the sequential form.
         tokens = B * T
-        if mode == "auto":
-            use_matrix = (self.square and self.L > 1
-                          and tokens >= max(256, self.d_in))
-        else:
-            use_matrix = mode == "matrix" and self.square and self.L > 1
-        if use_matrix:
-            P = self.compose_product(D)
+        if self.composition == "sum":
+            # The sum is cheap even for a single token, so there is no reason
+            # to keep a separate sequential path.
+            P = self.compose_sum(D)
             y = torch.matmul(xm.reshape(tokens, self.d_in), P.transpose(0, 1))
-        elif self.anchor:
-            s = self.s
-            y = xm.reshape(tokens, self.d_in)
-            for l in range(self.L):
-                y = torch.addmm(s * y, y, D[l].transpose(0, 1))
         else:
-            y = xm.reshape(tokens, self.d_in)
-            for l in range(self.L):
-                y = torch.matmul(y, D[l].transpose(0, 1))
+            if mode == "auto":
+                use_matrix = (self.square and self.L > 1
+                              and tokens >= max(256, self.d_in))
+            else:
+                use_matrix = mode == "matrix" and self.square and self.L > 1
+            if use_matrix:
+                P = self.compose_product(D)
+                y = torch.matmul(xm.reshape(tokens, self.d_in), P.transpose(0, 1))
+            elif self.anchor:
+                s = self.s
+                y = xm.reshape(tokens, self.d_in)
+                for l in range(self.L):
+                    y = torch.addmm(s * y, y, D[l].transpose(0, 1))
+            else:
+                y = xm.reshape(tokens, self.d_in)
+                for l in range(self.L):
+                    y = torch.matmul(y, D[l].transpose(0, 1))
 
         y = y.reshape(B, T, self.d_out)
         if self.gate is not None:
@@ -354,11 +413,15 @@ class KronCompose(nn.Module):
         return y, D
 
     def extra_repr(self) -> str:
+        s = "None" if self.s is None else f"{float(self.s):.4g}"
+        gate = "None" if self.gate is None else f"{float(self.gate):.4g}"
+        alpha = ("" if self.alpha is None
+                 else f", alpha={float(self.alpha.mean()):.4g}")
         return (f"d={self.d_in}->{self.d_out}, L={self.L}, K={self.K}, "
                 f"K_win={self.K_win}, anchor={self.anchor}, "
-                f"s={None if self.s is None else float(self.s):.4g}, "
-                f"tau={float(self.tau.mean()):.4g}, "
-                f"gate={None if self.gate is None else float(self.gate):.4g}")
+                f"composition={self.composition}, s={s}, "
+                f"tau={float(self.tau.mean()):.4g}, gate={gate}"
+                f"{alpha}")
 
 
 # ---------------------------------------------------------------------------
@@ -409,7 +472,10 @@ class KronBank:
         self.stop_gradient = m0.stop_gradient
         self.normalize_D = m0.normalize_D
         self.anchor = m0.anchor
+        self.composition = m0.composition
         self._m0 = m0
+        assert all(m.composition == self.composition for m in mods), \
+            "KronBank requires one composition mode per group"
         assert all(self.layers[i] <= self.layers[i + 1]
                    for i in range(len(self.layers) - 1)), "layers must be sorted"
         # contiguous (layer, start, stop) ranges
@@ -469,8 +535,15 @@ class KronBank:
             Ds.append(Di)
         D = torch.cat(Ds, dim=0)
 
-        if self.anchor:
-            s = torch.stack([m.s for m in mods])       # (M,)
+        if self.composition == "sum":
+            alpha = torch.stack([m.alpha for m in mods])    # (M,L)
+            P = (alpha.view(M, L, 1, 1) * D).sum(dim=1)
+            if self.anchor:
+                s = torch.stack([m.s for m in mods])       # (M,)
+                eye = cached_eye(self.d_in, D.device, D.dtype)
+                P = P + s.view(M, 1, 1) * eye
+        elif self.anchor:
+            s = torch.stack([m.s for m in mods])           # (M,)
             eye = cached_eye(self.d_in, D.device, D.dtype)
             sI = s.view(M, 1, 1) * eye
             P = sI + D[:, 0]

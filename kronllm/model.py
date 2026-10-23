@@ -270,6 +270,8 @@ class KronBlock(nn.Module):
             normalize_D=bool(kc.get("normalize_D", True)),
             gate_init=float(kc.get("gate_init", 0.1)),
             use_gate=bool(kc.get("gate", True)),
+            composition=str(kc.get("composition", "product")),
+            sum_alpha_init=float(kc.get("sum_alpha_init", 1.0)),
         )
 
     def ffn_module(self) -> nn.Module:
@@ -471,7 +473,7 @@ class KronTransformer(nn.Module):
                 sig = (mod.L, mod.K, mod.d_in, mod.d_out, mod.n1_in, mod.n2_in,
                        mod.n1_out, mod.n2_out, mod.anchor, mod.normalize_D,
                        mod.stop_gradient, mod.K_win, mod.rezero_eps,
-                       mod.gate is None)
+                       mod.gate is None, mod.composition, mod.alpha is None)
                 g = groups.setdefault(sig, ([], [], []))
                 g[0].append(mod)
                 g[1].append(i)
@@ -659,9 +661,12 @@ class KronTransformer(nn.Module):
         mc = self.cfg["model"]
         d = self.d
         fused = self.use_bank or tokens >= max(256, d)
+        composition = str(mc["kron"].get("composition", "product"))
 
         def compose_cost(out_d: int, L: int) -> float:
             if fused and out_d == d and L > 1:
+                if composition == "sum":
+                    return d * out_d + L * d * d + L * d
                 return d * out_d + L * d * d * out_d / tokens + L * d
             return L * d * out_d + L * d
 

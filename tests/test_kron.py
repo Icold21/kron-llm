@@ -100,6 +100,39 @@ def test_T3b_matrix_mode_matches_sequential():
 
 
 # ---------------------------------------------------------------------------
+# T3c -- sum composition: P = sI + sum_l alpha_l D_l, no L-fold power
+# ---------------------------------------------------------------------------
+def test_T3c_sum_composition_matches_dense():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=3, K=2, K_win=0, s_init=0.7,
+                    anchor=True, rezero_eps=0.0, stop_gradient=False,
+                    normalize_D=False, innovation_scale=1.0,
+                    use_gate=False, composition="sum")
+    x = torch.randn(2, 5, 64)
+    y, D = m(x, None, layer_idx=0)
+    P = m.compose_sum(D)
+    ref = x.reshape(-1, 64) @ P.T
+    assert torch.allclose(y.reshape(-1, 64), ref, atol=1e-6)
+
+    # The anchor is s, not s**L: this is the point of the sum ablation.
+    expected = float(m.s) * torch.eye(64) + sum(
+        m.alpha[l] * D[l] for l in range(m.L))
+    assert torch.allclose(P, expected, atol=1e-6)
+
+
+def test_T3d_sum_identity_when_D_is_zero():
+    m = KronCompose(64, 64, 8, 8, L=4, K=2, K_win=2, s_init=0.5,
+                    anchor=True, composition="sum", use_gate=False)
+    with torch.no_grad():
+        m.A.zero_()
+        m.B.zero_()
+    x = torch.randn(2, 7, 64)
+    y, D = m(x, None, layer_idx=0)
+    assert torch.allclose(D, torch.zeros_like(D))
+    assert torch.allclose(y, float(m.s) * x, atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
 # T4 -- recurrence D_i = I_i + sigma(theta) * D_{i-1}
 # ---------------------------------------------------------------------------
 def test_T4_depth_recurrence():
@@ -164,6 +197,18 @@ def test_T5_full_backprop_optional():
     y, _ = m(x, prev, layer_idx=1)
     y.sum().backward()
     assert prev.grad is not None
+
+
+def test_T5_sum_alpha_gradient():
+    m = KronCompose(64, 64, 8, 8, L=3, K=2, K_win=0,
+                    stop_gradient=False, composition="sum")
+    x = torch.randn(1, 3, 64, requires_grad=True)
+    prev = torch.randn(3, 64, 64, requires_grad=True)
+    y, _ = m(x, prev, layer_idx=1)
+    y.pow(2).sum().backward()
+    assert prev.grad is not None
+    assert m.alpha.grad is not None
+    assert float(m.alpha.grad.abs().sum()) > 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -292,12 +337,14 @@ def test_kron_materialize_shape_and_rank():
 # ---------------------------------------------------------------------------
 # T16 -- batched prelude (KronBank) must equal the per-module reference path
 # ---------------------------------------------------------------------------
-def _tiny_model_cfg(n_layers: int = 3, d: int = 64, n1: int = 8, n2: int = 8):
+def _tiny_model_cfg(n_layers: int = 3, d: int = 64, n1: int = 8, n2: int = 8,
+                    composition: str = "product"):
     from kronllm.config import experiment_config
     cfg = experiment_config("E2")
     cfg["data"]["seq_len"] = 32
     cfg["model"].update({"d_model": d, "n_layers": n_layers, "n_heads": 4})
-    cfg["model"]["kron"].update({"n1": n1, "n2": n2})
+    cfg["model"]["kron"].update({"n1": n1, "n2": n2,
+                                 "composition": composition})
     return cfg
 
 
@@ -318,6 +365,44 @@ def test_T16_bank_matches_reference_gradients():
     from kronllm.model import KronTransformer
     torch.manual_seed(0)
     m = KronTransformer(_tiny_model_cfg())
+    x = torch.randint(0, 256, (2, 20))
+    y = torch.roll(x, -1, dims=1)
+
+    loss = m(x, y)["loss"]
+    loss.backward()
+    g_bank = {k: p.grad.detach().clone() for k, p in m.named_parameters()
+              if p.grad is not None}
+    m.zero_grad(set_to_none=True)
+
+    m._banks = []
+    loss2 = m(x, y)["loss"]
+    loss2.backward()
+    assert abs(float(loss) - float(loss2)) < 1e-6
+    for k, p in m.named_parameters():
+        if k not in g_bank:
+            continue
+        assert p.grad is not None, k
+        assert torch.allclose(g_bank[k], p.grad, atol=1e-5, rtol=1e-4), k
+
+
+def test_T16b_bank_matches_sum_reference_forward():
+    from kronllm.model import KronTransformer
+    torch.manual_seed(0)
+    m = KronTransformer(_tiny_model_cfg(composition="sum"))
+    assert m._banks, "expected the batched prelude to be active"
+    assert all(b.composition == "sum" for b in m._banks)
+    x = torch.randint(0, 256, (2, 20))
+    with torch.no_grad():
+        a = m(x)["logits"].clone()
+        m._banks = []
+        b = m(x)["logits"].clone()
+    assert torch.allclose(a, b, atol=1e-5), (a - b).abs().max().item()
+
+
+def test_T16c_bank_matches_sum_reference_gradients():
+    from kronllm.model import KronTransformer
+    torch.manual_seed(0)
+    m = KronTransformer(_tiny_model_cfg(composition="sum"))
     x = torch.randint(0, 256, (2, 20))
     y = torch.roll(x, -1, dims=1)
 
