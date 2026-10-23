@@ -46,6 +46,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 
 # ---------------------------------------------------------------------------
@@ -386,6 +387,27 @@ class KronCompose(nn.Module):
             return D.clone()
         return self.s * cached_eye(self.d_in, D.device, D.dtype) + D
 
+    # -- dynamic softmax gate ---------------------------------------------
+    def _gate_weights(self, xf: torch.Tensor) -> torch.Tensor:
+        """Per-token weights ``L * softmax(g(x))``; mean 1, uniform at init."""
+        if self.dynamic_gate == "dense":
+            logits = self.w_gate(xf)
+        else:
+            xm = xf.reshape(xf.shape[0], self.n1_in, self.n2_in)
+            z = torch.einsum("bpq,ip,jq->bij", xm,
+                             self.w_gate_A, self.w_gate_B)
+            logits = z.reshape(xf.shape[0], self.L) + self.w_gate_b
+        return self.L * torch.softmax(logits, dim=-1)
+
+    def _dynamic_sum(self, xf: torch.Tensor, D: torch.Tensor,
+                     s: torch.Tensor) -> torch.Tensor:
+        """``y = s x + sum_l w_l(x) (x D_l^T)`` (checkpointed unit)."""
+        w = self._gate_weights(xf)
+        y = xf * s
+        for l in range(self.L):
+            y = y + w[:, l:l + 1] * torch.matmul(xf, D[l].transpose(0, 1))
+        return y
+
     # -- forward ----------------------------------------------------------
     def forward(
         self,
@@ -432,20 +454,21 @@ class KronCompose(nn.Module):
         if self.composition == "sum":
             if self.dynamic_gate is not None:
                 xf = xm.reshape(tokens, self.d_in)
-                if self.dynamic_gate == "dense":
-                    logits = self.w_gate(xf)
+                if self.training:
+                    # The dynamic path cannot use KronBank (P depends on the
+                    # token) and L weighted GEMMs otherwise retain all their
+                    # activations; checkpoint recomputes them in the backward.
+                    s = (self.s if self.s is not None
+                         else torch.zeros((), device=xf.device, dtype=xf.dtype))
+                    y = checkpoint(self._dynamic_sum, xf, D, s,
+                                   use_reentrant=False)
                 else:
-                    z = torch.einsum("bpq,ip,jq->bij", xm,
-                                     self.w_gate_A, self.w_gate_B)
-                    logits = z.reshape(tokens, self.L) + self.w_gate_b
-                # L * softmax keeps the mean weight at 1 (uniform init ==
-                # the static alpha=1 sum).
-                w = self.L * torch.softmax(logits, dim=-1)
-                self._last_w_mean = w.mean(dim=0).detach()
-                y = xf * self.s if self.s is not None else torch.zeros_like(xf)
-                for l in range(self.L):
-                    y = y + w[:, l:l + 1] * torch.matmul(
-                        xf, D[l].transpose(0, 1))
+                    s = (self.s if self.s is not None
+                         else torch.zeros((), device=xf.device, dtype=xf.dtype))
+                    y = self._dynamic_sum(xf, D, s)
+                    with torch.no_grad():
+                        self._last_w_mean = self._gate_weights(
+                            xf).mean(dim=0).detach()
             else:
                 # The sum is cheap even for a single token, so there is no
                 # reason to keep a separate sequential path.

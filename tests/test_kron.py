@@ -173,6 +173,7 @@ def test_T17_dynamic_gate_uniform_equals_static_sum():
 def test_T17_dynamic_gate_weights_depend_on_input():
     torch.manual_seed(0)
     dyn = _sum_compose(dynamic_gate="dense")
+    dyn.eval()
     with torch.no_grad():
         dyn.w_gate.weight.normal_(0.0, 0.5)
         dyn.w_gate.bias.zero_()
