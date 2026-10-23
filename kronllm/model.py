@@ -54,6 +54,68 @@ class DenseFFN(nn.Module):
         return self.fc2(F.silu(self.fc1(x)))
 
 
+class KronEmbedding(nn.Module):
+    """Embedding table ``V x r`` as a sum of K Kronecker products.
+
+    The vocabulary is split as ``V = v1 * v2`` and the rank as ``r = r1 * r2``;
+    the table is
+
+        E = sum_k A_k (x) B_k,   A_k: v1 x r1,  B_k: v2 x r2.
+
+    Parameter cost is ``K * (v1*r1 + v2*r2)`` instead of ``V * r``, while the
+    rank stays in the same class as a dense ``V x r`` factorisation:
+    ``rank(A (x) B) = rank(A) * rank(B) <= r1 * r2 = r``.  With ``K`` summands
+    the table can reach rank ``min(V, r)``, i.e. the same information ceiling
+    as the dense factorised embedding it replaces, at a small fraction of the
+    parameter count for wide vocabularies.  The table is materialised once per
+    forward (``K * V * r`` MACs, amortised over the batch) and the tied head
+    keeps the same ``d*r + r*V`` per-token logits cost.
+    """
+
+    def __init__(self, vocab_size: int, rank: int, v1: int, v2: int,
+                 r1: int, r2: int, K: int) -> None:
+        super().__init__()
+        if v1 * v2 != vocab_size:
+            raise ValueError(f"v1*v2={v1 * v2} != vocab_size={vocab_size}")
+        if r1 * r2 != rank:
+            raise ValueError(f"r1*r2={r1 * r2} != rank={rank}")
+        self.v1, self.v2 = int(v1), int(v2)
+        self.r1, self.r2 = int(r1), int(r2)
+        self.rank = int(rank)
+        self.K = int(K)
+        self.A = nn.ParameterList(
+            [nn.Parameter(torch.empty(self.v1, self.r1)) for _ in range(self.K)])
+        self.B = nn.ParameterList(
+            [nn.Parameter(torch.empty(self.v2, self.r2)) for _ in range(self.K)])
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        for a in self.A:
+            nn.init.normal_(a, 0.0, 1.0)
+        for b in self.B:
+            nn.init.normal_(b, 0.0, 1.0)
+        # Rescale so that the composed table has entry std 1/sqrt(r), the same
+        # scale as a standard embedding initialisation.  Scaling every factor
+        # by s scales every Kronecker product by s^2.
+        with torch.no_grad():
+            t = self.table()
+            target = 1.0 / (self.rank ** 0.5)
+            s = (target / max(float(t.std()), 1e-8)) ** 0.5
+            for p in self.A:
+                p.mul_(s)
+            for p in self.B:
+                p.mul_(s)
+
+    def table(self) -> torch.Tensor:
+        """Materialise the ``(V, r)`` table (cached by the caller in eval)."""
+        out: Optional[torch.Tensor] = None
+        for a, b in zip(self.A, self.B):
+            kron = torch.kron(a, b)
+            out = kron if out is None else out + kron
+        assert out is not None
+        return out
+
+
 class RoutedEmbedding(nn.Module):
     """Dense token embeddings selected by a sparse top-k router.
 
@@ -390,11 +452,13 @@ class KronTransformer(nn.Module):
         mode = str(mc.get("embed_mode", "auto")).lower()
         if mode == "auto":
             mode = "factorised" if self.embed_rank > 0 else "dense"
-        if mode not in {"factorised", "dense", "routed"}:
+        if mode not in {"factorised", "dense", "routed", "kron"}:
             raise ValueError(
-                f"embed_mode must be auto/factorised/dense/routed, got {mode!r}")
+                f"embed_mode must be auto/factorised/dense/routed/kron, "
+                f"got {mode!r}")
         self.embed_mode = mode
         self.routed: Optional[RoutedEmbedding] = None
+        self.kron_embed: Optional[KronEmbedding] = None
         if mode == "routed":
             rc = mc.get("routed", {})
             self.routed = RoutedEmbedding(
@@ -407,6 +471,21 @@ class KronTransformer(nn.Module):
             self.embed_rank = 0
             self.embed = None
             self.embed_up = None
+            self.lm_head = None
+        elif mode == "kron":
+            if self.embed_rank <= 0:
+                raise ValueError("kron embedding requires embed_rank > 0")
+            # V x r table as a sum of Kronecker products; the up-projection
+            # U (d x r) is kept, so lookup and the tied head stay identical to
+            # the factorised mode -- only the V x r storage is compressed.
+            ek = mc.get("embed_kron", {})
+            self.kron_embed = KronEmbedding(
+                self.vocab_size, self.embed_rank,
+                v1=int(ek.get("v1", 64)), v2=int(ek.get("v2", 64)),
+                r1=int(ek.get("r1", 16)), r2=int(ek.get("r2", 8)),
+                K=int(ek.get("K", 32)))
+            self.embed = None
+            self.embed_up = nn.Linear(self.embed_rank, self.d, bias=False)
             self.lm_head = None
         elif mode == "factorised":
             if self.embed_rank <= 0:
@@ -550,13 +629,27 @@ class KronTransformer(nn.Module):
     def _embed_tokens(self, idx: torch.Tensor) -> torch.Tensor:
         if self.routed is not None:
             return F.embedding(idx, self._effective_embeddings())
-        x = self.embed(idx)
+        x = F.embedding(idx, self.embed_table())
         if self.embed_up is not None:
             x = self.embed_up(x)
         return x
 
+    def embed_table(self) -> torch.Tensor:
+        """The ``V x r`` lookup table: the kron composition or the dense factor.
+
+        The kron table is materialised fresh on every call; it costs
+        ``K * V * r`` MACs, which is amortised over the whole forward pass and
+        never cached (caching a tensor that carries a training-time graph would
+        leak gradients between forwards).
+        """
+        if self.kron_embed is not None:
+            return self.kron_embed.table()
+        assert self.embed is not None
+        return self.embed.weight
+
     def _logits(self, x: torch.Tensor,
-                eff: Optional[torch.Tensor] = None) -> torch.Tensor:
+                eff: Optional[torch.Tensor] = None,
+                emb: Optional[torch.Tensor] = None) -> torch.Tensor:
         if eff is not None:
             # The routed table is the input embedding and the tied head at the
             # same time: logits[v] = h . E_eff[v].
@@ -564,26 +657,30 @@ class KronTransformer(nn.Module):
         if self.embed_up is not None:
             # tied: h (d) -> r via U (shape d x r) -> V via E^T (r x V).
             # Costs d*r + r*V instead of d*V.
-            return torch.matmul(torch.matmul(x, self.embed_up.weight),
-                                self.embed.weight.t())
+            w = emb if emb is not None else self.embed_table()
+            return torch.matmul(torch.matmul(x, self.embed_up.weight), w.t())
         return self.lm_head(x)
 
-    def _ce_chunk(self, xc: torch.Tensor, yc: torch.Tensor,
-                  eff: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def _ce_chunk(self, xc: torch.Tensor, yc: torch.Tensor) -> torch.Tensor:
         """Cross-entropy over one row chunk; the checkpointed unit of
-        :meth:`_chunked_loss`."""
-        logits = self._logits(xc, eff)
+        :meth:`_chunked_loss`.  Runs under ``no_grad`` in the forward (freeing
+        the chunk's logits) and is recomputed in the backward, so at most one
+        chunk of ``chunk x V`` logits exists at a time.  All head weights it
+        reads are parameters (leaves), so gradients flow; the kron-embed table
+        is rebuilt from its factor parameters inside the recompute."""
+        logits = self._logits(xc)
         return F.cross_entropy(logits, yc, reduction="sum")
 
-    def _chunked_loss(self, x: torch.Tensor, targets: torch.Tensor,
-                      eff: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """Mean cross-entropy computed in row chunks of ``loss_chunk`` rows.
+    def _chunked_loss(self, x: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Mean cross-entropy in row chunks of ``loss_chunk`` rows.
 
         A wide vocabulary makes the full ``B*T*V`` logits tensor the largest
-        single allocation in the training step (100 MB at 32x192x4096 fp32).
-        Chunking plus :func:`torch.utils.checkpoint.checkpoint` keeps only one
-        chunk of logits alive at a time; the backward recomputes each chunk on
-        demand.  The result is mathematically identical to the unchunked loss.
+        single allocation of the training step (100 MB at 32x192x4096 fp32).
+        Each chunk runs under :func:`torch.utils.checkpoint.checkpoint`, so
+        only one chunk of logits is alive at a time and the backward recomputes
+        them on demand.  Mathematically identical to the unchunked loss.  Not
+        used for routed embeddings: their effective table is a non-leaf tensor
+        whose gradients checkpointing would detach.
         """
         y = targets.reshape(-1)
         xr = x.reshape(-1, x.size(-1))
@@ -591,8 +688,7 @@ class KronTransformer(nn.Module):
         total: Optional[torch.Tensor] = None
         for i in range(0, n, self.loss_chunk):
             chunk = checkpoint(self._ce_chunk, xr[i:i + self.loss_chunk],
-                               y[i:i + self.loss_chunk], eff,
-                               use_reentrant=False)
+                               y[i:i + self.loss_chunk], use_reentrant=False)
             total = chunk if total is None else total + chunk
         assert total is not None, "loss_chunk > 0 guarantees one chunk"
         return total / n
@@ -633,16 +729,17 @@ class KronTransformer(nn.Module):
             h_norms.append(x.detach().norm().item())
 
         x = self.norm_f(x)
+        emb = self.embed_table() if self.kron_embed is not None else None
 
         if (targets is not None and self.loss_chunk > 0
                 and self.routed is None):
             # Chunked loss: never materialise the full B*T*V logits tensor.
             # Used for training, validation and diagnostics alike; `collect`
             # still records the trace and stats from the block outputs.
-            out: Dict[str, Any] = {"loss": self._chunked_loss(x, targets, eff)}
+            out: Dict[str, Any] = {"loss": self._chunked_loss(x, targets)}
         else:
-            logits = self._logits(x, eff)
-            out: Dict[str, Any] = {"logits": logits}
+            logits = self._logits(x, eff, emb)
+            out = {"logits": logits}
             if targets is not None:
                 out["loss"] = F.cross_entropy(
                     logits.view(-1, self.vocab_size), targets.reshape(-1))
@@ -737,6 +834,10 @@ class KronTransformer(nn.Module):
         elif self.embed_up is not None:
             r = float(self.embed_rank)
             macs += d * r + r * self.vocab_size      # factorised tied head
+            if self.kron_embed is not None:
+                # Materialising the V x r kron table, amortised over the
+                # forward pass' tokens.
+                macs += self.kron_embed.K * self.vocab_size * r / tokens
         else:
             macs += d * self.vocab_size              # lm head
         macs += 2 * d

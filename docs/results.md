@@ -331,4 +331,11 @@ materialised; without that the wider vocabulary exceeds the 6 GB card. Runs
 4,000 steps against Q4's 0.9248 bpb.
 
 Q5 = Q4 + `K=24` (7,747,832 parameters) at the same activation footprint;
-queued after Q6. Both are recorded in `current_progress.md` as they finish.
+queued after Q6.
+
+Q7 = Q6 + kron-structured embedding (`E = Σ_k A_k ⊗ B_k`, §5.2 of
+[architecture.md](architecture.md)): the embedding+head budget drops from
+565,248 to 90,112 parameters (1,998,072 total) at the same rank ceiling. It
+runs 4,000 steps against Q6 to test whether the composed table keeps the same
+information. All follow-ups are recorded in `current_progress.md` as they
+finish.

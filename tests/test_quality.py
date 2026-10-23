@@ -152,23 +152,87 @@ def test_qk_norm_forward_finite():
 
 
 def test_chunked_loss_matches_full_and_grads_flow():
-    """`model.loss_chunk` must reproduce the unchunked loss exactly and keep
-    a gradient path to the embedding."""
+    """Checkpoint-chunked loss must equal the unchunked loss and produce the
+    same gradients."""
     cfg = make_cfg(**{"model.loss_chunk": 4})
-    model = KronTransformer(cfg).eval()
+    model = KronTransformer(cfg).train()
     x = torch.randint(0, 256, (2, 11))
     y = torch.roll(x, -1, dims=1)
 
     model.loss_chunk = 0
-    with torch.no_grad():
-        full = model(x, y)["loss"].item()
+    full = model(x, y)["loss"]
+    full.backward()
+    grads_full = {n: p.grad.detach().clone()
+                  for n, p in model.named_parameters() if p.grad is not None}
+    assert torch.isfinite(full)
 
+    model.zero_grad(set_to_none=True)
     model.loss_chunk = 4
-    loss = model(x, y)["loss"]
-    assert abs(loss.item() - full) <= 1e-5 * max(1.0, abs(full))
+    out = model(x, y)
+    assert "logits" not in out
+    assert abs(float(out["loss"]) - float(full)) <= 1e-4 * max(1.0, abs(float(full)))
+    out["loss"].backward()
+    for n, p in model.named_parameters():
+        if n in grads_full:
+            assert torch.allclose(p.grad, grads_full[n], atol=1e-5,
+                                  rtol=1e-4), f"grad mismatch at {n}"
+
+
+def test_kron_embedding_builds_and_forward_finite():
+    cfg = make_cfg(**{"model.embed_rank": 32, "model.embed_mode": "kron",
+                      "model.embed_kron": {"v1": 16, "v2": 16, "r1": 4,
+                                           "r2": 8, "K": 8}})
+    model = KronTransformer(cfg)
+    assert model.embed_mode == "kron"
+    assert model.embed is None and model.embed_up is not None
+    table = model.embed_table()
+    assert tuple(table.shape) == (256, 32)
+    x = torch.randint(0, 256, (2, 16))
+    out = model(x, torch.roll(x, -1, dims=1))
+    assert torch.isfinite(out["loss"])
+
+
+def test_kron_embedding_param_cost_and_grads():
+    """The kron table costs K*(v1*r1 + v2*r2) parameters, far below V*r, and
+    gradients flow to every factor."""
+    v1, v2, r1, r2, K = 16, 16, 4, 8, 8
+    cfg = make_cfg(**{"model.embed_rank": 32, "model.embed_mode": "kron",
+                      "model.embed_kron": {"v1": v1, "v2": v2, "r1": r1,
+                                           "r2": r2, "K": K}})
+    model = KronTransformer(cfg)
+    factor_params = sum(p.numel() for p in model.kron_embed.parameters())
+    assert factor_params == K * (v1 * r1 + v2 * r2)
+    assert factor_params < 256 * 32, "kron table must be cheaper than V*r"
+
+    x = torch.randint(0, 256, (2, 16))
+    loss = model(x, torch.roll(x, -1, dims=1))["loss"]
     loss.backward()
-    assert model.embed.weight.grad is not None
-    assert torch.isfinite(model.embed.weight.grad).all()
+    for p in model.kron_embed.parameters():
+        assert p.grad is not None and torch.isfinite(p.grad).all()
+
+
+def test_kron_embedding_chunked_loss_grads():
+    """The kron table is rebuilt from its factor parameters inside each
+    checkpointed chunk, so gradients must reach every factor."""
+    cfg = make_cfg(**{"model.embed_rank": 32, "model.embed_mode": "kron",
+                      "model.embed_kron": {"v1": 16, "v2": 16, "r1": 4,
+                                           "r2": 8, "K": 8},
+                      "model.loss_chunk": 4})
+    model = KronTransformer(cfg).train()
+    x = torch.randint(0, 256, (2, 16))
+    out = model(x, torch.roll(x, -1, dims=1))
+    assert "logits" not in out
+    out["loss"].backward()
+    for p in model.kron_embed.parameters():
+        assert p.grad is not None and torch.isfinite(p.grad).all()
+
+
+def test_kron_embedding_bad_shapes_raise():
+    cfg = make_cfg(**{"model.embed_rank": 32, "model.embed_mode": "kron",
+                      "model.embed_kron": {"v1": 15, "v2": 16, "r1": 4,
+                                           "r2": 8, "K": 8}})
+    with pytest.raises(ValueError):
+        KronTransformer(cfg)
 
 
 # ---------------------------------------------------------------------------

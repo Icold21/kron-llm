@@ -151,6 +151,31 @@ and the router through the selected logits; the top-k indices themselves are
 discrete. `model.set_route_top_k(k)` changes `k` at generation time and
 invalidates the effective-table cache.
 
+### 5.2 Kronecker-structured embedding (`embed_mode="kron"`, Q7)
+
+The factorised `V × r` table grows linearly with the vocabulary. In kron mode
+the table is a sum of Kronecker products:
+
+```
+E = sum_k A_k (x) B_k,    V = v1*v2,  r = r1*r2
+A_k: (v1, r1),  B_k: (v2, r2)
+```
+
+The parameter cost is `K·(v1·r1 + v2·r2)` instead of `V·r`, and the rank
+ceiling is unchanged: `rank(A ⊗ B) = rank(A)·rank(B) ≤ r1·r2 = r`, so `K`
+summands can reach the same rank `min(V, r)` as the dense factorisation.
+Lookup and the tied head are untouched (`logits = h·Uᵀ·Eᵀ`); only the storage
+of `E` is compressed. The table is materialised fresh on every forward
+(`K·V·r` MACs, amortised over the batch; never cached, because a cached tensor
+would carry a stale training graph).
+
+For Q7 (`V=4096, r=128, v1=v2=64, r1=16, r2=8, K=32`) the factors cost
+`32·(1024+512) = 49,152` parameters versus `524,288` for the dense factor --
+a 10.7× reduction, with the model dropping from 2,473,208 to 1,998,072
+parameters. The ratio improves as the vocabulary grows. Whether the composed
+table stores the *same information* as the dense factor is exactly what Q7
+tests at equal steps against Q6.
+
 ## 6. Batched prelude (`KronBank`)
 
 On WDDM every kernel launch costs ~45 µs, so computing 120 small compositions

@@ -1005,6 +1005,7 @@ artifacts/
 | step | why | expected effect |
 |---|---|---|
 | **Q6: BPE-4096 tokenizer** (running) | BPE-1024 gives 3.07 bytes/token; a wider vocab raises bpb and generation bytes/s for ~393k extra parameters | −0.03…−0.06 bpb at the same steps, more bytes/s |
+| **Q7: Kronecker embedding** (queued) | the `V × r` table becomes `Σ_k A_k ⊗ B_k`: 49K instead of 524K parameters at the same rank ceiling, so a wide vocab stops eating the 10M budget | embedding budget scales with `K·(v1·r1 + v2·r2)`; Q7 tests whether the composed table keeps Q6's quality |
 | **Q5: `K=24` at Q2's activation footprint** (queued) | spends the 10M parameter ceiling on Kronecker summands without increasing activation memory | ~7.75M params, still 6 GB, more expressive `D_l` |
 | **Orthogonal anchor** (`O_l` Householder + `D_l`) | keeps `W_l` full-rank and stable while allowing larger `D_l` | tests H2 without the near-identity compromise; higher risk |
 | **E1 / dense-2M controls** | isolate attention vs FFN and parameter count | the missing controls behind the current claims |

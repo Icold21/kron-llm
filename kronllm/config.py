@@ -49,7 +49,16 @@ DEFAULTS: Dict[str, Any] = {
         "embed_rank": 0,
         # "auto" -> factorised when embed_rank > 0, dense otherwise.
         # "routed" -> top-k mixture of a dense (v_eff, d) bank (Q3).
+        # "kron" -> the V x r table is a sum of Kronecker products
+        #           (embed_kron); lookup and the tied head are unchanged.
         "embed_mode": "auto",
+        "embed_kron": {
+            # E = sum_k A_k (x) B_k,  V = v1*v2, r = r1*r2.
+            # Cost: K*(v1*r1 + v2*r2) instead of V*r.
+            "v1": 64, "v2": 64,
+            "r1": 16, "r2": 8,
+            "K": 32,
+        },
         "routed": {
             "v_eff": 5000,
             "route_dim": 6,
@@ -409,6 +418,20 @@ EXPERIMENTS["Q6"] = {
         "data.meta_file": "tokenizer_meta4096.json",
         "model.loss_chunk": 1024,
         "training.max_steps": 4000,
+    },
+}
+
+# Q7: Kronecker-structured embedding on top of Q6.  The V x r table becomes
+# E = sum_k A_k (x) B_k with V = v1*v2 and r = r1*r2, so the embedding budget
+# scales as K*(v1*r1 + v2*r2) instead of V*r: 49,152 parameters instead of
+# 524,288 at the same rank ceiling (r1*r2 = r).  Lookup and the tied head are
+# unchanged; only the table storage is compressed.
+EXPERIMENTS["Q7"] = {
+    "desc": "Q6 + kron embedding (49K vs 524K embed params)",
+    "overrides": {
+        **EXPERIMENTS["Q6"]["overrides"],
+        "model.embed_mode": "kron",
+        "model.embed_kron": {"v1": 64, "v2": 64, "r1": 16, "r2": 8, "K": 32},
     },
 }
 
