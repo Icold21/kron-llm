@@ -462,6 +462,19 @@ EXPERIMENTS["Q7"] = {
     },
 }
 
+# Wikitext probes: the product-vs-sum question on a harder corpus than
+# TinyStories, at the E2/E8 geometry (byte level, seq 256, batch 128).
+EXPERIMENTS["E8w"] = {
+    "desc": "E8 (full backprop) on WikiText-103 bytes",
+    "overrides": {**EXPERIMENTS["E8"]["overrides"],
+                  "data.data_dir": "data/wikitext"},
+}
+EXPERIMENTS["E14w"] = {
+    "desc": "E14 (sum composition) on WikiText-103 bytes",
+    "overrides": {**EXPERIMENTS["E14"]["overrides"],
+                  "data.data_dir": "data/wikitext"},
+}
+
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
     """Recursively merge ``override`` into a copy of ``base``."""

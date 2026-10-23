@@ -30,3 +30,5 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+data/wikitext/
