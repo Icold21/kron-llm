@@ -559,3 +559,56 @@ def test_kron_innovation_factorized_matches_dense():
     dense = x @ m.innovation()[0].t()
     factored = m.apply_innovation(x, 0)
     assert torch.allclose(dense, factored, atol=1e-5)
+
+# ---------------------------------------------------------------------------
+# Grouped composition: sum inside groups, product across groups
+# ---------------------------------------------------------------------------
+def test_grouped_G1_equals_sum():
+    torch.manual_seed(0)
+    kw = dict(d_in=64, d_out=64, n1_in=8, n2_in=8, L=2, K=2, K_win=0,
+              s_init=0.7, anchor=True, normalize_D=False,
+              innovation_scale=1.0, use_gate=False)
+    sum_m = KronCompose(**kw, composition="sum")
+    grp_m = KronCompose(**kw, composition="grouped", groups=1)
+    grp_m.load_state_dict(sum_m.state_dict(), strict=False)
+    x = torch.randn(2, 5, 64)
+    y_sum, D_sum = sum_m(x, None, 0)
+    y_grp, D_grp = grp_m(x, None, 0)
+    assert torch.allclose(y_sum, y_grp, atol=1e-5)
+    assert torch.allclose(sum_m.compose_sum(D_sum),
+                          grp_m.compose_grouped(D_grp), atol=1e-5)
+
+
+def test_grouped_GL_equals_product():
+    torch.manual_seed(0)
+    kw = dict(d_in=64, d_out=64, n1_in=8, n2_in=8, L=2, K=2, K_win=0,
+              s_init=0.7, anchor=True, normalize_D=False,
+              innovation_scale=1.0, use_gate=False)
+    prod = KronCompose(**kw, composition="product")
+    torch.manual_seed(0)
+    grp = KronCompose(**kw, composition="grouped", groups=2)
+    x = torch.randn(2, 5, 64)
+    y_p, D_p = prod(x, None, 0)
+    y_g, D_g = grp(x, None, 0)
+    assert torch.allclose(y_p, y_g, atol=1e-5)
+    assert torch.allclose(prod.compose_product(D_p),
+                          grp.compose_grouped(D_g), atol=1e-5)
+
+
+def test_grouped_G2_forward_and_gradients():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=4, K=2, K_win=0, s_init=0.7,
+                    anchor=True, normalize_D=True, innovation_scale=0.1,
+                    use_gate=False, composition="grouped", groups=2)
+    x = torch.randn(2, 6, 64, requires_grad=True)
+    y, D = m(x, None, 0)
+    y.square().mean().backward()
+    assert torch.isfinite(y).all()
+    assert m.alpha is not None and m.alpha.grad is not None
+    assert m.A.grad is not None and torch.isfinite(m.A.grad).all()
+
+
+def test_grouped_rejects_bad_group_count():
+    import pytest
+    with pytest.raises(ValueError):
+        KronCompose(64, 64, 8, 8, L=4, K=2, composition="grouped", groups=3)

@@ -175,6 +175,7 @@ class KronCompose(nn.Module):
         composition: str = "product",
         sum_alpha_init: float = 1.0,
         dynamic_gate: Optional[str] = None,
+        groups: int = 1,
     ) -> None:
         super().__init__()
         d_out = d_in if d_out is None else d_out
@@ -194,9 +195,17 @@ class KronCompose(nn.Module):
         assert self.square or L == 1, "non-square KronCompose requires L == 1"
 
         self.composition = str(composition).lower()
-        if self.composition not in {"product", "sum"}:
+        if self.composition not in {"product", "sum", "grouped"}:
             raise ValueError(
-                f"composition must be 'product' or 'sum', got {composition!r}")
+                "composition must be 'product', 'sum' or 'grouped', got "
+                f"{composition!r}")
+        self.groups = int(groups)
+        if self.composition == "grouped":
+            if self.groups < 1 or L % self.groups != 0:
+                raise ValueError(
+                    f"groups={groups} must divide L={L}")
+        else:
+            self.groups = 1
         self.sum_alpha_init = float(sum_alpha_init)
         self.dynamic_gate = (str(dynamic_gate).lower() if dynamic_gate else None)
         if self.dynamic_gate is not None:
@@ -226,7 +235,7 @@ class KronCompose(nn.Module):
         # product composition keeps ``alpha=None`` so old checkpoints and the
         # parameter count of the product runs stay unchanged.
         self.alpha = (nn.Parameter(torch.full((L,), self.sum_alpha_init))
-                      if self.composition == "sum" else None)
+                      if self.composition in {"sum", "grouped"} else None)
 
         # Input-dependent softmax gate over the L sum-composition terms:
         #   w_t = L * softmax(g(x_t)),  P_t = sI + sum_l w_{t,l} D_l.
@@ -247,10 +256,11 @@ class KronCompose(nn.Module):
                                  persistent=False)
 
         if self.anchor:
-            # For a product, s_init denotes the effective post-composition
-            # anchor, so each factor gets its L-th root.  A sum has no L-fold
-            # product: s_init is already the coefficient of the identity term.
-            if self.composition == "sum":
+            # A sum has no L-fold product: s_init is already the coefficient of
+            # the identity term.  A grouped composition is a product of G sums,
+            # so s_init is also the *effective* anchor (each group gets its
+            # G-th root at composition time).
+            if self.composition in {"sum", "grouped"}:
                 s0 = float(s_init)
             else:
                 s0 = (float(s_init) ** (1.0 / L)
@@ -386,10 +396,42 @@ class KronCompose(nn.Module):
             P = P + self.s * cached_eye(self.d_in, D.device, D.dtype)
         return P
 
+    def compose_grouped(self, D: torch.Tensor) -> torch.Tensor:
+        """Grouped composition: sum inside groups, product across groups.
+
+        With ``L`` factors split into ``G`` groups of size ``L/G``:
+
+            S_g = s^(1/G) I + sum_{l in g} alpha_l D_l
+            P   = S_G ... S_1
+
+        ``G=1`` is exactly the sum composition; ``G=L`` is exactly the product
+        (with ``alpha=1``), so the family interpolates between the two.  The
+        multiplicative depth is ``G-1`` instead of ``L-1``: less conditioning
+        and rank collapse than the product, more interaction than the sum.
+        """
+        G = self.groups
+        m = self.L // G
+        sg = (self.s ** (1.0 / G)) if self.s is not None else None
+        eye = (cached_eye(self.d_in, D.device, D.dtype)
+               if sg is not None else None)
+        P: Optional[torch.Tensor] = None
+        for g in range(G):
+            start = g * m
+            S = self.alpha[start] * D[start]
+            for l in range(start + 1, start + m):
+                S = S + self.alpha[l] * D[l]
+            if sg is not None:
+                S = S + sg * eye
+            P = S if P is None else S @ P
+        assert P is not None
+        return P
+
     def compose(self, D: torch.Tensor) -> torch.Tensor:
         """Compose the depth state with the configured operation."""
         if self.composition == "sum":
             return self.compose_sum(D)
+        if self.composition == "grouped":
+            return self.compose_grouped(D)
         return self.compose_product(D)
 
     @property
@@ -398,6 +440,8 @@ class KronCompose(nn.Module):
         if self.s is None:
             return None
         if self.composition == "sum":
+            return self.s
+        if self.composition == "grouped":
             return self.s
         return self.s ** self.L
 
@@ -496,23 +540,30 @@ class KronCompose(nn.Module):
                 P = self.compose_sum(D)
                 y = torch.matmul(xm.reshape(tokens, self.d_in), P.transpose(0, 1))
         else:
-            if mode == "auto":
-                use_matrix = (self.square and self.L > 1
-                              and tokens >= max(256, self.d_in))
-            else:
-                use_matrix = mode == "matrix" and self.square and self.L > 1
-            if use_matrix:
-                P = self.compose_product(D)
+            if self.composition == "grouped":
+                # Grouped always builds its (G-1)-fold product of group sums;
+                # there is no cheap per-factor sequential fallback.
+                P = self.compose_grouped(D)
                 y = torch.matmul(xm.reshape(tokens, self.d_in), P.transpose(0, 1))
-            elif self.anchor:
-                s = self.s
-                y = xm.reshape(tokens, self.d_in)
-                for l in range(self.L):
-                    y = torch.addmm(s * y, y, D[l].transpose(0, 1))
             else:
-                y = xm.reshape(tokens, self.d_in)
-                for l in range(self.L):
-                    y = torch.matmul(y, D[l].transpose(0, 1))
+                if mode == "auto":
+                    use_matrix = (self.square and self.L > 1
+                                  and tokens >= max(256, self.d_in))
+                else:
+                    use_matrix = mode == "matrix" and self.square and self.L > 1
+                if use_matrix:
+                    P = self.compose_product(D)
+                    y = torch.matmul(xm.reshape(tokens, self.d_in),
+                                     P.transpose(0, 1))
+                elif self.anchor:
+                    s = self.s
+                    y = xm.reshape(tokens, self.d_in)
+                    for l in range(self.L):
+                        y = torch.addmm(s * y, y, D[l].transpose(0, 1))
+                else:
+                    y = xm.reshape(tokens, self.d_in)
+                    for l in range(self.L):
+                        y = torch.matmul(y, D[l].transpose(0, 1))
 
         y = y.reshape(B, T, self.d_out)
         if self.gate is not None:

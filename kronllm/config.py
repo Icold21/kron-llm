@@ -87,6 +87,9 @@ DEFAULTS: Dict[str, Any] = {
             # E15/E16: input-dependent softmax weights over the L sum terms.
             # None (static alpha) | "dense" (d x L linear) | "kron" (Kron gate).
             "dynamic_gate": None,
+            # E17: grouped composition -- sum inside `groups` blocks, product
+            # across blocks.  G=1 is the sum, G=L is the product.
+            "groups": 2,
             "anchor": True,          # E4 turns the s*I anchor off
             # Per-role anchor, interpreted as the *effective* (post L-fold)
             # value: s = s_init ** (1/L).  See README "Deviations".
@@ -473,6 +476,13 @@ EXPERIMENTS["E14w"] = {
     "desc": "E14 (sum composition) on WikiText-103 bytes",
     "overrides": {**EXPERIMENTS["E14"]["overrides"],
                   "data.data_dir": "data/wikitext"},
+}
+EXPERIMENTS["E17w"] = {
+    "desc": "E8 + grouped composition (G=2) on WikiText-103 bytes",
+    "overrides": {**EXPERIMENTS["E8"]["overrides"],
+                  "data.data_dir": "data/wikitext",
+                  "model.kron.composition": "grouped",
+                  "model.kron.groups": 2},
 }
 
 
