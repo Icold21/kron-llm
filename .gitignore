@@ -1,5 +1,9 @@
 # Byte-level and BPE corpora (hundreds of MB, reproducible from scripts/)
 data/*.bin
+# Generated BPE vocabulary variants (tokenizer4096.json, tokenizer_meta2048.json, ...);
+# the shipped data/tokenizer.json stays tracked.
+data/tokenizer*.json
+data/tokenizer_meta*.json
 
 # Training artifacts
 runs/

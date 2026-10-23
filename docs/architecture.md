@@ -84,6 +84,24 @@ y         = γ^{(i)} · P^{(i)} x
 The composition `P` is computed once per block and applied as a single
 `x @ Pᵀ`; see §6.
 
+### Sum-composition ablation (E14)
+
+The product is an empirical choice, not a requirement of the Kronecker
+parameterisation. E14 keeps the same innovations and depth recurrence but
+replaces the L-fold product with an additive composition:
+
+```
+P_sum^(i) = s * Id + sum_l alpha_l * D_l^(i)
+```
+
+`alpha_l` is a learnable per-channel coefficient initialised to 1.0. There is
+no exponentiation in this path: `s_init` is used directly as the coefficient of
+the identity, unlike the product path where each factor receives
+`s_init ** (1/L)` and the composed anchor is `s ** L`. The sum is therefore a
+direct test of whether the product, rather than the recurrence or the budget,
+causes the measured rank compression. `KronBank` evaluates the sum with one
+batched weighted reduction followed by a single GEMM.
+
 ## 4. Attention
 
 The block is pre-norm RMSNorm → attention → residual, then pre-norm RMSNorm →
@@ -137,8 +155,9 @@ invalidates the effective-table cache.
 
 On WDDM every kernel launch costs ~45 µs, so computing 120 small compositions
 one by one is wasteful. `KronBank` groups the modules by signature
-`(role, n₁, n₂, K, L)` and computes the innovations with batched `bmm` calls and
-the composition with `L−1` `baddbmm` calls. The result is mathematically
+`(role, n₁, n₂, K, L, composition)` and computes the innovations with batched
+`bmm` calls and the composition with `L−1` `baddbmm` calls (product) or one
+weighted reduction (sum). The result is mathematically
 identical to the per-module path (test T16 checks forward and all gradients) and
 saves ~15 % of step time.
 
@@ -161,6 +180,12 @@ formula. The reported values are 3.70M (E2), 11.2M (Q1) and 36.2M (Q2) per
 token. Since the tokenizers differ, the honest unit is FLOPs per **byte**:
 3.73 (E2), 3.66 (Q1) and 11.9 (Q2) MFLOP/byte.
 
+The sum path is not FLOP-free. It materialises `sI + Σ α_l D_l` on every forward,
+so its prelude costs `L·d²` per token, whereas the product is amortised over the
+sequence. At the E2 geometry, E8 (product) reports 3.70 MFLOP/token and E14
+(sum) reports 11.5 MFLOP/token at batch 64; the sum is an expressiveness
+ablation, not a cheaper model.
+
 ## 8. Implementation invariants
 
 The following properties are enforced by the test suite:
@@ -170,12 +195,15 @@ The following properties are enforced by the test suite:
 | T1 | `kron_apply(A, B, x)` equals `(A ⊗ B) x` and `A · X · Bᵀ` |
 | T2 | with `D = 0` a layer equals `γ · s^L · x` (the anchor) |
 | T3 | `kron_materialize` equals `torch.kron`; matrix mode equals sequential |
+| T3c | sum composition equals `sI + Σ α_l D_l`; the anchor is `s`, not `s^L` |
+| T3d | sum composition with `D = 0` is the identity times `s` |
 | T4 | the recurrence matches `D_l = I_l + σ·D_{l-1}`; normalised `D` has RMS `τ` |
-| T5 | stop-gradient blocks `∂L/∂θ` through `D_{l-1}` |
+| T5 | stop-gradient blocks `∂L/∂θ` through `D_{l-1}`; full backprop and `α_l` are differentiable |
 | T6 | RoPE preserves the norm and depends on position |
 | T7 | attention is causal |
 | T8 | the head is tied to the embedding |
 | T16 | `KronBank` equals the per-module path in forward and gradients |
+| T16b/T16c | `KronBank` equals the per-module sum path in forward and gradients |
 | T17 | the ReZero gate is active and differentiable |
 | T19 | the factorised tied embedding has `V·r + r·d` parameters |
 | T20 | QK-norm has unit per-head RMS and costs `2·d_head·N` |

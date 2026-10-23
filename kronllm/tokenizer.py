@@ -90,8 +90,8 @@ class BPETokenizer:
 # ---------------------------------------------------------------------------
 # factory
 # ---------------------------------------------------------------------------
-def meta_path(data_dir: str | Path) -> Path:
-    return Path(data_dir) / "tokenizer_meta.json"
+def meta_path(data_dir: str | Path, name: str | None = None) -> Path:
+    return Path(data_dir) / (str(name) if name else "tokenizer_meta.json")
 
 
 def load_tokenizer(cfg: Mapping[str, Any]):
@@ -102,7 +102,7 @@ def load_tokenizer(cfg: Mapping[str, Any]):
         return ByteTokenizer()
     if kind != "bpe":
         raise ValueError(f"unknown tokenizer {kind!r}")
-    path = meta_path(dc.get("data_dir", "data"))
+    path = meta_path(dc.get("data_dir", "data"), dc.get("meta_file"))
     if not path.exists():
         raise FileNotFoundError(
             f"{path} missing -- run `python scripts/prepare_bpe.py` first")

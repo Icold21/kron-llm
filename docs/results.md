@@ -20,16 +20,19 @@ is reproducible with the commands in §6 of the [README](../README.md).
 |---|---|---|---|---|---|---|---|
 | E0 | byte | 969,856 | 933,888 | 128 / 12 | dense | 256 / 128 | 2,500 |
 | E2 | byte | 190,108 | 154,140 | 128 / 12 | 2 / 4 | 256 / 128 | 2,500 |
+| E8 | byte | 190,108 | 154,140 | 128 / 12 | 2 / 4 | 256 / 128 | 4,000 |
+| E14 | byte | 190,348 | 154,380 | 128 / 12 | 2 / 4 (sum) | 256 / 128 | 4,000 |
 | Q1 | BPE-1024 | 926,468 | 800,900 | 192 / 20 | 5 / 4 | 192 / 64 | 4,200 |
 | Q2 | BPE-1024 | 2,079,992 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 10,000 |
+| Q4 | BPE-1024 | 2,079,992 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 4,000 |
 | Q3 (pilot) | BPE-1024 | 3,544,104 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 400 |
 | Q3warm | BPE-1024 | 3,544,104 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 24 | 500 |
 | Q3long | BPE-1024 | 3,544,104 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 24 | 2,000 |
 | D1 | BPE-1024 | 1,068,544 | 933,888 | 128 / 12 | — | 192 / 64 | 4,200 |
 | S1 | BPE-1024 | 2,079,992 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 400 |
 
-The fp32 checkpoints are **0.87 MB** (E2), **3.90 MB** (Q1), **4.31 MB**
-(D1), **8.55 MB** (Q2), **8.55 MB** (S1), and **14.41 MB**
+The fp32 checkpoints are **0.87 MB** (E2/E8/E14), **3.90 MB** (Q1),
+**4.31 MB** (D1), **8.55 MB** (Q2/Q4), **8.55 MB** (S1), and **14.41 MB**
 (Q3/Q3warm/Q3long).
 
 ## 2. Quality
@@ -38,8 +41,11 @@ The fp32 checkpoints are **0.87 MB** (E2), **3.90 MB** (Q1), **4.31 MB**
 |---|---|---|---|---|---|
 | E0 | 0.9789 | nats/byte | 2.661 | **1.412** | dense control, bytes |
 | E2 | 1.1502 | nats/byte | 3.159 | **1.659** | Kron, bytes |
+| E8 | 1.0251 | nats/byte | 2.79 | **1.479** | full backprop, best step 4,000 |
+| E14 | 1.0750 | nats/byte | 2.93 | **1.551** | sum composition, step 4,000; negative result |
 | Q1 | 2.0735 | nats/token | 7.953 | **0.976** | best checkpoint, step 4,000 |
 | Q2 | 1.7833 | nats/token | 5.95 | **0.839** | 10,000 steps |
+| Q4 | 1.9653 | nats/token | 7.137 | **0.9248** | full backprop, step 4,000 |
 | Q3 (pilot) | 4.4275 | nats/token | 83.7 | 2.083 | routed, step 400; not adopted |
 | Q3warm | 1.7502 | nats/token | 5.76 | **0.824** | routed, warm-started from Q2; not shipped |
 | Q3long | 2.7145 | nats/token | 15.10 | 1.277 | routed from scratch, step 2,000; no jump |
@@ -48,25 +54,26 @@ The fp32 checkpoints are **0.87 MB** (E2), **3.90 MB** (Q1), **4.31 MB**
 
 Validation curves (`runs/<id>/log.csv`):
 
-| step | E2 bpb | Q1 bpb | Q2 bpb |
-|---|---|---|---|
-| 500 | 1.768 | 1.525 | 1.482 |
-| 1,000 | 1.659 | 1.266 | 1.245 |
-| 1,500 | — | 1.149 | 1.132 |
-| 2,000 | — | 1.083 | 1.068 |
-| 2,500 | — | 1.044 | 1.037 |
-| 3,000 | — | 1.016 | 1.004 |
-| 3,500 | — | 0.994 | 0.980 |
-| 4,000 | — | **0.976** | 0.962 |
-| 4,500 | — | — | 0.946 |
-| 5,000 | — | — | 0.928 |
-| 6,000 | — | — | 0.902 |
-| 8,000 | — | — | 0.859 |
-| 10,000 | — | — | **0.839** |
+| step | E2 bpb | Q1 bpb | Q2 bpb | Q4 bpb |
+|---|---|---|---|---|
+| 500 | 1.768 | 1.525 | 1.482 | 1.490 |
+| 1,000 | 1.659 | 1.266 | 1.245 | 1.244 |
+| 1,500 | — | 1.149 | 1.132 | 1.115 |
+| 2,000 | — | 1.083 | 1.068 | 1.046 |
+| 2,500 | — | 1.044 | 1.037 | 1.001 |
+| 3,000 | — | 1.016 | 1.004 | 0.963 |
+| 3,500 | — | 0.994 | 0.980 | 0.939 |
+| 4,000 | — | **0.976** | 0.962 | **0.9248** |
+| 4,500 | — | — | 0.946 | — |
+| 5,000 | — | — | 0.928 | — |
+| 6,000 | — | — | 0.902 | — |
+| 8,000 | — | — | 0.859 | — |
+| 10,000 | — | — | **0.839** | — |
 
 The E2 run stops at 2,500 steps (0.45 epochs). Q1 was stopped at step 4,200 to
 spend the remaining time on Q2; its best checkpoint is step 4,000. Q2 sees 61.4M
-tokens (≈ 1.04 epochs of the BPE corpus) in 10,000 steps.
+tokens (≈ 1.04 epochs of the BPE corpus) in 10,000 steps. Q4 stops at the
+matched 4,000-step point and beats Q2 at every shared evaluation.
 
 ## 3. Cost
 
@@ -74,8 +81,11 @@ tokens (≈ 1.04 epochs of the BPE corpus) in 10,000 steps.
 |---|---|---|---|---|---|
 | E0 | 361 | 91k | 3.51 | 3.51 | ~2.0 GB |
 | E2 | 425 | 77k | 3.70 | 3.73 | 2.58 GB |
+| E8 | 414 | 79k | 3.70 | 3.73 | — |
+| E14 | 416 | 79k | 11.5 | 11.5 | 2.58 GB |
 | Q1 | 540 | 22.8k | 11.2 | 3.66 | ~3.5 GB |
 | Q2 | 1,055 | 5.8k | 36.2 | 11.9 | 4.22 GB |
+| Q4 | 820 | 7.5k | 36.2 | 11.9 | 4.31 GB |
 | D1 | 178 | 69k | 3.31 | 1.08 | 1.44 GB |
 | S1 | 844 | 7.3k | 36.2 | 11.9 | 4.22 GB |
 
@@ -97,24 +107,24 @@ KV cache), so the 2.08M quality checkpoint is usable without a GPU.
 
 Spectral diagnostics of E2 after 2,500 steps:
 
-| metric | value | comment |
-|---|---|---|
-| `eff_rank(D)` | 91.2 / 128 | was 1.0 with the specification's `gain = 1/√d` |
-| `eff_rank(P)` | 60.0 | the composition compresses rank |
-| `eff_rank(sI + ΣD_l)` | **101.0** | same trained `D_l`, sum diagnostic |
-| sum / product | **1.70** | multiplication removes ~40 % of the rank |
-| `eff_rank(P − s^L Id)` | 64.0 | the anchor dominates the spectrum |
-| `cos(W_i, W_{i−1})` | 0.719 | layers differ (was 1.000) |
-| `cos(P_i, P_{i−1})` | 0.083 | neighbouring compositions are nearly orthogonal |
-| `D_rms / s` | 0.118 | `s = 1.0`; RMS innovation is 12 % of the anchor |
-| `‖D‖_F / s` | 15.2 | high-rank `D` (128 × RMS) |
-| `σ_max(D) / s` | 3.60 | spectral norm is 3.6 × the anchor |
-| `τ` | 0.118 | grows with depth (0.105 → 0.17) |
-| `γ` | 0.115 | grows with depth (0.10 → 0.185) |
-| attention entropy | 1.65 | ln(256) = 5.55; the model uses context |
-| `‖h_i‖/‖h_{i−1}‖` | 1.66 (max 6.6) | the residual does not explode |
-| `Var_l σ(θ_l)` | 0.0039 | H3 is not confirmed (threshold 0.01) |
-| Spearman(eff_rank D, depth) | 0.378 | H2 is not confirmed (threshold 0.7) |
+| metric | E2 | E8 | E14 | comment |
+|---|---:|---:|---:|---|
+| `eff_rank(D)` | 91.2 / 128 | 91.7 / 128 | 88.8 / 128 | was 1.0 with the specification's `gain = 1/√d` |
+| `eff_rank(P)` | 60.0 | 60.3 | **97.66** | the product compresses rank; the trained sum does not |
+| `eff_rank(sI + ΣD_l)` | **101.0** | **101.2** | **97.66** | for E14 this is the trained composition |
+| sum / product | **1.70** | **1.70** | **1.00** | E14 removes the multiplication-rank gap |
+| `eff_rank(P − s^L Id)` | 64.0 | 64.1 | 96.55 (P − sI) | the anchor dominates the product spectrum |
+| `cos(W_i, W_{i−1})` | 0.719 | 0.761 | 0.717 | layers differ (was 1.000) |
+| `cos(P_i, P_{i−1})` | 0.083 | 0.104 | 0.318 (mean) | E14 compositions are more similar |
+| `D_rms / s` | 0.118 | 0.119 | 0.159 | `s = 1.0`; RMS innovation is 16 % of the anchor |
+| `‖D‖_F / s` | 15.2 | 15.3 | 20.4 | high-rank `D` (128 × RMS) |
+| `σ_max(D) / s` | 3.60 | 3.59 | 5.64 | spectral norm is 5.6 × the anchor |
+| `τ` | 0.118 | 0.119 | 0.159 | grows with depth |
+| `γ` | 0.115 | 0.115 | 0.182 | grows with depth |
+| attention entropy | 1.65 | 1.46 | 2.32 | ln(256) = 5.55; E14 is more diffuse |
+| `‖h_i‖/‖h_{i−1}‖` | 1.66 (max 6.6) | 1.54 (max 4.65) | 1.36 (max 1.95) | the residual does not explode |
+| `Var_l σ(θ_l)` | 0.0039 | 0.00248 | 0.00767 | H3 is not confirmed (threshold 0.01) |
+| Spearman(eff_rank D, depth) | 0.378 | 0.238 | 0.042 | H2 is not confirmed (threshold 0.7) |
 
 | metric | Q1 (step 4,000) | Q2 (step 10,000) |
 |---|---:|---:|
@@ -137,20 +147,41 @@ Spectral diagnostics of E2 after 2,500 steps:
 
 The `sI + ΣD_l` rows use the trained product model's `D_l`; they are a
 rank diagnostic, not a trained sum-composition run. They isolate the rank
-lost by multiplication itself; a trained sum ablation remains open.
+lost by multiplication itself. E14 trains the same additive composition; its
+result is reported in §9.
+
+E8 removes the stop-gradient and improves quality from **1.659** to **1.586**
+bpb at the matched 2,500-step point, reaching **1.479** at step 4,000. The
+spectral geometry is essentially unchanged: `eff_rank(P)` is 60.3 versus
+101.2 for the sum diagnostic, and `Var_l σ(θ_l)` is 0.00248. Full backprop
+therefore improves optimisation but does not remove the product's rank
+compression; H3 remains unconfirmed.
+
+E14 trains the additive composition directly. It removes the rank gap
+(`eff_rank(P) = 97.66`), but reaches only **1.551** bpb at step 4,000 versus
+E8's **1.479**, while costing **3.1×** the FLOPs/token. The alpha coefficients
+remain near 1.0 (mean 0.993, std 0.044), so the channels do not specialise.
+This is the strongest evidence that rank compression is **not** the quality
+bottleneck at this scale. The product remains the default; E14 is a negative
+ablation, not a shipped model.
 
 H2 and H3 remain unconfirmed at both scales: the depth-rank correlation is far
 below 0.7, and the variance of `σ(θ)` stays below 0.01. H1 is strongly
 supported by Q2's bpb and the D1 comparison. The full Q1/Q2 plots are in
 `runs/Q1/analysis/` and `runs/Q2/analysis/`.
 
+Q4 at step 4,000 keeps the Q2 geometry: `eff_rank(D) = 248.9 / 320`,
+`eff_rank(P) = 140.2`, `τ = 0.0884`, `gate = 0.107`, `cos(W_i, W_{i−1}) =
+0.896`, `Var_l σ(θ_l) = 0.00558`, Spearman 0.307. Full backprop improves
+quality without changing the spectral picture.
+
 ## 5. Hypotheses
 
-| hypothesis | criterion | E2 | verdict |
-|---|---|---|---|
-| H1: Kron is no worse than dense at fewer parameters | `PPL(E2) ≤ 1.2 · PPL(E0)` | 3.159 vs 2.661 (1.187) | confirmed |
-| H2: expressiveness grows with depth | `Spearman > 0.7` | 0.378 | rejected |
-| H3: channels split into fast and slow | `Var σ(θ) > 0.01` | 0.0039 | rejected |
+| hypothesis | criterion | E2 | E8 | E14 | verdict |
+|---|---|---|---|---|---|
+| H1: Kron is no worse than dense at fewer parameters | `PPL(E2) ≤ 1.2 · PPL(E0)` | 3.159 vs 2.661 (1.187) | 3.00 vs 2.661 (1.127), step 2,500 | 2.93 vs 2.661 (1.101) | confirmed |
+| H2: expressiveness grows with depth | `Spearman > 0.7` | 0.378 | 0.238 | 0.042 | rejected |
+| H3: channels split into fast and slow | `Var σ(θ) > 0.01` | 0.0039 | 0.00248 | 0.00767 | rejected |
 
 H2 and H3 are rejected in the *formulation used here*, not in general: the
 composition of matrices loses rank with depth, and `σ` multiplies an already
@@ -255,3 +286,49 @@ python -m kronllm.cli train --exp Q3 --steps 500 --run-dir runs/Q3warm/run \
     --override training.warmup_steps=50 \
     --override training.eval_every=100 --override training.log_every=50
 ```
+
+## 9. Full backprop and sum composition (E8/E14)
+
+E8 removes the stop-gradient from the depth recurrence. At the matched
+2,500-step point it reaches **1.586 bpb** versus E2's **1.659**, and its best
+checkpoint at step 4,000 reaches **1.479**. Full backprop therefore improves
+optimisation, but the spectral geometry is unchanged: at step 4,000
+`eff_rank(P) = 60.27`, `eff_rank(sI + ΣD_l) = 101.23`, and
+`Var_l σ(θ_l) = 0.00248`.
+
+E14 replaces the product with `P = sI + Σ α_l D_l`, using learnable `α_l`
+initialised to 1.0 and no exponentiation. It has 190,348 parameters and
+11.5 MFLOP/token at batch 64 (E8: 3.70), because the sum is materialised on
+every forward. At step 2,000 E14 reaches **1.675 bpb** versus E8's **1.656**;
+`eff_rank(P)` rises to **97.7** from 60.3, but the alpha coefficients stay near
+1.0.
+
+The final 4,000-step result is **1.551 bpb** (val loss 1.0750, PPL 2.93),
+against E8's **1.479** at the same step: the sum is **4.9 % worse** while using
+**3.1×** the FLOPs/token. The alpha coefficients end at mean **0.993**, std
+**0.044**, range 0.915–1.206, so the channels do not specialise.
+`Var_l σ(θ_l) = 0.00767` stays below the 0.01 threshold, and the depth-rank
+Spearman correlation is 0.042. The product remains the default; E14 is a
+negative result, not a shipped model. It shows that removing rank compression
+is not sufficient to improve quality.
+
+## 10. Quality-scale follow-ups (Q4/Q5/Q6)
+
+Q4 = Q2 + full backprop. At the matched 4,000-step point it reaches **0.9248
+bpb** (val loss 1.9653, PPL 7.137) versus Q2's **0.962**, at identical cost:
+2,079,992 parameters, 36.2 MFLOP/token, 4.31 GB peak VRAM. Q4 also beats Q2 at
+every shared evaluation from step 500 onward (see §2). The E8 win therefore
+survives at quality scale, and the stop-gradient stays off for all following
+runs. Q2 remains the shipped model because it trained longer (10,000 steps,
+0.839 bpb); Q4 is the new base for further runs.
+
+Q6 = Q4 + BPE-4096. BPE-1024 compresses to 3.07 bytes/token; BPE-4096 reaches
+**3.96 bytes/token** on the same corpus, and the factorised embedding
+(`V × rank`) makes the wider vocabulary cheap: 2,473,208 parameters total,
+34.5 MFLOP/token at batch 64. The loss is computed in row chunks
+(`model.loss_chunk = 1024`) so the `32 × 192 × 4096` logits tensor is never
+materialised; without that the wider vocabulary exceeds the 6 GB card. Runs
+4,000 steps against Q4's 0.9248 bpb.
+
+Q5 = Q4 + `K=24` (7,747,832 parameters) at the same activation footprint;
+queued after Q6. Both are recorded in `current_progress.md` as they finish.

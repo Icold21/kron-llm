@@ -24,6 +24,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .kron import KronBank, KronCompose, apply_rope, rope_frequencies
+from torch.utils.checkpoint import checkpoint
 
 # Roles in the order in which a block consumes them.  "fg" is the gate branch
 # of the optional gated FFN.
@@ -439,6 +440,10 @@ class KronTransformer(nn.Module):
         if self.routed is not None:
             self.routed.reset_parameters()
         self._banks: List[KronBank] = self._build_banks() if self.use_bank else []
+        # >0: compute the training loss in row chunks of this size (through
+        # torch.utils.checkpoint) so that a wide vocabulary never materialises
+        # the full B*T*V logits tensor.  0 disables chunking.
+        self.loss_chunk = int(mc.get("loss_chunk") or 0)
 
     # -- init -------------------------------------------------------------
     def _init_weights(self, module: nn.Module) -> None:
@@ -563,6 +568,35 @@ class KronTransformer(nn.Module):
                                 self.embed.weight.t())
         return self.lm_head(x)
 
+    def _ce_chunk(self, xc: torch.Tensor, yc: torch.Tensor,
+                  eff: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Cross-entropy over one row chunk; the checkpointed unit of
+        :meth:`_chunked_loss`."""
+        logits = self._logits(xc, eff)
+        return F.cross_entropy(logits, yc, reduction="sum")
+
+    def _chunked_loss(self, x: torch.Tensor, targets: torch.Tensor,
+                      eff: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Mean cross-entropy computed in row chunks of ``loss_chunk`` rows.
+
+        A wide vocabulary makes the full ``B*T*V`` logits tensor the largest
+        single allocation in the training step (100 MB at 32x192x4096 fp32).
+        Chunking plus :func:`torch.utils.checkpoint.checkpoint` keeps only one
+        chunk of logits alive at a time; the backward recomputes each chunk on
+        demand.  The result is mathematically identical to the unchunked loss.
+        """
+        y = targets.reshape(-1)
+        xr = x.reshape(-1, x.size(-1))
+        n = y.numel()
+        total: Optional[torch.Tensor] = None
+        for i in range(0, n, self.loss_chunk):
+            chunk = checkpoint(self._ce_chunk, xr[i:i + self.loss_chunk],
+                               y[i:i + self.loss_chunk], eff,
+                               use_reentrant=False)
+            total = chunk if total is None else total + chunk
+        assert total is not None, "loss_chunk > 0 guarantees one chunk"
+        return total / n
+
     # -- forward ----------------------------------------------------------
     def forward(self, idx: torch.Tensor, targets: Optional[torch.Tensor] = None,
                 collect: bool = False) -> Dict[str, Any]:
@@ -570,7 +604,6 @@ class KronTransformer(nn.Module):
         cos, sin = self._rope(T, idx.device)
         eff = self._effective_embeddings() if self.routed is not None else None
         x = F.embedding(idx, eff) if eff is not None else self._embed_tokens(idx)
-
         P_map: Dict[Tuple[int, str], torch.Tensor] = {}
         D_map: Dict[Tuple[int, str], torch.Tensor] = {}
         if self._banks:
@@ -600,12 +633,19 @@ class KronTransformer(nn.Module):
             h_norms.append(x.detach().norm().item())
 
         x = self.norm_f(x)
-        logits = self._logits(x, eff)
 
-        out: Dict[str, Any] = {"logits": logits}
-        if targets is not None:
-            out["loss"] = F.cross_entropy(
-                logits.view(-1, self.vocab_size), targets.reshape(-1))
+        if (targets is not None and self.loss_chunk > 0
+                and self.routed is None):
+            # Chunked loss: never materialise the full B*T*V logits tensor.
+            # Used for training, validation and diagnostics alike; `collect`
+            # still records the trace and stats from the block outputs.
+            out: Dict[str, Any] = {"loss": self._chunked_loss(x, targets, eff)}
+        else:
+            logits = self._logits(x, eff)
+            out: Dict[str, Any] = {"logits": logits}
+            if targets is not None:
+                out["loss"] = F.cross_entropy(
+                    logits.view(-1, self.vocab_size), targets.reshape(-1))
         if collect:
             ratios = [(h_norms[i + 1] + 1e-9) / (h_norms[i] + 1e-9)
                       for i in range(len(h_norms) - 1)]

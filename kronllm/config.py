@@ -392,6 +392,26 @@ EXPERIMENTS["Q5"] = {
     },
 }
 
+# Q6: a wider tokenizer on top of Q4.  BPE-1024 gives ~3.07 bytes/token; a
+# 4096-token vocabulary raises the compression rate and the generation
+# bytes/s.  The embedding table is factorised (V x rank), so the extra
+# vocabulary costs only ~393k parameters.  Artifacts are prepared with
+# `python scripts/prepare_bpe.py --vocab 4096 --suffix 4096` and live next to
+# the shipped BPE-1024 files.
+EXPERIMENTS["Q6"] = {
+    "desc": "Q4 + BPE-4096 tokenizer (~2.47M params)",
+    "overrides": {
+        **EXPERIMENTS["Q4"]["overrides"],
+        "data.vocab_size": 4096,
+        "data.eot_id": 4095,
+        "data.train_bin": "train.bpe4096.bin",
+        "data.val_bin": "val.bpe4096.bin",
+        "data.meta_file": "tokenizer_meta4096.json",
+        "model.loss_chunk": 1024,
+        "training.max_steps": 4000,
+    },
+}
+
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
     """Recursively merge ``override`` into a copy of ``base``."""

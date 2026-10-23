@@ -151,6 +151,26 @@ def test_qk_norm_forward_finite():
     assert torch.isfinite(out["logits"]).all()
 
 
+def test_chunked_loss_matches_full_and_grads_flow():
+    """`model.loss_chunk` must reproduce the unchunked loss exactly and keep
+    a gradient path to the embedding."""
+    cfg = make_cfg(**{"model.loss_chunk": 4})
+    model = KronTransformer(cfg).eval()
+    x = torch.randint(0, 256, (2, 11))
+    y = torch.roll(x, -1, dims=1)
+
+    model.loss_chunk = 0
+    with torch.no_grad():
+        full = model(x, y)["loss"].item()
+
+    model.loss_chunk = 4
+    loss = model(x, y)["loss"]
+    assert abs(loss.item() - full) <= 1e-5 * max(1.0, abs(full))
+    loss.backward()
+    assert model.embed.weight.grad is not None
+    assert torch.isfinite(model.embed.weight.grad).all()
+
+
 # ---------------------------------------------------------------------------
 # budget
 # ---------------------------------------------------------------------------

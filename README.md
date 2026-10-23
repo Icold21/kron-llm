@@ -8,7 +8,7 @@ single consumer GPU and generate on CPU. On TinyStories, the 926K model reaches
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-63%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-66%20passed-brightgreen.svg)](tests)
 [![Parameters](https://img.shields.io/badge/parameters-190K%E2%80%932.08M-orange.svg)](#at-a-glance)
 
 > **Naming.** The repository is `kron_llm`, the Python package is `kronllm`, and
@@ -19,7 +19,7 @@ single consumer GPU and generate on CPU. On TinyStories, the 926K model reaches
 | property | value |
 |---|---|
 | Models | 190,108 · 926,468 · 2,079,992 parameters |
-| Matrix parameterisation | Kronecker products, 4 channels × up to 6 summands |
+| Matrix parameterisation | Kronecker products, 4 channels × 2–8 summands; product or sum |
 | Tokenizer | byte-level BPE, 1,024 tokens, 3.05 bytes/token |
 | Context | 192 tokens |
 | Validation quality | **0.976 bpb** (Q1, 926K) · **0.839** (Q2, 2.08M) |
@@ -41,7 +41,7 @@ the organising goal.
 tokenizer, training, evaluation, spectral diagnostics, sampling, Dolly Q/A
 fine-tuning, int8/int4 post-training quantisation, an experimental routed dense
 embedding (Q3), a Hugging Face `PreTrainedModel` wrapper, a 28-cell acceptance
-notebook and 63 tests.
+notebook and 66 tests.
 
 **Quick start** (details in §6):
 
@@ -219,6 +219,7 @@ All values are ≤ 1,000,000 (the maximum is E0 at 97.0 % of the limit).
 | E11 | gated FFN | 220,936 | 184,968 | 0.20× |
 | E12 | no normalisation of D | 190,108 | 154,140 | 0.17× |
 | E13 | `K=8` (budget ~651K) | 650,908 | 614,940 | 0.66× |
+| E14 | sum composition, full backprop | 190,348 | 154,380 | 0.17× |
 
 ---
 
@@ -365,8 +366,8 @@ plots).
 | `eff_rank_W` | rank of `W = s·Id + D`; with the anchor it is always ≈ d, so it is not informative | ≈ d, ignore |
 | `rank_excess` | `eff_rank(W) − eff_rank(D)` — how much rank the anchor contributes | > 0 |
 | `eff_rank_P` | rank of the composition `P = W_L ⋯ W_1` | ≈ 60–90 |
-| `eff_rank_sum` | rank of the sum diagnostic `sI + ΣD_l` on the same trained `D_l` | > `eff_rank_P` means multiplication compresses |
-| `eff_rank_excess` | rank of `P − s^L·Id` — the non-anchor part of the composition | the larger the better |
+| `eff_rank_sum` | rank of `sI + ΣD_l`; on product runs it reuses the trained `D_l`, on E14 it is the trained composition | > `eff_rank_P` means multiplication compresses |
+| `eff_rank_excess` | rank of `P − s^L·Id` for product runs, `P − s·Id` for E14 | the larger the better |
 | `cos_prev_max` | cosine between `W_l` of neighbouring layers | 1.0 = identical layers; 0.7 = distinct |
 | `tau_mean`, `D_rms` | scale of D; `D_rms` equals τ by construction | 0.05–0.5 |
 | `D_rms / s`, `σ_max(D) / s` | innovation scale relative to the anchor | ≪ 1 = sum-like; ≈ 1 = product-like |
@@ -416,8 +417,8 @@ The RMS ratio is small, but `σ_max(D)/s` is 3.3–3.6: the innovation is not an
 infinitesimal perturbation. The rank loss is a property of the product and of
 the correlated channels, not just of a small RMS. The sum row uses the trained
 `D_l` from the product model; it is a diagnostic, not a trained sum-composition
-result. It shows that multiplication itself removes ~40 % of the rank; a
-trained sum ablation is future work.
+result. It shows that multiplication itself removes ~40 % of the rank. The
+trained sum ablation is E14 (§8.8).
 
 Two mechanisms are visible directly in the plots (`runs/E2/analysis/`):
 
@@ -437,23 +438,44 @@ of a byte-level vocabulary: the first letter of an English word is almost
 unpredictable from context, and the model has to keep a distribution over 26+
 options. No architecture fixes this — only BPE/word-level tokenisation does.
 
-### 8.2 The E0–E13 series: why it was stopped
+### 8.2 The E0–E14 series: why it was stopped
 
 The plan was 14 runs, E0–E13. After E2 it became clear that they differ by 1–3
 hyperparameters and change PPL by ±5–10 %: that answers "which of nearly
 identical configurations is slightly better", not "how to get good text". The
 time budget went into the quality branch Q: first **Q1** (BPE + 926K, §8.3),
-then **Q2** — the same architecture with 2.08M parameters (§8.4).
+then **Q2** — the same architecture with 2.08M parameters (§8.4). E8 (full
+backprop) and E14 (sum composition) were added later as targeted ablations of
+the two assumptions behind the product: stop-gradient and multiplication.
 
 | run | parameters | matrix | val loss | val PPL (token) | **val bpb** | steps |
 |---|---|---|---|---|---|---|
 | **E0** (dense, bytes) | 969,856 | 933,888 | 0.9789 | 2.661 | **1.412** | 2,500 |
 | **E2** (Kron, bytes) | 190,108 | 154,140 | 1.1502 | 3.159 | **1.659** | 2,500 |
+| **E8** (full backprop, bytes) | 190,108 | 154,140 | 1.0251 | 2.79 | **1.479** | 4,000 |
+| **E14** (sum, bytes) | 190,348 | 154,380 | 1.0750 | 2.93 | **1.551** | 4,000 |
 | **Q1** (Kron, BPE) | 926,468 | 800,900 | 2.0735 | 7.953 | **0.976** | 4,200 |
 | **Q2** (Kron, BPE) | 2,079,992 | 1,890,360 | 1.7833 | 5.95 | **0.839** | 10,000 |
+| **Q4** (full backprop, BPE) | 2,079,992 | 1,890,360 | 1.9653 | 7.137 | **0.9248** | 4,000 |
 
-`val loss`/`PPL` in this table are in different units (nats/byte for E0/E2,
-nats/token for Q1/Q2), so only the last column can be compared across rows.
+`val loss`/`PPL` in this table are in different units (nats/byte for
+E0/E2/E8/E14, nats/token for Q1/Q2/Q4), so only the last column can be compared
+across rows.
+
+**Full backprop (E8).** Removing the stop-gradient from the depth recurrence
+improves quality: at the matched 2,500-step point E8 reaches **1.586 bpb**
+versus E2's **1.659**, and its best checkpoint at step 4,000 reaches **1.479**.
+The run was stopped at step 4,400 because the default 3-epoch schedule would
+have run ~16k steps; 4,000 is the matched comparison point. The spectral
+picture does not change: at step 4,000 `eff_rank(P) = 60.27` versus
+`eff_rank(sI + ΣD_l) = 101.23` (ratio 1.70), `Var_l σ(θ_l) = 0.00248`, and
+`cos(W_i, W_{i−1}) = 0.761`. Full backprop buys quality but does **not** remove
+the product's rank compression; H3 is still not confirmed.
+
+**Full backprop at quality scale (Q4).** The E8 win survives at 2M: Q4 reaches
+**0.9248 bpb** at step 4,000 versus Q2's **0.962** at the same step, at
+identical cost (2,079,992 parameters, 36.2 MFLOP/token, 4.31 GB peak VRAM).
+The stop-gradient stays off in all following runs.
 
 `python scripts/run_experiments.py --rebuild-summary` builds
 `results/summary.csv` from `results/E*.json`; single runs are started as
@@ -730,6 +752,34 @@ Q2 quantises similarly on TinyStories: int8 is **2.45 MB** with **+0.0004 bpb**
 (32-batch evaluation), and int4 is **1.42 MB** with **+0.2193 bpb**. Only the Q2
 int8 artifact is shipped; the Q2 int4 file is not competitive.
 
+### 8.8 Sum composition (E14)
+
+E14 keeps E2's geometry and full backprop but replaces the L-fold product with
+an additive composition:
+
+```
+P = sI + sum_l alpha_l D_l
+```
+
+`alpha_l` is learnable per channel and initialised to 1.0. There is no
+exponentiation in this path: `s_init` is used directly, unlike the product
+where each factor receives `s_init ** (1/L)` and the composed anchor is
+`s ** L`. E14 has **190,348** parameters (154,380 in matrices; +240 alpha) and
+**11.5 MFLOP/token** at batch 64, versus 3.70 for E8, because the sum
+materialises `P` on every forward.
+
+E14 reaches **1.551 bpb** at step 4,000 versus E8's **1.479**: the sum is
+**4.9 % worse** while using **3.1×** the FLOPs per token. The rank diagnostic
+does exactly what it was designed to do - `eff_rank(P)` rises from 60.3 to
+**97.66** - but quality does not follow. The alpha coefficients stay near 1.0
+(mean 0.993, std 0.044, range 0.915-1.206), so the channels do not specialise,
+and `Var_l σ(θ_l) = 0.00767` remains below the 0.01 H3 threshold.
+
+The conclusion is negative and useful: **rank compression is not the quality
+bottleneck at this scale**. The product remains the default; the sum costs
+3.1× the FLOPs and does not buy quality. E14 is an ablation, not a shipped
+model.
+
 ---
 
 ## 9. Hypotheses H1–H3: verdicts
@@ -742,7 +792,9 @@ int8 artifact is shipped; the Q2 int4 file is not competitive.
 
 At 2.08M parameters the pattern is unchanged: Q2 has
 `Spearman(eff_rank(D), depth) = 0.265` and `Var_l σ(θ_l) = 0.0087`, so H2 and
-H3 remain unconfirmed. H1 is still supported by Q2's bpb; D1 supplies the
+H3 remain unconfirmed. E8, which removes the stop-gradient, has
+`Spearman = 0.238` and `Var_l σ(θ_l) = 0.00248`: full backprop does not change
+the verdict either. H1 is still supported by Q2's bpb; D1 supplies the
 same-tokenizer dense control.
 
 **H2 is not confirmed, and that is a meaningful result.** The rank of `D` saws
@@ -776,16 +828,17 @@ not part of the current series.
 
 ## 10. Tests
 
-`python -m pytest tests -q` → **63 tests** (T13/T14 and the integration runs
-need CUDA).
+`python -m pytest tests -q` → **66 passed, 2 skipped** on CPU (T13/T14 and the
+integration runs need CUDA).
 
 | test | what it checks |
 |---|---|
 | T1 | `kron_apply(A,B,x) == (A⊗B)x == A·X·Bᵀ` (3 sizes + batched) |
 | T2 | with `D=0` the layer equals `γ·s^L·x` (the anchor) |
 | T3 / T3b | `materialize` yields exactly `s·Id + A⊗B`; matrix mode == sequential |
+| **T3c / T3d** | **sum composition** equals `sI + Σ α_l D_l`; the anchor is `s`, not `s^L` |
 | T4 | `D_l = I_l + σ·D_{l−1}` (unnormalised); normalised `D` has RMS = τ; `K_win` reset |
-| T5 | stop-gradient: `∂L/∂θ` does not flow through `D_{l−1}`; and optionally does |
+| T5 | stop-gradient: `∂L/∂θ` does not flow through `D_{l−1}`; full backprop and `α_l` do |
 | T6 | RoPE preserves the norm and depends on position |
 | T7 | causal attention (against a manual mask) |
 | T8 | weight tying |
@@ -797,6 +850,7 @@ need CUDA).
 | T14 | CUDA step-time smoke test at batch=32 |
 | T15 | determinism: two runs produce identical losses |
 | **T16** | **`KronBank` == the per-module path**: forward and every gradient |
+| **T16b / T16c** | **`KronBank` == the sum path**: forward and every gradient |
 | **T17** | the ReZero gate is active, differentiable and small at init |
 | **T18** | BPE: `decode(encode(x)) == x`, `max(id) < EOT`, 2.5–4 bytes/token |
 | **T19** | factorised tied embedding: `V×r + r×d` parameters, `logits == h·U·Eᵀ`, both tensors receive gradients |
@@ -818,6 +872,7 @@ T13/T14 require CUDA and are skipped without a GPU.
 | model | parameters | fp32 checkpoint | MFLOP/token | MFLOP/byte |
 |---|---|---|---|---|
 | E2 (byte) | 190,108 | 0.87 MB | 3.70 | 3.73 |
+| E14 (byte, sum) | 190,348 | 0.87 MB | 11.5 | 11.5 |
 | Q1 (BPE) | 926,468 | 3.90 MB | 11.2 | 3.66 |
 | Q2 (BPE) | 2,079,992 | 8.55 MB | 36.2 | 11.9 |
 
@@ -832,6 +887,8 @@ times will vary):
 | configuration | ms/step | tok/s |
 |---|---|---|
 | E2, bs=128, seq=256 | 425 | 77k |
+| E8, bs=128, seq=256 | 414 | 79k |
+| E14, bs=128, seq=256 | 416 | 79k |
 | E0 dense, bs=128, seq=256 | 361 | 91k |
 | E2 without `KronBank` (per module) | 505 | 65k |
 | E2, seq=128 | 187 | 87k |
@@ -872,13 +929,13 @@ Why the implementation is shaped this way:
 
 ```
 kronllm/
-  kron.py          KronCompose (innovation, recurrence, τ, γ) + KronBank
+  kron.py          KronCompose (innovation, recurrence, τ, γ, product/sum) + KronBank
   model.py         KronBlock, KronTransformer, the P-path forward,
                    factorised/routed tied embedding, QK-norm, prelude cache
   tokenizer.py     ByteTokenizer + byte-level BPE, bits_per_byte, corpus encoding
   quantization.py  int8/int4 per-channel post-training quantisation
   hf.py            Hugging Face PreTrainedModel / AutoClass wrapper
-  config.py        DEFAULTS + EXPERIMENTS E0-E13, Q1-Q3, D1, S1
+  config.py        DEFAULTS + EXPERIMENTS E0-E14, Q1-Q5, D1, S1
   train.py         training loop, param groups, diagnostics, CSV log with bpb
   diagnostics.py   spectral_report (eff_rank D/W/P, cos, τ, γ), σ(θ),
                    routed_report (Q3 usage/rank), gradients
@@ -896,7 +953,7 @@ scripts/
   init_routed.py       warm-start the Q3 routed embedding from Q2's table
   dashboard.py         Gradio dashboard
 tests/
-  test_kron.py         T1–T10, T16, T17
+  test_kron.py         T1–T10, T16/T16b/T16c, T17
   test_integration.py  T11–T15 + generation
   test_quality.py      T18-T25 (tokenizer, budgets, QK-norm, caching, logging)
   test_quantization.py T26 (int8/int4)
@@ -923,11 +980,14 @@ artifacts/
    fragments and breaks on long-range coherence; Q1 and Q2 remove much of that
    limitation but remain 1–2M parameter models trained on ~10 % of TinyStories.
 2. **H2/H3 are not confirmed** — see §9. That is a result, not a bug.
-3. **The product composition is rank-compressing.** At E2,
-   `eff_rank(P) = 60 < eff_rank(D) = 91`; Q1/Q2 show the same pattern.
-   The sum-composition and orthogonal-anchor fixes are not implemented,
-   and the dense-2M, E1 and E8 controls are not run. Treat the product as
-   an empirical choice, not a proven advantage.
+3. **The product composition is rank-compressing, but rank is not the
+   bottleneck.** At E2, `eff_rank(P) = 60 < eff_rank(D) = 91`; Q1/Q2 show the
+   same pattern, and E8 (full backprop) leaves it at 60.3. E14 trains the
+   additive composition: `eff_rank(P)` rises to 97.66, but bpb worsens from
+   E8's 1.479 to 1.551 while FLOPs/token grow 3.1×. The product remains the
+   default. The orthogonal-anchor fix is not implemented, and the dense-2M and
+   E1 controls are not run. Treat the product as an empirical choice, not a
+   proven advantage.
 4. **No KV cache** at generation time: every new token is a full forward. The
    Kronecker prelude is cached in eval mode (a 3× speed-up), but attention is
    still recomputed from scratch: ~16 ms/token for Q1.
@@ -944,15 +1004,21 @@ artifacts/
 
 | step | why | expected effect |
 |---|---|---|
-| **Sum-composition ablation** (`P = sI + Σ α_l D_l`) | tests whether the product, not the budget, causes rank compression | `eff_rank(P)` closer to `Σ eff_rank(D_l)`; one run |
+| **Q6: BPE-4096 tokenizer** (running) | BPE-1024 gives 3.07 bytes/token; a wider vocab raises bpb and generation bytes/s for ~393k extra parameters | −0.03…−0.06 bpb at the same steps, more bytes/s |
+| **Q5: `K=24` at Q2's activation footprint** (queued) | spends the 10M parameter ceiling on Kronecker summands without increasing activation memory | ~7.75M params, still 6 GB, more expressive `D_l` |
 | **Orthogonal anchor** (`O_l` Householder + `D_l`) | keeps `W_l` full-rank and stable while allowing larger `D_l` | tests H2 without the near-identity compromise; higher risk |
-| **E1 / E8 / dense-2M controls** | isolate attention vs FFN, stop-gradient, and parameter count | the missing controls behind the current claims |
+| **E1 / dense-2M controls** | isolate attention vs FFN and parameter count | the missing controls behind the current claims |
 | **`σ` before normalisation**: `D = τ·rms_norm(σ·Î + prev)` | today `σ` multiplies an already normalised `D`, so its gradient is ~250× smaller than the factors' and H3 is untestable | `σ` starts controlling the scale of memory → `Var σ(θ)` grows by orders of magnitude |
 | **More data** (200K → 2.1M TinyStories stories) | Q2 sees 61M tokens ≈ 1 epoch, while the full corpus is ~620M tokens | the main remaining quality lever after Q2: expected −0.04…−0.08 bpb |
 | **KV cache + `torch.compile`** | generation is currently O(T²) per token | ×10–20 sampling speed at no quality cost |
 | **Distillation from Q2 into 500–700K** | 2.08M → ~600K at a similar bpb | a compact artefact for CPU and edge deployment |
 | **Vector gate `γ` per layer** (`γ` is a scalar today) | `γ` learned to 0.05–0.19, i.e. the model already switches layers off | a soft per-layer depth selector |
 | **Separate the Q1/Q2 contributions** (tokenizer / capacity / steps) | §8.3–8.4 compare several changes at once | a clean answer to "what exactly produced the bpb" |
+
+E14 rules out a sum-composition scaling run for now: it is 4.9 % worse than the
+product at 3.1× the FLOPs/token. Q4 confirmed full backprop at quality scale
+(0.9248 vs 0.962 bpb at step 4,000), so the next bets are the tokenizer (Q6)
+and parameter scaling at fixed activation memory (Q5).
 
 ---
 

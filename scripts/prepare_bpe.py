@@ -8,7 +8,13 @@ Usage
 -----
     python scripts/prepare_bpe.py                       # vocab 1024 (~3 bytes/token)
     python scripts/prepare_bpe.py --vocab 2048
+    python scripts/prepare_bpe.py --vocab 4096 --suffix 4096
     python scripts/prepare_bpe.py --vocab 512 --merge-stories 40000
+
+``--suffix`` writes ``tokenizer<suffix>.json``, ``{train,val}.bpe<suffix>.bin``
+and ``tokenizer_meta<suffix>.json`` instead of the default names, so several
+vocabularies can coexist in ``data/`` without clobbering the shipped
+BPE-1024 artifacts.
 """
 from __future__ import annotations
 
@@ -35,13 +41,19 @@ def main() -> None:
     ap.add_argument("--merge-stories", type=int, default=60000,
                     help="stories used to learn the merges")
     ap.add_argument("--min-frequency", type=int, default=2)
+    ap.add_argument("--suffix", default="",
+                    help="artifact suffix, e.g. '4096' -> tokenizer4096.json")
     args = ap.parse_args()
 
     data_dir = Path(args.data_dir)
     t0 = time.time()
     vocab = int(args.vocab)
     eot_id = vocab - 1
-    tok_path = data_dir / "tokenizer.json"
+    sfx = args.suffix
+    tok_path = data_dir / f"tokenizer{sfx}.json"
+    train_out = data_dir / f"train.bpe{sfx}.bin"
+    val_out = data_dir / f"val.bpe{sfx}.bin"
+    meta_out = data_dir / f"tokenizer_meta{sfx}.json"
 
     train_stories = stories_from_bytes(data_dir / "train.bin")
     val_stories = stories_from_bytes(data_dir / "val.bin")
@@ -60,8 +72,8 @@ def main() -> None:
     print(f"[bpe] learned {tok._tok.get_vocab_size()} ids "
           f"(+ EOT -> {vocab})")
 
-    tr = encode_corpus(train_stories, tok, data_dir / "train.bpe.bin", eot_id)
-    va = encode_corpus(val_stories, tok, data_dir / "val.bpe.bin", eot_id)
+    tr = encode_corpus(train_stories, tok, train_out, eot_id)
+    va = encode_corpus(val_stories, tok, val_out, eot_id)
     bpt = va["bytes"] / va["tokens"]
     print(f"[bpe] train {tr['tokens']:,} tokens "
           f"({tr['bytes_per_token']:.2f} bytes/token)")
@@ -80,8 +92,8 @@ def main() -> None:
         "val_bytes": va["bytes"],
         "merge_stories": len(sample),
     }
-    meta_path(data_dir).write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    print(f"[bpe] wrote {meta_path(data_dir)} in {time.time() - t0:.1f}s")
+    meta_out.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    print(f"[bpe] wrote {meta_out} in {time.time() - t0:.1f}s")
 
 
 if __name__ == "__main__":
