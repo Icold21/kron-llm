@@ -1,10 +1,10 @@
 # Current progress
 
 Rolling log of the most recent results, newest first. At most five entries are
-kept. An entry is never removed before it is one hour old; if more than five
-results arrive within an hour, all are kept temporarily and the oldest is
-pruned once it is older than one hour. This file is committed and pushed after
-every result.
+kept. Pruning is triggered only by overflow: with five or fewer entries nothing
+is removed, regardless of age. When a new result would make six, entries younger
+than one hour are kept temporarily; the oldest is removed once it is at least
+one hour old. This file is committed and pushed after every result.
 
 ## In progress
 
