@@ -394,9 +394,9 @@ EXPERIMENTS["Q5"] = {
     "overrides": {
         **EXPERIMENTS["Q4"]["overrides"],
         "model.kron.K": 24,
-        "training.lr": 3e-4,
-        "training.min_lr": 3e-5,
-        "training.max_steps": 2000,
+        # Same lr schedule as Q4: the first attempt used 3e-4/2k steps and is
+        # not a clean K ablation.
+        "training.max_steps": 4000,
         "training.eval_every": 500,
     },
 }
