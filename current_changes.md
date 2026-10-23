@@ -27,31 +27,32 @@ convergence.
   compresses rank and H3 remains unconfirmed.
 - **Q3long (from scratch):** stopped at 2,000 steps at bpb **1.277**, with no
   phase transition. Q3warm reached **0.8236** but is an initialisation test.
+- **E14 (sum composition):** 190,348 params, bpb **1.551** at step 4,000 vs
+  E8's **1.479**. `eff_rank(P)` rises from 60.3 to **97.7**, but quality is
+  worse and `α_l` stays near 1.0 (mean 0.993, std 0.044). Removing rank
+  compression does not by itself improve quality; the product remains the
+  default. E14 is a negative result, not a shipped model.
 
 ## In progress
 
-**E14 (sum composition):** `P = sI + Σ α_l D_l`, learnable `α_l`, full
-backprop, 190,348 parameters, 11.5 MFLOP/token. Running for 4,000 steps to
-match E8's best checkpoint. Live state is in `runs/E14/train.log` and
-`current_progress.md`; the final result is not in yet.
+**Q4 (Q2 + full backprop):** 2,079,992 params, 4,000 steps. It tests the E8
+win at quality scale against Q2's **0.962 bpb** at step 4,000. Live state is in
+`runs/Q4/train.log` and `current_progress.md`.
 
-The sum path is implemented in `KronCompose`, `KronBank`, the block config and
-the diagnostics. The CPU suite passes (66 passed, 2 skipped).
+The sum path remains implemented in `KronCompose`, `KronBank`, the block config
+and the diagnostics. The CPU suite passes (66 passed, 2 skipped).
 
 ## Next experiments
 
-1. **Q4: Q2 + full backprop.** The cheapest test of the only clear E8 win at
-   quality scale; 2.08M params, 4,000 steps, compare against Q2's 0.962 bpb at
-   step 4,000.
-2. **Q5: scale toward 8-10M at fixed activation memory.** Start with Q2's
+1. **Q5: scale toward 8-10M at fixed activation memory.** Start with Q2's
    `d=320, N=24, batch=32, seq=192` geometry and raise `K` (for example
    `K=24`, about 7.75M parameters). This tests whether more Kronecker summands
    buy quality while staying inside 6 GB.
-3. **Only if E14 is competitive:** a sum-composition run at Q scale. The sum
-   costs `L·d²` per token instead of an amortised product, so it must justify
-   its FLOPs.
-4. **Orthogonal anchor** remains a separate, higher-risk rank experiment; it is
-   not part of the current shipped path.
+2. **If Q4 wins:** use full backprop in Q5 and compare against Q2 at matched
+   steps. If Q4 loses, keep the stop-gradient in the scaled run.
+3. **Orthogonal anchor** remains a separate, higher-risk rank experiment; it is
+   not part of the current shipped path. The E14 result lowers its priority:
+   rank compression alone is not the quality bottleneck.
 
 ## Constraints
 
