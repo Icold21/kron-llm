@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.attention import SDPBackend, sdpa_kernel
 
 from .kron import KronBank, KronCompose, apply_rope, rope_frequencies
 from torch.utils.checkpoint import checkpoint
@@ -29,6 +30,14 @@ from torch.utils.checkpoint import checkpoint
 # Roles in the order in which a block consumes them.  "fg" is the gate branch
 # of the optional gated FFN.
 ROLES = ("q", "k", "v", "o", "f", "fg")
+
+# Explicit SDPA backends for `model.attn_impl`; "auto" leaves the choice to
+# PyTorch (flash on Ampere+, memory-efficient on Turing, math otherwise).
+_ATTN_BACKENDS = {
+    "flash": SDPBackend.FLASH_ATTENTION,
+    "mem_efficient": SDPBackend.EFFICIENT_ATTENTION,
+    "math": SDPBackend.MATH,
+}
 
 
 class RMSNorm(nn.Module):
@@ -108,12 +117,13 @@ class KronEmbedding(nn.Module):
 
     def table(self) -> torch.Tensor:
         """Materialise the ``(V, r)`` table (cached by the caller in eval)."""
-        out: Optional[torch.Tensor] = None
-        for a, b in zip(self.A, self.B):
-            kron = torch.kron(a, b)
-            out = kron if out is None else out + kron
-        assert out is not None
-        return out
+        # One einsum instead of K torch.kron calls: torch.kron allocates a
+        # V x r tensor per summand, and on WDDM those launches dominate when
+        # the table is rebuilt inside every checkpointed loss chunk.
+        A = torch.stack(list(self.A))          # (K, v1, r1)
+        B = torch.stack(list(self.B))          # (K, v2, r2)
+        t = torch.einsum("kvp,kwq->vwpq", A, B)
+        return t.reshape(self.v1 * self.v2, self.r1 * self.r2)
 
 
 class RoutedEmbedding(nn.Module):
@@ -258,6 +268,15 @@ class KronBlock(nn.Module):
 
         self.norm1 = RMSNorm(d, float(mc["norm_eps"]))
         self.norm2 = RMSNorm(d, float(mc["norm_eps"]))
+        # Attention kernel: "auto" lets PyTorch pick the best fused SDPA
+        # backend; "flash"/"mem_efficient"/"math" pin one for benchmarking.
+        # This only swaps the QK^T-softmax-AV kernel; q/k/v still come from the
+        # Kronecker maps and the output still goes through the Kron o-map.
+        self.attn_impl = str(mc.get("attn_impl", "auto")).lower()
+        if self.attn_impl not in {"auto", *_ATTN_BACKENDS}:
+            raise ValueError(
+                f"attn_impl must be auto/{'/'.join(_ATTN_BACKENDS)}, "
+                f"got {self.attn_impl!r}")
         # intra-layer normalisation of the attention operands: keeps q/k at a
         # fixed scale regardless of how the Kron branch grows, which removes
         # the logit drift that limits the learning rate in small models.
@@ -402,7 +421,11 @@ class KronBlock(nn.Module):
             cache["k_sigma_min"] = torch.linalg.svdvals(
                 k.reshape(-1, dh).float()).min().item()
 
-        out = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        if self.attn_impl == "auto":
+            out = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        else:
+            with sdpa_kernel(_ATTN_BACKENDS[self.attn_impl]):
+                out = F.scaled_dot_product_attention(q, k, v, is_causal=True)
         out = out.transpose(1, 2).reshape(B, T, self.d)
 
         o, Do = apply(self.o, "o", out)

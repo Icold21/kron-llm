@@ -68,6 +68,10 @@ DEFAULTS: Dict[str, Any] = {
         # Intra-layer RMSNorm on q/k per head: removes logit drift and lets the
         # model use a higher lr at this scale.
         "qk_norm": False,
+        # SDPA kernel: "auto" (best fused kernel), or "flash",
+        # "mem_efficient", "math" to pin a backend for benchmarking.  Only the
+        # attention kernel changes; the Kronecker maps are untouched.
+        "attn_impl": "auto",
         # Fuse all composes of the model into a handful of batched GEMMs.
         # See kronllm/kron.py:KronBank for the launch-count rationale.
         "batched_prelude": True,

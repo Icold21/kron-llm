@@ -235,6 +235,32 @@ def test_kron_embedding_bad_shapes_raise():
         KronTransformer(cfg)
 
 
+def test_kron_table_einsum_matches_torch_kron():
+    cfg = make_cfg(**{"model.embed_rank": 32, "model.embed_mode": "kron",
+                      "model.embed_kron": {"v1": 16, "v2": 16, "r1": 4,
+                                           "r2": 8, "K": 8}})
+    model = KronTransformer(cfg)
+    expected = sum(torch.kron(a, b) for a, b in
+                   zip(model.kron_embed.A, model.kron_embed.B))
+    assert torch.allclose(model.embed_table(), expected, atol=1e-6)
+
+
+def test_attn_impl_pins_backend_without_changing_params():
+    auto = KronTransformer(make_cfg())
+    math = KronTransformer(make_cfg(**{"model.attn_impl": "math"}))
+    assert math.blocks[0].attn_impl == "math"
+    assert auto.n_params == math.n_params
+
+    x = torch.randint(0, 256, (2, 16))
+    with torch.no_grad():
+        out = math(x, torch.roll(x, -1, dims=1))
+    assert torch.isfinite(out["loss"])
+
+    cfg = make_cfg(**{"model.attn_impl": "flashy"})
+    with pytest.raises(ValueError):
+        KronTransformer(cfg)
+
+
 # ---------------------------------------------------------------------------
 # budget
 # ---------------------------------------------------------------------------

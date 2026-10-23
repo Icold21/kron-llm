@@ -141,6 +141,21 @@ def test_T14_step_time():
     assert ms < 160, f"{ms:.1f} ms/step > 160 ms"
 
 
+@CUDA
+def test_attn_backends_match():
+    """Flash/mem-efficient/math SDPA must agree; only the kernel changes."""
+    cfg = make_cfg(**{"model.d_model": 64, "model.n_layers": 2,
+                      "model.n_heads": 4, "model.attn_impl": "auto"})
+    model = KronTransformer(cfg).cuda().eval()
+    x = torch.randint(0, 256, (2, 32), device="cuda")
+    with torch.no_grad():
+        auto = model(x)["logits"]
+        model.blocks[0].attn_impl = "math"
+        math = model(x)["logits"]
+    assert torch.isfinite(auto).all() and torch.isfinite(math).all()
+    assert torch.allclose(auto, math, atol=2e-3, rtol=2e-3)
+
+
 # ---------------------------------------------------------------------------
 # T15 -- reproducibility
 # ---------------------------------------------------------------------------
