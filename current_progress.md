@@ -8,14 +8,22 @@ one hour old. This file is committed and pushed after every result.
 
 ## In progress
 
-- **E8** (E2 + full backprop, no stop-gradient): stopped at step 4,400; best
-  checkpoint is step 4,000 (bpb 1.479). The default 3-epoch schedule would have
-  run ~16k steps, so the ablation was cut short to keep it cheap.
-- **E14** (E2 + sum composition + full backprop): code implemented in
-  `KronCompose`/`KronBank`; 66 tests pass, 2 skipped on CPU. Starting now for
-  4,000 steps, matching E8's best checkpoint.
+- **Q4** (Q2 + full backprop, no stop-gradient): 2,079,992 params; starting
+  for 4,000 steps to compare against Q2's 0.962 bpb at step 4,000.
 
 ## Results
+
+## 2026-10-23T09:32+03:00 — E14 sum composition: final
+
+- val loss **1.0750**, PPL **2.93**, bpb **1.551** (190,348 params)
+- E8 product at the same step: bpb **1.479**; the sum is **4.9 % worse** while
+  using **3.1×** the FLOPs/token (11.5 vs 3.70 MFLOP)
+- `eff_rank(P)` **97.66** vs E8's **60.27**: the sum removes rank compression,
+  but that does not translate into quality
+- `alpha` mean **0.993**, std **0.044**, range 0.915–1.206: no channel
+  specialisation; `Var sigma(theta)` **0.00767** is still below 0.01
+- 0.428 s/step, 28.6 min, peak VRAM **2.58 GB**; the product remains the
+  default and E14 is a negative result, not a shipped model
 
 ## 2026-10-23T09:03+03:00 — E8 stopped; best at step 4,000
 
