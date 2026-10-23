@@ -1,0 +1,118 @@
+# KronLLM v2.0 -- default configuration (E2)
+# Every key here is optional: kronllm/config.py holds the same defaults.
+# This file is a *reference*: passing it is equivalent to passing nothing.
+project: KronLLM-v2
+seed: 42
+
+data:
+  dataset: "roneneldan/TinyStories"
+  tokenizer: "byte_level"
+  vocab_size: 256
+  seq_len: 256
+  val_split: 0.05
+  data_dir: "data"
+  eot_id: 255          # 0xFF == <|endoftext|>
+  max_stories: 200000  # 950 tokens/param; see README section 5
+  max_val_stories: 10000
+
+model:
+  d_model: 128
+  n_layers: 12
+  n_heads: 8
+  n_kv_heads: null          # E10 -> 2 (GQA)
+  rope_theta: 10000.0
+  norm: "rmsnorm"
+  norm_eps: 1.0e-6
+  tie_embeddings: true
+  ffn_silu: true            # E9 -> false (linear-FFN ablation)
+  ffn_gated: false          # E11 -> true: (W_a x) * silu(W_b x)
+  use_kron_qkv: true
+  use_kron_ffn: true
+  dense_ffn_mult: 1.0       # E0 only (0.375 -> hidden=48)
+  # Fuse all L-fold compositions into a handful of batched GEMMs.
+  batched_prelude: true
+
+  kron:
+    L: 4
+    K: 2
+    K_win: 2
+    n1: 8
+    n2: 16
+    stop_gradient: true     # E8 -> false
+    anchor: true            # E4 -> false
+    # Per-role *effective* anchor (after the L-fold composition):
+    #   s = s_init ** (1/L)
+    s_init:
+      q: 1.0
+      k: 1.0
+      v: 1.0
+      o: 1.0
+      ffn: 1.0
+    s_init_effective: true
+    s_learnable: false      # E3 -> true (Parameter instead of buffer)
+    # Orthogonal factor gain.  Irrelevant in the forward pass because D is
+    # RMS-normalised; kept for the E12 ablation.
+    #   "unit" -> K ** -0.25   |   "spec" -> 1/sqrt(d) (literal TZ recipe)
+    init_gain: "unit"
+    # THE key knob: normalise D to unit RMS before the anchor and recurrence.
+    # Without it ||I|| ~ 1/d and the model is numerically the identity.
+    normalize_D: true
+    innovation_scale: 0.1   # tau init == RMS of every D_l
+    gate_init: 0.1          # ReZero gamma init
+    gate: true
+    theta_std: 0.1
+    rezero_eps: 0.0
+
+training:
+  batch_size: 128
+  seq_len: 256
+  grad_accum: 1
+  epochs: 3
+  optimizer: "adamw"
+  betas: [0.9, 0.95]
+  lr: 3.0e-4
+  lr_s: 3.0e-3
+  lr_theta: 1.0e-2   # theta's gradient is ~100x smaller than the factors'
+  warmup_steps: 500
+  schedule: "cosine"
+  min_lr: 3.0e-5
+  weight_decay: 0.1
+  grad_clip: 1.0
+  amp: "none"        # TU116 has no tensor cores: fp16 is 2.4x SLOWER here
+  log_every: 100
+  eval_every: 500
+  eval_batches: 64
+  early_stop_patience: 4
+  num_workers: 0
+  device: "cuda"
+  compile: false
+  out_dir: "runs"
+
+metrics:
+  primary: ["val_ppl", "val_loss"]
+  diagnostic:
+    - sigma_theta_mean
+    - sigma_theta_var
+    - D_norm
+    - D_rms
+    - tau_mean
+    - gate_mean
+    - h_norm_ratio
+    - sigma_min_W
+    - eff_rank_W
+    - eff_rank_D
+    - rank_excess
+    - attn_entropy
+    - grad_norm
+  comparison:
+    - n_params
+    - n_params_matrix
+    - flops_per_token
+    - time_per_epoch
+    - peak_vram
+  spectral_every: 2000
+
+logging:
+  tensorboard: true
+  wandb: false
+  wandb_project: "kronllm"

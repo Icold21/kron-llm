@@ -1,0 +1,21 @@
+{
+  "dataset": "databricks/databricks-dolly-15k",
+  "categories": [
+    "closed_qa",
+    "general_qa",
+    "open_qa"
+  ],
+  "max_tokens": 192,
+  "train_examples": 4638,
+  "val_examples": 244,
+  "train_tokens": 496258,
+  "val_tokens": 25992,
+  "bytes_per_token": 3.065902666637611,
+  "prompt_with_context": "### Context:\n{context}\n### Question:\n{instruction}\n### Answer:\n{response}",
+  "prompt_without_context": "### Question:\n{instruction}\n### Answer:\n{response}",
+  "stats": {
+    "retried_without_context": 1711,
+    "kept": 4882,
+    "dropped_too_long": 2824
+  }
+}

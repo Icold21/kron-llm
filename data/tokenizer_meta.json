@@ -1,0 +1,12 @@
+{
+  "type": "bpe",
+  "tokenizer": "data/tokenizer.json",
+  "vocab_size": 1024,
+  "eot_id": 1023,
+  "bytes_per_token": 3.065902666637611,
+  "train_tokens": 59237168,
+  "val_tokens": 2707417,
+  "train_bytes": 180523995,
+  "val_bytes": 8300677,
+  "merge_stories": 60000
+}

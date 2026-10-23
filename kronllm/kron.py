@@ -1,0 +1,488 @@
+"""KronCompose: the Kronecker-parameterised linear map with depth recurrence.
+
+Core object of the project.  A ``KronCompose`` layer implements
+
+    I_{i,l}   = sum_{k=1..K} A_{i,l,k} (x) B_{i,l,k}          (innovation)
+    D_{i,l}   = I_{i,l} + sigma(theta_{i,l}) * sg(D_{i-1,l})   (depth recurrence)
+    W_{i,l}   = s * Id + tau * D_{i,l}                         (anchor)
+    P_i       = W_{i,L} ( ... ( W_{i,1} ) )                    (L-fold composition)
+    y         = gamma_i * P_i x                                (ReZero gate)
+
+where ``i`` is the *model depth* (transformer layer index), ``l`` the
+micro-composition channel and ``sg`` the stop-gradient operator.
+
+Scale handling (deviation from the original TZ, see README)
+-----------------------------------------------------------
+The TZ fixed the orthogonal gain of ``A, B`` to ``1/sqrt(n1*n2) = 1/sqrt(d)``.
+That makes ``||I|| ~ 1/d`` -- 128x below the ``s*Id`` anchor at d=128 -- so
+``dL/dA``, ``dL/dB`` and ``dL/dtheta`` all vanish and the model is numerically
+the identity map (measured: ``theta_grad = 0``, ``eff_rank(W) = d``,
+``cos(W_i, W_{i-1}) = 1``), i.e. a context-free unigram model.
+
+Here the innovation is **normalised** before it is used
+(``D <- tau * D / rms(D)``), which makes the gain irrelevant and replaces it
+with two explicit, learnable magnitudes:
+
+* ``tau``  -- per-channel innovation scale (init ``innovation_scale``),
+* ``gamma`` -- per-compose ReZero gate (init ``gate_init``), so a branch can
+  start as a small perturbation of the residual stream instead of forcing
+  ``||W|| ~ 1`` at initialisation.
+
+Kronecker convention
+--------------------
+``A`` is ``(n1_out, n1_in)``, ``B`` is ``(n2_out, n2_in)`` and ``x`` is viewed
+as ``(n1_in, n2_in)``.  Then
+
+    (A (x) B) x  ==  A @ X @ B.T
+
+with ``X = x.reshape(n1_in, n2_in)`` and row-major flattening of the result.
+This is what ``kron_apply`` implements and what test T1 checks.
+"""
+from __future__ import annotations
+
+import math
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+# ---------------------------------------------------------------------------
+# primitives
+# ---------------------------------------------------------------------------
+def kron_apply(A: torch.Tensor, B: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    """Apply ``(A (x) B)`` to ``x`` without materialising the Kronecker product.
+
+    Parameters
+    ----------
+    A : (n1_out, n1_in)
+    B : (n2_out, n2_in)
+    x : (..., n1_in, n2_in)
+
+    Returns
+    -------
+    (..., n1_out, n2_out)
+    """
+    if A.shape[0] == A.shape[1] and B.shape[0] == B.shape[1]:
+        return torch.matmul(torch.matmul(A, x), B.transpose(-1, -2))
+    return torch.einsum("ij,...jl,ml->...im", A, x, B)
+
+
+def kron_materialize(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
+    """Dense matrix of ``A (x) B`` with row-major index order."""
+    n1o, n1i = A.shape
+    n2o, n2i = B.shape
+    return torch.einsum("ij,ml->imjl", A, B).reshape(n1o * n2o, n1i * n2i)
+
+
+def effective_rank(singular_values: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
+    """``exp(entropy(sigma / sum(sigma)))`` -- a smooth rank proxy."""
+    s = singular_values.clamp_min(eps)
+    p = s / s.sum()
+    return torch.exp(-(p * p.log()).sum())
+
+
+def rope_frequencies(seq_len: int, d_head: int, theta: float,
+                     device: Optional[torch.device] = None,
+                     dtype: torch.dtype = torch.float32
+                     ) -> Tuple[torch.Tensor, torch.Tensor]:
+    inv_freq = 1.0 / (theta ** (torch.arange(0, d_head, 2, device=device,
+                                            dtype=torch.float32) / d_head))
+    pos = torch.arange(seq_len, device=device, dtype=torch.float32)
+    freqs = torch.outer(pos, inv_freq)          # (T, d_head/2)
+    return freqs.cos().to(dtype), freqs.sin().to(dtype)
+
+
+def apply_rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
+    """Rotary positional embedding.  ``x``: (B, H, T, d_head)."""
+    x1, x2 = x[..., 0::2], x[..., 1::2]
+    out = torch.stack((x1 * cos - x2 * sin, x1 * sin + x2 * cos), dim=-1)
+    return out.flatten(-2)
+
+
+_EYE_CACHE: dict = {}
+_STATE0_CACHE: dict = {}
+
+
+def cached_eye(d: int, device, dtype) -> torch.Tensor:
+    key = (d, str(device), dtype)
+    eye = _EYE_CACHE.get(key)
+    if eye is None:
+        eye = torch.eye(d, device=device, dtype=dtype)
+        _EYE_CACHE[key] = eye
+    return eye
+
+
+def rms_norm_matrix(x: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    """Normalise every matrix in the trailing two dims to unit RMS."""
+    r = x.pow(2).mean(dim=(-2, -1), keepdim=True).clamp_min(eps).sqrt()
+    return x / r
+
+
+def _init_gain_value(mode: "str | float", K: int, d_in: int) -> float:
+    if mode == "unit":
+        return float(K) ** -0.25
+    if mode == "spec":
+        return 1.0 / math.sqrt(max(d_in, 1))
+    return float(mode)
+
+
+# ---------------------------------------------------------------------------
+# KronCompose
+# ---------------------------------------------------------------------------
+class KronCompose(nn.Module):
+    """Kronecker-parameterised linear layer with depth recurrence.
+
+    The depth state ``D`` is *not* owned by the module: it is passed in and
+    returned so that the same parameters can be reused at every transformer
+    layer while ``D`` keeps evolving along depth (one state per channel and
+    per matrix role).
+    """
+
+    def __init__(
+        self,
+        d_in: int,
+        d_out: Optional[int] = None,
+        n1_in: int = 8,
+        n2_in: int = 16,
+        n1_out: Optional[int] = None,
+        n2_out: Optional[int] = None,
+        L: int = 4,
+        K: int = 2,
+        K_win: int = 2,
+        s_init: float = 1.0,
+        s_learnable: bool = False,
+        anchor: bool = True,
+        stop_gradient: bool = True,
+        theta_std: float = 0.1,
+        rezero_eps: float = 0.0,
+        s_init_effective: bool = True,
+        init_gain: "str | float" = "unit",
+        innovation_scale: float = 0.1,
+        normalize_D: bool = True,
+        gate_init: float = 0.1,
+        use_gate: bool = True,
+    ) -> None:
+        super().__init__()
+        d_out = d_in if d_out is None else d_out
+        n1_out = n1_in if n1_out is None else n1_out
+        n2_out = n2_in if n2_out is None else n2_out
+
+        assert n1_in * n2_in == d_in, (n1_in, n2_in, d_in)
+        assert n1_out * n2_out == d_out, (n1_out, n2_out, d_out)
+
+        self.d_in, self.d_out = d_in, d_out
+        self.n1_in, self.n2_in = n1_in, n2_in
+        self.n1_out, self.n2_out = n1_out, n2_out
+        self.L, self.K, self.K_win = L, K, K_win
+        self.init_gain = init_gain
+        self.square = d_in == d_out
+        # L-fold composition is only defined for square maps.
+        assert self.square or L == 1, "non-square KronCompose requires L == 1"
+
+        self.anchor = bool(anchor) and self.square
+        self.stop_gradient = stop_gradient
+        self.rezero_eps = rezero_eps
+        self.normalize_D = bool(normalize_D)
+        self.innovation_scale = float(innovation_scale)
+
+        self.A = nn.Parameter(torch.empty(L, K, n1_out, n1_in))
+        self.B = nn.Parameter(torch.empty(L, K, n2_out, n2_in))
+        self.theta = nn.Parameter(torch.randn(L) * theta_std)
+        # explicit innovation magnitude (replaces the implicit factor gain)
+        self.tau = nn.Parameter(torch.full((L,), float(innovation_scale)))
+        # ReZero gate: the branch starts as a small perturbation
+        self.gate = nn.Parameter(torch.tensor(float(gate_init))) if use_gate else None
+
+        if self.anchor:
+            s0 = float(s_init) ** (1.0 / L) if s_init_effective else float(s_init)
+            if s_learnable:
+                self.s = nn.Parameter(torch.tensor(s0))
+            else:
+                self.register_buffer("s", torch.tensor(s0))
+        else:
+            self.s = None
+
+        self.reset_parameters()
+
+    # -- init -------------------------------------------------------------
+    def reset_parameters(self) -> None:
+        """Orthogonal factors.
+
+        With ``normalize_D`` the gain is irrelevant for the forward pass (it is
+        normalised away); ``init_gain`` is kept so the TZ recipe can be
+        reproduced for the ablation table.
+        """
+        gain = _init_gain_value(self.init_gain, self.K, self.d_in)
+        nn.init.orthogonal_(self.A, gain=gain)
+        nn.init.orthogonal_(self.B, gain=gain)
+        with torch.no_grad():
+            self.theta.normal_(0.0, 0.1)
+            self.tau.fill_(self.innovation_scale)
+
+    @property
+    def n_params(self) -> int:
+        total = self.A.numel() + self.B.numel() + self.theta.numel() + self.tau.numel()
+        if isinstance(self.s, nn.Parameter):
+            total += 1
+        if self.gate is not None:
+            total += 1
+        return total
+
+    # -- state ------------------------------------------------------------
+    def initial_state(self, device=None, dtype=torch.float32) -> torch.Tensor:
+        """``D_{-1,l} = eps * Id`` (small start at a window boundary).
+
+        Cached: the tensor is constant and never mutated (the recurrence
+        creates a new tensor every layer).
+        """
+        key = (self.L, self.d_out, self.d_in, self.rezero_eps,
+               str(device), dtype, self.square)
+        cached = _STATE0_CACHE.get(key)
+        if cached is None:
+            D = torch.zeros(self.L, self.d_out, self.d_in, device=device,
+                            dtype=dtype)
+            if self.square and self.rezero_eps:
+                D = D + self.rezero_eps * cached_eye(self.d_in, device, dtype)
+            _STATE0_CACHE[key] = D
+            cached = D
+        return cached
+
+    def innovation(self) -> torch.Tensor:
+        """``I_l = sum_k A_k (x) B_k`` as dense ``(L, d_out, d_in)``.
+
+        Explicit broadcast outer product instead of a 5-index einsum: the
+        contraction is tiny, but einsum's path selection made this one of the
+        most expensive ops in the forward pass.
+        """
+        L, K, n1o, n1i = self.A.shape
+        _, _, n2o, n2i = self.B.shape
+        outer = (self.A.unsqueeze(-1).unsqueeze(-1)
+                 * self.B.unsqueeze(2).unsqueeze(2))       # (L,K,n1o,n1i,n2o,n2i)
+        I4 = outer.sum(dim=1)                               # (L,n1o,n1i,n2o,n2i)
+        return I4.permute(0, 1, 3, 2, 4).reshape(
+            self.L, n1o * n2o, n1i * n2i)
+
+    # -- composition ------------------------------------------------------
+    def compose_product(self, D: torch.Tensor) -> torch.Tensor:
+        """``P = W_L ... W_1`` with ``W_l = s Id + D_l``."""
+        s = self.s
+        if s is None:
+            P = D[0]
+            for l in range(1, self.L):
+                P = torch.matmul(D[l], P)
+            return P
+        sI = s * cached_eye(self.d_in, D.device, D.dtype)
+        P = sI + D[0]
+        for l in range(1, self.L):
+            # (s Id + D_l) @ P = s*P + D_l @ P
+            P = torch.addmm(s * P, D[l], P)
+        return P
+
+    @torch.no_grad()
+    def materialize(self, D: torch.Tensor) -> torch.Tensor:
+        """Dense ``(L, d, d)`` factor matrices ``W_l = s Id + D_l``."""
+        if not self.anchor:
+            return D.clone()
+        return self.s * cached_eye(self.d_in, D.device, D.dtype) + D
+
+    # -- forward ----------------------------------------------------------
+    def forward(
+        self,
+        x: torch.Tensor,
+        prev_D: Optional[torch.Tensor] = None,
+        layer_idx: int = 0,
+        mode: str = "auto",
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Returns ``(y, D_new)``.  ``prev_D`` is the depth state of the
+        previous transformer layer (or ``None`` at a window boundary)."""
+        B, T, _ = x.shape
+        xm = x.reshape(B * T, self.n1_in, self.n2_in)
+
+        # innovation (position independent: it is a weight, not an activation)
+        I = self.innovation()                      # (L, d_out, d_in)
+
+        # recurrence, truncated at window boundaries
+        in_window = prev_D is not None and not (
+            self.K_win and self.K_win > 0 and layer_idx % self.K_win == 0)
+        if in_window:
+            prev = prev_D.detach() if self.stop_gradient else prev_D
+        else:
+            prev = self.initial_state(I.device, I.dtype)
+
+        if self.normalize_D:
+            I = rms_norm_matrix(I)
+            if in_window:
+                prev = rms_norm_matrix(prev)
+
+        sig = torch.sigmoid(self.theta)             # (L,)
+        D = I + sig.view(self.L, 1, 1) * prev       # (L, d_out, d_in)
+        if self.normalize_D:
+            D = rms_norm_matrix(D)
+        D = self.tau.view(self.L, 1, 1) * D
+
+        # y = gamma * W_L ... W_1 x
+        # Two equivalent execution modes:
+        #  * "sequential": L matvec products (best for single-token decoding)
+        #  * "matrix":     build P = W_L...W_1 once, then one GEMM.  The
+        #                  product costs L*d^3 but is amortised over all
+        #                  tokens in the batch, so for B*T >> L*d it is ~L x
+        #                  cheaper in FLOPs than the sequential form.
+        tokens = B * T
+        if mode == "auto":
+            use_matrix = (self.square and self.L > 1
+                          and tokens >= max(256, self.d_in))
+        else:
+            use_matrix = mode == "matrix" and self.square and self.L > 1
+        if use_matrix:
+            P = self.compose_product(D)
+            y = torch.matmul(xm.reshape(tokens, self.d_in), P.transpose(0, 1))
+        elif self.anchor:
+            s = self.s
+            y = xm.reshape(tokens, self.d_in)
+            for l in range(self.L):
+                y = torch.addmm(s * y, y, D[l].transpose(0, 1))
+        else:
+            y = xm.reshape(tokens, self.d_in)
+            for l in range(self.L):
+                y = torch.matmul(y, D[l].transpose(0, 1))
+
+        y = y.reshape(B, T, self.d_out)
+        if self.gate is not None:
+            y = y * self.gate
+        return y, D
+
+    def extra_repr(self) -> str:
+        return (f"d={self.d_in}->{self.d_out}, L={self.L}, K={self.K}, "
+                f"K_win={self.K_win}, anchor={self.anchor}, "
+                f"s={None if self.s is None else float(self.s):.4g}, "
+                f"tau={float(self.tau.mean()):.4g}, "
+                f"gate={None if self.gate is None else float(self.gate):.4g}")
+
+
+# ---------------------------------------------------------------------------
+# KronBank -- batched evaluation of many composes at once
+# ---------------------------------------------------------------------------
+class KronBank:
+    """Evaluate a set of same-shaped ``KronCompose`` modules as batched ops.
+
+    The modules keep ownership of their parameters; the bank only *reads* them
+    (``torch.stack`` is differentiable), so ``state_dict``, the ablation table
+    and the reference per-module path keep working unchanged.
+
+    Why this exists
+    ---------------
+    A 12-layer model has 60 composes, each with its own innovation, recurrence,
+    ``L``-fold product and apply.  Implemented one by one that is ~900 kernel
+    launches per forward pass; on Windows/WDDM a launch costs ~45 us, so the
+    step time was 117 ms *independently of the batch size* (measure: batch 1
+    and batch 32 took the same time).  The bank collapses the weight-only part
+    (innovation, recurrence, products -- everything that does not depend on the
+    activations) into ~20 batched launches.
+    """
+
+    def __init__(self, mods: Sequence[KronCompose], layers: Sequence[int],
+                 keys: Optional[Sequence[Any]] = None) -> None:
+        assert len(mods) == len(layers) and len(mods) > 0
+        m0 = mods[0]
+        for m in mods:
+            same = (m.L == m0.L and m.K == m0.K and m.d_in == m0.d_in
+                    and m.d_out == m0.d_out and m.n1_in == m0.n1_in
+                    and m.n2_in == m0.n2_in and m.n1_out == m0.n1_out
+                    and m.n2_out == m0.n2_out and m.anchor == m0.anchor
+                    and m.normalize_D == m0.normalize_D
+                    and m.stop_gradient == m0.stop_gradient
+                    and m.K_win == m0.K_win
+                    and (m.gate is None) == (m0.gate is None))
+            if not same:
+                raise ValueError("KronBank modules must share shape and flags")
+        self.mods = list(mods)
+        self.layers = list(layers)
+        self.keys = list(keys) if keys is not None else list(range(len(mods)))
+        self.M = len(mods)
+        self.L, self.K = m0.L, m0.K
+        self.d_in, self.d_out = m0.d_in, m0.d_out
+        self.n1_in, self.n2_in = m0.n1_in, m0.n2_in
+        self.n1_out, self.n2_out = m0.n1_out, m0.n2_out
+        self.K_win = m0.K_win
+        self.stop_gradient = m0.stop_gradient
+        self.normalize_D = m0.normalize_D
+        self.anchor = m0.anchor
+        self._m0 = m0
+        assert all(self.layers[i] <= self.layers[i + 1]
+                   for i in range(len(self.layers) - 1)), "layers must be sorted"
+        # contiguous (layer, start, stop) ranges
+        self.bounds: List[Tuple[int, int, int]] = []
+        start = 0
+        for j in range(1, len(self.layers) + 1):
+            if j == len(self.layers) or self.layers[j] != self.layers[start]:
+                self.bounds.append((self.layers[start], start, j))
+                start = j
+
+    # -- batched weight-only prelude --------------------------------------
+    def prelude(self) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Return ``(P, D)``.
+
+        ``P``: (M, d_out, d_in) -- the full composed map *including* the
+        ReZero gate, i.e. ``y = x @ P.T``.
+        ``D``: (M, L, d_out, d_in) -- the depth state (for diagnostics).
+        """
+        mods, M, L, K = self.mods, self.M, self.L, self.K
+        n1o, n1i, n2o, n2i = self.n1_out, self.n1_in, self.n2_out, self.n2_in
+
+        A = torch.stack([m.A for m in mods])            # (M,L,K,n1o,n1i)
+        B = torch.stack([m.B for m in mods])            # (M,L,K,n2o,n2i)
+        theta = torch.stack([m.theta for m in mods])    # (M,L)
+        tau = torch.stack([m.tau for m in mods])        # (M,L)
+
+        # innovation  I[m,l,i,j,m2,n2] = sum_k A[m,l,k,i,j] B[m,l,k,m2,n2]
+        a = A.reshape(M * L, K, n1o * n1i).transpose(1, 2)
+        b = B.reshape(M * L, K, n2o * n2i)
+        I = torch.bmm(a, b).reshape(M, L, n1o, n1i, n2o, n2i)
+        I = I.permute(0, 1, 2, 4, 3, 5).reshape(
+            M, L, self.d_out, self.d_in).contiguous()
+
+        if self.normalize_D:
+            I = rms_norm_matrix(I)
+
+        sig = torch.sigmoid(theta).view(M, L, 1, 1)
+        init = self._m0.initial_state(I.device, I.dtype)      # (L,d,d), cached
+
+        Ds: List[torch.Tensor] = []
+        for k, (layer, lo, hi) in enumerate(self.bounds):
+            in_window = k > 0 and not (
+                self.K_win and self.K_win > 0 and layer % self.K_win == 0)
+            if in_window:
+                prev = Ds[-1]
+                if self.stop_gradient:
+                    prev = prev.detach()
+                if self.normalize_D:
+                    prev = rms_norm_matrix(prev)
+            else:
+                prev = init.unsqueeze(0).expand(hi - lo, L, self.d_out,
+                                                self.d_in)
+            Di = I[lo:hi] + sig[lo:hi] * prev
+            if self.normalize_D:
+                Di = rms_norm_matrix(Di)
+            Di = tau[lo:hi].view(-1, L, 1, 1) * Di
+            Ds.append(Di)
+        D = torch.cat(Ds, dim=0)
+
+        if self.anchor:
+            s = torch.stack([m.s for m in mods])       # (M,)
+            eye = cached_eye(self.d_in, D.device, D.dtype)
+            sI = s.view(M, 1, 1) * eye
+            P = sI + D[:, 0]
+            for l in range(1, L):
+                P = torch.baddbmm(s.view(M, 1, 1) * P, D[:, l], P)
+        else:
+            P = D[:, 0]
+            for l in range(1, L):
+                P = torch.bmm(D[:, l], P)
+
+        gates = [m.gate for m in mods]
+        if gates[0] is not None:
+            g = torch.stack(gates).view(M, 1, 1)
+            P = P * g
+        return P, D

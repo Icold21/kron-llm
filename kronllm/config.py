@@ -1,0 +1,419 @@
+"""Configuration handling for KronLLM.
+
+Single source of truth for defaults is ``DEFAULTS`` below.  Experiments are
+expressed as *overrides* (dotted keys) merged on top of the defaults, so that
+every E-run is guaranteed to share the same seed / data / schedule unless it
+explicitly says otherwise.
+"""
+from __future__ import annotations
+
+import copy
+import json
+from pathlib import Path
+from typing import Any, Dict, Iterable, Mapping
+
+import yaml
+
+DEFAULTS: Dict[str, Any] = {
+    "project": "KronLLM-v2",
+    "seed": 42,
+    "data": {
+        "dataset": "roneneldan/TinyStories",
+        "tokenizer": "byte_level",
+        "vocab_size": 256,
+        "seq_len": 256,
+        "val_split": 0.05,
+        "data_dir": "data",
+        "eot_id": 255,
+        "num_proc": 8,
+        "max_stories": 200000,
+        "max_val_stories": 10000,
+        "force": False,
+    },
+    "model": {
+        "d_model": 128,
+        "n_layers": 12,
+        "n_heads": 8,
+        "n_kv_heads": None,          # None -> MHA
+        "rope_theta": 10000.0,
+        "norm": "rmsnorm",
+        "norm_eps": 1e-6,
+        "tie_embeddings": True,
+        "ffn_silu": True,            # E9 is now the *linear* FFN ablation
+        "ffn_gated": False,          # E11: SwiGLU-style gated FFN
+        "use_kron_qkv": True,
+        "use_kron_ffn": True,
+        "dense_ffn_mult": 1.0,       # only used when use_kron_ffn == False
+        # ALBERT-style factorised (tied) embedding: V x r then r x d.
+        # 0 -> plain V x d table.  Keeps the embedding ~12% of the budget.
+        "embed_rank": 0,
+        # Intra-layer RMSNorm on q/k per head: removes logit drift and lets the
+        # model use a higher lr at this scale.
+        "qk_norm": False,
+        # Fuse all composes of the model into a handful of batched GEMMs.
+        # See kronllm/kron.py:KronBank for the launch-count rationale.
+        "batched_prelude": True,
+        "kron": {
+            "L": 4,
+            "K": 2,
+            "K_win": 2,
+            "n1": 8,
+            "n2": 16,
+            "stop_gradient": True,   # E8 flips this
+            "anchor": True,          # E4 turns the s*I anchor off
+            # Per-role anchor, interpreted as the *effective* (post L-fold)
+            # value: s = s_init ** (1/L).  See README "Deviations".
+            "s_init": {"q": 1.0, "k": 1.0, "v": 1.0, "o": 1.0, "ffn": 1.0},
+            "s_init_effective": True,
+            "s_learnable": False,    # E3 turns this on
+            # Orthogonal factor gain.  With normalize_D the gain is normalised
+            # away in the forward pass, so it only matters for the ablation
+            # table (E12).  "spec" is the literal TZ recipe 1/sqrt(d).
+            "init_gain": "unit",
+            # RMS-normalise D before it enters the anchor and the recurrence.
+            # This is what makes the innovation *visible* to the gradient:
+            # without it ||I|| ~ 1/d and the model is numerically the identity.
+            "normalize_D": True,
+            "innovation_scale": 0.1,  # tau init: RMS of every D_l
+            "gate_init": 0.1,         # ReZero gamma init
+            "gate": True,             # E12 keeps tau but drops the normaliser
+            "theta_std": 0.1,
+            "rezero_eps": 0.0,
+        },
+    },
+    "training": {
+        "batch_size": 128,
+        "seq_len": 256,
+        "grad_accum": 1,
+        "epochs": 3,
+        "optimizer": "adamw",
+        "betas": [0.9, 0.95],
+        "lr": 3e-4,
+        "lr_s": 3e-3,
+        # theta is 4 scalars per module; its gradient is ~400x smaller than the
+        # factor gradients because D is RMS-normalised (a scale-free mixing
+        # coefficient). 10x the old value gives it a chance to move at all --
+        # H3 ("fast/slow channels") is otherwise not even testable.
+        "lr_theta": 1e-2,
+        "warmup_steps": 500,
+        "schedule": "cosine",
+        "min_lr": 3e-5,
+        "weight_decay": 0.1,
+        "grad_clip": 1.0,
+        "amp": "none",   # TU116 has no tensor cores: fp16 is *slower* here
+        "log_every": 100,
+        "eval_every": 500,
+        "eval_batches": 64,
+        "early_stop_patience": 4,
+        "num_workers": 0,
+        "device": "cuda",
+        "compile": False,
+        "out_dir": "runs",
+    },
+    "metrics": {
+        "primary": ["val_ppl", "val_loss"],
+        "diagnostic": [
+            "sigma_theta_mean",
+            "sigma_theta_var",
+            "D_norm",
+            "D_rms",
+            "tau_mean",
+            "gate_mean",
+            "h_norm_ratio",
+            "sigma_min_W",
+            "eff_rank_W",
+            "eff_rank_D",
+            "rank_excess",
+            "attn_entropy",
+            "grad_norm",
+        ],
+        "comparison": [
+            "n_params",
+            "n_params_matrix",
+            "flops_per_token",
+            "time_per_epoch",
+            "peak_vram",
+        ],
+        "spectral_every": 2000,
+    },
+    "logging": {"tensorboard": True, "wandb": False, "wandb_project": "kronllm"},
+}
+
+# E-series from section 6.3 of the spec.  ``overrides`` are dotted paths.
+# NOTE: SiLU on the FFN output is part of the *base* model now (it was E9 in
+# the TZ), so E9 tests the opposite direction -- a purely linear FFN.  E11/E12
+# are additions motivated by the diagnostics of the first training runs; see
+# README "Deviations" for the full table.
+EXPERIMENTS: Dict[str, Dict[str, Any]] = {
+    "E0": {
+        "desc": "Dense baseline (MHA + dense FFN, ~0.97M params)",
+        "overrides": {"model.use_kron_qkv": False, "model.use_kron_ffn": False,
+                      # dense FFN hidden = 48 keeps the *control* under the
+                      # project-wide 1M ceiling (it is 5x the Kron budget)
+                      "model.dense_ffn_mult": 0.375},
+    },
+    "E1": {
+        "desc": "Dense MHA + Kron FFN",
+        "overrides": {"model.use_kron_qkv": False, "model.use_kron_ffn": True},
+    },
+    "E2": {
+        "desc": "Full Kron (base)",
+        "overrides": {},
+    },
+    "E3": {
+        "desc": "E2 + learnable anchor s",
+        "overrides": {"model.kron.s_learnable": True},
+    },
+    "E4": {
+        "desc": "E2 without anchor, K_qkv=8 (pure innovation product)",
+        "overrides": {
+            "model.kron.anchor": False,
+            "model.kron.K_qkv": 8,
+            # without the identity carrier the product of L innovations has
+            # norm ~ tau**L, so tau must be O(1) for the branch to be alive
+            "model.kron.innovation_scale": 1.0,
+        },
+    },
+    "E5": {
+        "desc": "E2 + wider/deeper (d=192, N=16)",
+        "overrides": {
+            "model.d_model": 192,
+            "model.n_layers": 16,
+            "model.kron.n1": 12,
+            "model.kron.n2": 16,
+        },
+    },
+    "E6": {
+        "desc": "E2 + L=6",
+        "overrides": {"model.kron.L": 6},
+    },
+    "E7": {
+        "desc": "E2 + K=4",
+        "overrides": {"model.kron.K": 4},
+    },
+    "E8": {
+        "desc": "E2 + full backprop (no stop-grad)",
+        "overrides": {"model.kron.stop_gradient": False},
+    },
+    "E9": {
+        "desc": "E2 with a linear FFN (SiLU ablation)",
+        "overrides": {"model.ffn_silu": False},
+    },
+    "E10": {
+        "desc": "E2 + GQA (n_kv=2)",
+        "overrides": {"model.n_kv_heads": 2},
+    },
+    "E11": {
+        "desc": "E2 + gated FFN: (W_a x) * silu(W_b x)",
+        "overrides": {"model.ffn_gated": True},
+    },
+    "E12": {
+        "desc": "E2 without D normalisation (raw innovation scale)",
+        "overrides": {
+            "model.kron.normalize_D": False,
+            "model.kron.innovation_scale": 1.0,
+        },
+    },
+    "E13": {
+        "desc": "E2 + K=8 (budget-scaling point, ~651K params)",
+        "overrides": {"model.kron.K": 8},
+    },
+    # ------------------------------------------------------------------
+    # Q-series: quality first.  Same Kron skeleton, but the budget is spent
+    # where it pays off: a 3-bytes/token BPE vocabulary, more depth/width and
+    # more Kronecker terms per matrix, with a factorised embedding so the
+    # lookup table does not swallow the budget.
+    # ------------------------------------------------------------------
+    "Q1": {
+        "desc": "BPE-1024, d=192/N=20, K=5, qk-norm (~926K params)",
+        "overrides": {
+            "data.tokenizer": "bpe",
+            "data.vocab_size": 1024,
+            "data.eot_id": 1023,
+            "data.seq_len": 192,
+            "model.d_model": 192,
+            "model.n_layers": 20,
+            "model.n_heads": 8,
+            "model.embed_rank": 96,
+            "model.qk_norm": True,
+            "model.kron.n1": 12,
+            "model.kron.n2": 16,
+            "model.kron.K": 5,
+            "training.seq_len": 192,
+            # batch 96 OOMs at 6 GB with d=192/N=20; 64 x 192 = 12.3k tok/step
+            "training.batch_size": 64,
+            "training.lr": 5e-4,
+            "training.min_lr": 5e-5,
+            "training.warmup_steps": 300,
+            "training.eval_every": 500,
+            "training.early_stop_patience": 99,
+            # 10000 x 64 x 192 = 123M tokens ~ 2.1 epochs of the BPE corpus
+            "training.max_steps": 10000,
+        },
+    },
+    # ------------------------------------------------------------------
+    # Controls: is the Kron parameterisation actually *worth* it at equal
+    # parameters?  D1 is E0's dense recipe on the Q tokenizer, so the pair
+    # D1 vs Q1 differs in exactly one thing: dense matrices vs Kron ones.
+    # ------------------------------------------------------------------
+    "D1": {
+        "desc": "Dense+BPE control: E0 recipe, 1024-token BPE (~1.07M)",
+        "overrides": {
+            "data.tokenizer": "bpe",
+            "data.vocab_size": 1024,
+            "data.eot_id": 1023,
+            "data.seq_len": 192,
+            "model.use_kron_qkv": False,
+            "model.use_kron_ffn": False,
+            "model.dense_ffn_mult": 0.375,
+            "model.qk_norm": True,
+            "training.seq_len": 192,
+            "training.batch_size": 64,
+            "training.lr": 5e-4,
+            "training.min_lr": 5e-5,
+            "training.warmup_steps": 300,
+            "training.eval_every": 500,
+            "training.early_stop_patience": 99,
+            "training.max_steps": 2500,
+        },
+    },
+    # Q1 was stopped at step ~4200 (val bpb 0.976) to spend the remaining GPU
+    # time on a 2.2x larger model instead -- the parameter ceiling is set by
+    # the 6 GB card, not by the 1M budget.
+    "Q2": {
+        "desc": "BPE-1024, d=320/N=24, K=6, qk-norm (~2.08M params)",
+        "overrides": {
+            "data.tokenizer": "bpe",
+            "data.vocab_size": 1024,
+            "data.eot_id": 1023,
+            "data.seq_len": 192,
+            "model.d_model": 320,
+            "model.n_layers": 24,
+            "model.n_heads": 8,          # d_head = 40
+            "model.embed_rank": 128,
+            "model.qk_norm": True,
+            "model.kron.n1": 16,
+            "model.kron.n2": 20,         # n1 * n2 == d_model == 320
+            "model.kron.K": 6,
+            "training.seq_len": 192,
+            # N*d*bs is held at Q1's level (24*320*32 == 20*192*64), so the
+            # activation footprint stays ~3.5 GB inside the 6 GB card.
+            "training.batch_size": 32,
+            "training.lr": 4e-4,
+            "training.min_lr": 4e-5,
+            "training.warmup_steps": 300,
+            "training.eval_every": 500,
+            "training.early_stop_patience": 99,
+            # 10000 x 32 x 192 = 61M tokens ~ 1 epoch of the BPE corpus
+            "training.max_steps": 10000,
+        },
+    },
+}
+
+# Supervised fine-tuning on top of Q2.  The corpus is written by
+# ``scripts/prepare_sft.py`` from Dolly-15k; only the model weights carry over,
+# so the run gets a fresh optimizer and its own short cosine schedule.
+EXPERIMENTS["S1"] = {
+    "desc": "Q2 + supervised fine-tuning on Dolly-15k Q/A (~2.08M params)",
+    "overrides": {
+        **EXPERIMENTS["Q2"]["overrides"],
+        "data.train_bin": "sft_train.bpe.bin",
+        "data.val_bin": "sft_val.bpe.bin",
+        "training.init_from": "runs/Q2/best.pt",
+        "training.max_steps": 400,
+        "training.lr": 1e-4,
+        "training.min_lr": 1e-5,
+        "training.warmup_steps": 40,
+        "training.eval_every": 50,
+        "training.early_stop_patience": 12,
+    },
+}
+
+
+def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
+    """Recursively merge ``override`` into a copy of ``base``."""
+    out = copy.deepcopy(dict(base))
+    for key, value in override.items():
+        if isinstance(value, Mapping) and isinstance(out.get(key), Mapping):
+            out[key] = deep_merge(out[key], value)
+        else:
+            out[key] = copy.deepcopy(value)
+    return out
+
+
+def set_dotted(cfg: Dict[str, Any], dotted: str, value: Any) -> None:
+    parts = dotted.split(".")
+    node = cfg
+    for part in parts[:-1]:
+        if part not in node or not isinstance(node[part], dict):
+            node[part] = {}
+        node = node[part]
+    node[parts[-1]] = value
+
+
+def get_dotted(cfg: Mapping[str, Any], dotted: str, default: Any = None) -> Any:
+    node: Any = cfg
+    for part in dotted.split("."):
+        if not isinstance(node, Mapping) or part not in node:
+            return default
+        node = node[part]
+    return node
+
+
+def load_config(path: str | Path | None = None,
+                overrides: Iterable[str] | Mapping[str, Any] | None = None) -> Dict[str, Any]:
+    """Load YAML config on top of DEFAULTS, then apply overrides.
+
+    ``overrides`` accepts either a mapping of dotted keys or an iterable of
+    ``key=value`` strings (CLI style).
+    """
+    cfg = copy.deepcopy(DEFAULTS)
+    if path is not None:
+        with open(path, "r", encoding="utf-8") as fh:
+            cfg = deep_merge(cfg, yaml.safe_load(fh) or {})
+
+    if overrides is None:
+        return cfg
+
+    if isinstance(overrides, Mapping):
+        for key, value in overrides.items():
+            set_dotted(cfg, key, value)
+        return cfg
+
+    for item in overrides:
+        if "=" not in item:
+            raise ValueError(f"override must be key=value, got {item!r}")
+        key, _, raw = item.partition("=")
+        set_dotted(cfg, key.strip(), _parse_scalar(raw.strip()))
+    return cfg
+
+
+def _parse_scalar(raw: str) -> Any:
+    try:
+        return yaml.safe_load(raw)
+    except yaml.YAMLError:
+        return raw
+
+
+def experiment_config(exp_id: str, base_path: str | Path | None = None,
+                      extra: Iterable[str] | None = None) -> Dict[str, Any]:
+    """Build the full config for one E-run."""
+    if exp_id not in EXPERIMENTS:
+        raise KeyError(f"unknown experiment {exp_id!r}; known: {sorted(EXPERIMENTS)}")
+    overrides: Dict[str, Any] = dict(EXPERIMENTS[exp_id]["overrides"])
+    cfg = load_config(base_path, overrides)
+    cfg["experiment"] = exp_id
+    cfg["experiment_desc"] = EXPERIMENTS[exp_id]["desc"]
+    if extra:
+        for item in extra:
+            key, _, raw = item.partition("=")
+            set_dotted(cfg, key.strip(), _parse_scalar(raw.strip()))
+    return cfg
+
+
+def save_config(cfg: Mapping[str, Any], path: str | Path) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        yaml.safe_dump(json.loads(json.dumps(cfg, default=str)), fh,
+                       sort_keys=False, allow_unicode=True)

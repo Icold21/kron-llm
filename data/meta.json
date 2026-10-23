@@ -1,0 +1,10 @@
+{
+  "dataset": "roneneldan/TinyStories",
+  "eot": 255,
+  "train_bytes": 180723995,
+  "val_bytes": 8310677,
+  "train_stories": 200000,
+  "cached": false,
+  "vocab_size": 256,
+  "eot_id": 255
+}

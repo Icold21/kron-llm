@@ -1,0 +1,28 @@
+# Byte-level and BPE corpora (hundreds of MB, reproducible from scripts/)
+data/*.bin
+
+# Training artifacts
+runs/
+results/
+*.log
+tb/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
