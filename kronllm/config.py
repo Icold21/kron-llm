@@ -367,6 +367,31 @@ EXPERIMENTS["S1"] = {
     },
 }
 
+# Q4: test the E8 win at quality scale.  Q2 plus full backprop through the
+# depth recurrence; same parameter count, tokenizer and activation footprint.
+EXPERIMENTS["Q4"] = {
+    "desc": "Q2 + full backprop (no stop-grad, ~2.08M params)",
+    "overrides": {
+        **EXPERIMENTS["Q2"]["overrides"],
+        "model.kron.stop_gradient": False,
+    },
+}
+
+# Q5: scale toward the 10M ceiling without increasing the activation
+# footprint.  K=24 raises the matrix budget from 1.89M to 7.56M parameters
+# while N*d*batch*seq stays at Q2's level, so it still targets a 6 GB card.
+EXPERIMENTS["Q5"] = {
+    "desc": "Q4 + K=24 (~7.75M params), same activation footprint",
+    "overrides": {
+        **EXPERIMENTS["Q4"]["overrides"],
+        "model.kron.K": 24,
+        "training.lr": 3e-4,
+        "training.min_lr": 3e-5,
+        "training.max_steps": 2000,
+        "training.eval_every": 500,
+    },
+}
+
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
     """Recursively merge ``override`` into a copy of ``base``."""
