@@ -89,6 +89,10 @@ checks → decontamination against the evaluation sets → fixed mixing ratio.
 TinyStories is **not** part of the pretraining shards; it is kept only as the
 development bench described above.
 
+The concrete 60/40 byte mix, domain quotas (math, science, logic, literature,
+encyclopedic), source licences and the pilot pipeline are fixed in
+[data_plan.md](data_plan.md).
+
 Start with **50/50 by bytes**, then tune on held-out bpb per language. Target
 **0.5–2B tokens**; the compute-optimal point for 10M parameters is ~200M, but
 small models usually keep improving past it, so the run is checkpointed and the

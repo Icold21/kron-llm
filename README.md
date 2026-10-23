@@ -1052,9 +1052,10 @@ TinyStories only as a sanity bench — see [docs/roadmap.md](docs/roadmap.md).
 The plan beyond these ablations — freeze the architecture, build a curated
 English–Russian corpus and a shared tokenizer, pretrain at ~10M parameters
 inside 6 GB, then structured Q/A SFT and optional distillation — is in
-[docs/roadmap.md](docs/roadmap.md). Each phase has an explicit gate and kill
-criteria, so a failed phase sends the project back instead of silently
-accumulating compute.
+[docs/roadmap.md](docs/roadmap.md); the bilingual mix, source licences and
+corpus pipeline are fixed in [docs/data_plan.md](docs/data_plan.md). Each phase
+has an explicit gate and kill criteria, so a failed phase sends the project
+back instead of silently accumulating compute.
 
 ---
 
