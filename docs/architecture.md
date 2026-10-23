@@ -102,6 +102,60 @@ direct test of whether the product, rather than the recurrence or the budget,
 causes the measured rank compression. `KronBank` evaluates the sum with one
 batched weighted reduction followed by a single GEMM.
 
+### 3.1 Rank relations: proven bounds and the effective-rank ordering
+
+Two hybrid compositions sit between the product and the sum:
+
+- **grouped** (`G` blocks): `S_g = s^(1/G) I + sum_{l in g} alpha_l D_l`,
+  `P = S_G ... S_1`; `G=1` is the sum, `G=L` is the product.
+- **alternating** (start `sum`): start at `P = sI`, then for each depth step
+  apply `P <- P + alpha_l D_l` (sum) or `P <- P (I + alpha_l D_l)` (product),
+  alternating the operation.
+
+**Proven bounds** (standard linear algebra):
+
+| statement | source |
+|---|---|
+| `rank(AB) <= min(rank A, rank B)` | Sylvester's rank inequality |
+| `rank(A + B) <= rank A + rank B` | rank subadditivity |
+| `rank(A ⊗ B) = rank(A) rank(B)` | Kronecker product rank |
+
+Applied to the compositions:
+
+```
+sum:         rank(P) <= 1 + sum_l rank(D_l)
+grouped:     rank(P) <= min_g rank(S_g) <= 1 + sum_l rank(D_l)
+product:     rank(P) <= min_l rank(sI + D_l)
+alternating: rank(P) <= min over the factors in the multiplicative chain
+```
+
+**Exact ranks saturate.** On all 60 modules of E8w/E14w/E17w the exact rank of
+`P` is 125–128 (d=128) and `max(rank(P) - bound) = 0`; exact rank therefore
+cannot distinguish the methods. The informative quantity is the **effective
+rank** (Roy & Vetterli, 2007): `exp(H(sigma / sum sigma))`.
+
+Measured on WikiText-103 at 4,000 steps (60 modules each):
+
+| composition | mean effective rank | range |
+|---|---:|---:|
+| product (E8w) | **60.1** | 45.4–78.5 |
+| grouped `G=2` (E17w) | **79.0** | 67.6–90.8 |
+| sum (E14w) | **97.7** | 90.4–103.0 |
+
+The non-strict ordering
+
+```
+eff_rank(P_product) <= eff_rank(P_grouped) <= eff_rank(P_sum)
+```
+
+held at **60 / 60 matched modules**. This is consistent with the multiplicative
+depth (0 for the sum, 1 for grouped, 3 for the product) and with Sylvester's
+bound, but it is **not a theorem**: effective rank is not monotone under matrix
+products, and counterexamples exist for exact rank. We record it as hypothesis
+**H4** and keep it empirical (one corpus, one seed so far). The sum-product
+construction is motivated by SPNs, where sum and product nodes alternate by
+design (Poon & Domingos, 2012).
+
 ## 4. Attention
 
 The block is pre-norm RMSNorm → attention → residual, then pre-norm RMSNorm →
@@ -282,3 +336,15 @@ The following properties are enforced by the test suite:
 * **One GPU, fp32.** fp16 autocast is 2.4× slower than fp32 on the reference
   GPU, so `amp` defaults to `none`. No DDP, no gradient checkpointing, no CUDA
   graphs (capture fails on `baddbmm` in this environment).
+
+## References
+
+- Rank inequalities (Sylvester, subadditivity): *Rank (linear algebra)*,
+  Wikipedia, <https://en.wikipedia.org/wiki/Rank_(linear_algebra)>.
+- Kronecker rank `rank(A ⊗ B) = rank(A) rank(B)`: *Kronecker product*,
+  Wikipedia, <https://en.wikipedia.org/wiki/Kronecker_product>.
+- Effective rank: O. Roy and M. Vetterli, "The Effective Rank: A Measure of
+  Effective Dimensionality", EUSIPCO 2007,
+  <https://www.eurasip.org/Proceedings/Eusipco/Eusipco2007/Papers/a5p-h05.pdf>.
+- Sum-product networks: H. Poon and P. Domingos, "Sum-Product Networks: A New
+  Deep Architecture", 2012, <https://arxiv.org/abs/1202.3732>.
