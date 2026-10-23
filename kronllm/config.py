@@ -90,6 +90,9 @@ DEFAULTS: Dict[str, Any] = {
             # E17: grouped composition -- sum inside `groups` blocks, product
             # across blocks.  G=1 is the sum, G=L is the product.
             "groups": 2,
+            # E18: alternating composition -- one operation per micro-depth
+            # step: sum, product, sum, product... starting from `sI`.
+            "alternate_start": "sum",
             "anchor": True,          # E4 turns the s*I anchor off
             # Per-role anchor, interpreted as the *effective* (post L-fold)
             # value: s = s_init ** (1/L).  See README "Deviations".
@@ -483,6 +486,13 @@ EXPERIMENTS["E17w"] = {
                   "data.data_dir": "data/wikitext",
                   "model.kron.composition": "grouped",
                   "model.kron.groups": 2},
+}
+EXPERIMENTS["E18w"] = {
+    "desc": "E8 + alternating sum/product composition on WikiText-103 bytes",
+    "overrides": {**EXPERIMENTS["E8"]["overrides"],
+                  "data.data_dir": "data/wikitext",
+                  "model.kron.composition": "alternating",
+                  "model.kron.alternate_start": "sum"},
 }
 
 

@@ -362,6 +362,10 @@ class KronBlock(nn.Module):
                     if L_eff == L and str(kc.get("composition",
                                                  "product")) == "grouped"
                     else 1),
+            alternate_start=(str(kc.get("alternate_start", "sum"))
+                             if L_eff == L and str(kc.get("composition",
+                                                          "product")) == "alternating"
+                             else "sum"),
         )
 
     def ffn_module(self) -> nn.Module:
@@ -621,9 +625,9 @@ class KronTransformer(nn.Module):
                     # The composed map depends on the input token, so it cannot
                     # be fused into one weight-only prelude per layer.
                     continue
-                if mod.composition == "grouped":
-                    # Grouped composition has its own product-of-sums path; keep
-                    # it out of the batched prelude until it is benchmarked.
+                if mod.composition in {"grouped", "alternating"}:
+                    # These have their own composition path; keep them out of
+                    # the batched prelude until they are benchmarked.
                     continue
                 sig = (mod.L, mod.K, mod.d_in, mod.d_out, mod.n1_in, mod.n2_in,
                        mod.n1_out, mod.n2_out, mod.anchor, mod.normalize_D,
@@ -892,6 +896,11 @@ class KronTransformer(nn.Module):
                     groups = max(1, int(mc["kron"].get("groups", 1)))
                     return (d * out_d + L * d * d
                             + (groups - 1) * d * d * out_d / tokens + L * d)
+                if composition == "alternating":
+                    start = str(mc["kron"].get("alternate_start", "sum"))
+                    products = ((L + 1) // 2 if start == "product" else L // 2)
+                    return (d * out_d + L * d * d
+                            + products * d * d * out_d / tokens + L * d)
                 return d * out_d + L * d * d * out_d / tokens + L * d
             return L * d * out_d + L * d
 

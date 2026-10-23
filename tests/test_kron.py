@@ -612,3 +612,44 @@ def test_grouped_rejects_bad_group_count():
     import pytest
     with pytest.raises(ValueError):
         KronCompose(64, 64, 8, 8, L=4, K=2, composition="grouped", groups=3)
+
+# ---------------------------------------------------------------------------
+# Alternating composition: one op per micro-depth step
+# ---------------------------------------------------------------------------
+def test_alternating_matches_manual_formula():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=2, K=2, K_win=0, s_init=0.7,
+                    anchor=True, normalize_D=False, innovation_scale=1.0,
+                    use_gate=False, composition="alternating",
+                    alternate_start="sum")
+    x = torch.randn(2, 5, 64)
+    _, D = m(x, None, 0)
+    eye = torch.eye(64)
+    manual = (0.7 * eye + m.alpha[0] * D[0]) @ (eye + m.alpha[1] * D[1])
+    assert torch.allclose(m.compose_alternating(D), manual, atol=1e-5)
+
+
+def test_alternating_product_start_matches_manual():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=2, K=2, K_win=0, s_init=0.7,
+                    anchor=True, normalize_D=False, innovation_scale=1.0,
+                    use_gate=False, composition="alternating",
+                    alternate_start="product")
+    x = torch.randn(2, 5, 64)
+    _, D = m(x, None, 0)
+    eye = torch.eye(64)
+    manual = 0.7 * eye @ (eye + m.alpha[0] * D[0]) + m.alpha[1] * D[1]
+    assert torch.allclose(m.compose_alternating(D), manual, atol=1e-5)
+
+
+def test_alternating_forward_gradients():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=4, K=2, K_win=0, s_init=1.0,
+                    anchor=True, normalize_D=True, innovation_scale=0.1,
+                    use_gate=False, composition="alternating")
+    x = torch.randn(2, 6, 64, requires_grad=True)
+    y, _ = m(x, None, 0)
+    y.square().mean().backward()
+    assert torch.isfinite(y).all()
+    assert m.alpha.grad is not None and torch.isfinite(m.alpha.grad).all()
+    assert m.A.grad is not None and torch.isfinite(m.A.grad).all()

@@ -176,6 +176,7 @@ class KronCompose(nn.Module):
         sum_alpha_init: float = 1.0,
         dynamic_gate: Optional[str] = None,
         groups: int = 1,
+        alternate_start: str = "sum",
     ) -> None:
         super().__init__()
         d_out = d_in if d_out is None else d_out
@@ -195,10 +196,10 @@ class KronCompose(nn.Module):
         assert self.square or L == 1, "non-square KronCompose requires L == 1"
 
         self.composition = str(composition).lower()
-        if self.composition not in {"product", "sum", "grouped"}:
+        if self.composition not in {"product", "sum", "grouped", "alternating"}:
             raise ValueError(
-                "composition must be 'product', 'sum' or 'grouped', got "
-                f"{composition!r}")
+                "composition must be 'product', 'sum', 'grouped' or "
+                f"'alternating', got {composition!r}")
         self.groups = int(groups)
         if self.composition == "grouped":
             if self.groups < 1 or L % self.groups != 0:
@@ -206,6 +207,9 @@ class KronCompose(nn.Module):
                     f"groups={groups} must divide L={L}")
         else:
             self.groups = 1
+        self.alternate_start = str(alternate_start).lower()
+        if self.alternate_start not in {"sum", "product"}:
+            raise ValueError("alternate_start must be 'sum' or 'product'")
         self.sum_alpha_init = float(sum_alpha_init)
         self.dynamic_gate = (str(dynamic_gate).lower() if dynamic_gate else None)
         if self.dynamic_gate is not None:
@@ -235,7 +239,8 @@ class KronCompose(nn.Module):
         # product composition keeps ``alpha=None`` so old checkpoints and the
         # parameter count of the product runs stay unchanged.
         self.alpha = (nn.Parameter(torch.full((L,), self.sum_alpha_init))
-                      if self.composition in {"sum", "grouped"} else None)
+                      if self.composition in {"sum", "grouped", "alternating"}
+                      else None)
 
         # Input-dependent softmax gate over the L sum-composition terms:
         #   w_t = L * softmax(g(x_t)),  P_t = sI + sum_l w_{t,l} D_l.
@@ -260,7 +265,7 @@ class KronCompose(nn.Module):
             # the identity term.  A grouped composition is a product of G sums,
             # so s_init is also the *effective* anchor (each group gets its
             # G-th root at composition time).
-            if self.composition in {"sum", "grouped"}:
+            if self.composition in {"sum", "grouped", "alternating"}:
                 s0 = float(s_init)
             else:
                 s0 = (float(s_init) ** (1.0 / L)
@@ -426,12 +431,40 @@ class KronCompose(nn.Module):
         assert P is not None
         return P
 
+    def compose_alternating(self, D: torch.Tensor) -> torch.Tensor:
+        """Alternate sum and product at every micro-depth step.
+
+        Starting from ``P = sI``, each factor applies one operation:
+
+            l even (with ``alternate_start='sum'``): P <- P + alpha_l D_l
+            l odd:                                   P <- P @ (I + alpha_l D_l)
+
+        The anchor is applied once at the start, so at ``D=0`` the map is
+        exactly ``sI``.  This is a sum-product network along depth: additive
+        steps raise the rank, multiplicative steps compose, and the
+        multiplicative depth is about ``L/2`` instead of ``L-1``.
+        """
+        P = (self.s * cached_eye(self.d_in, D.device, D.dtype)
+             if self.s is not None
+             else torch.zeros(self.d_in, self.d_in, device=D.device,
+                              dtype=D.dtype))
+        eye = cached_eye(self.d_in, D.device, D.dtype)
+        for l in range(self.L):
+            is_sum = ((l % 2 == 0) == (self.alternate_start == "sum"))
+            if is_sum:
+                P = P + self.alpha[l] * D[l]
+            else:
+                P = P @ (eye + self.alpha[l] * D[l])
+        return P
+
     def compose(self, D: torch.Tensor) -> torch.Tensor:
         """Compose the depth state with the configured operation."""
         if self.composition == "sum":
             return self.compose_sum(D)
         if self.composition == "grouped":
             return self.compose_grouped(D)
+        if self.composition == "alternating":
+            return self.compose_alternating(D)
         return self.compose_product(D)
 
     @property
@@ -441,7 +474,7 @@ class KronCompose(nn.Module):
             return None
         if self.composition == "sum":
             return self.s
-        if self.composition == "grouped":
+        if self.composition in {"grouped", "alternating"}:
             return self.s
         return self.s ** self.L
 
@@ -540,10 +573,10 @@ class KronCompose(nn.Module):
                 P = self.compose_sum(D)
                 y = torch.matmul(xm.reshape(tokens, self.d_in), P.transpose(0, 1))
         else:
-            if self.composition == "grouped":
-                # Grouped always builds its (G-1)-fold product of group sums;
-                # there is no cheap per-factor sequential fallback.
-                P = self.compose_grouped(D)
+            if self.composition in {"grouped", "alternating"}:
+                # These compositions have no cheap per-factor sequential
+                # fallback; build the composed map and apply it once.
+                P = self.compose(D)
                 y = torch.matmul(xm.reshape(tokens, self.d_in), P.transpose(0, 1))
             else:
                 if mode == "auto":
