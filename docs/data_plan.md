@@ -74,12 +74,20 @@ A shard with an unknown licence does not enter the mix.
 
 ## 4. Sizes
 
-| item | target |
-|---|---|
-| total pretraining tokens | 0.5–2B (checkpointed; curve decides) |
-| raw text | ≈2–8 GB depending on the final token count |
-| held-out | 10M tokens per language + 1M per domain |
-| minimum per domain-language | enough for ≥20M tokens after filtering |
+**The 100 MB pilot is not the pretraining corpus.** It exists to validate the
+pipeline and the tokenizer cheaply; training starts only after the full build.
+
+| stage | size | purpose |
+|---|---|---|
+| pilot | ~250 MB per language (≈60–80M tokens) | filters, dedup, licences, tokenizer fertility |
+| full corpus | **0.5–2B tokens** (≈2–8 GB raw text at 3.7–4.0 bytes/token) | actual pretraining |
+| held-out | 10M tokens per language + 1M per domain | evaluation, fixed before training |
+| minimum per domain-language | enough for ≥20M tokens after filtering | avoid a starved domain |
+
+Reference points: a 10M-parameter model is compute-optimal at ≈200M tokens
+(20 tokens/parameter), but small models usually keep improving well past that,
+so the run is checkpointed and the bpb-vs-tokens curve decides where to stop.
+At ~7k tokens/s, 1B tokens is ≈40 h of GPU time and 2B is ≈80 h.
 
 ## 5. Evaluation of the corpus itself
 
@@ -92,10 +100,10 @@ A shard with an unknown licence does not enter the mix.
 ## 6. Immediate steps
 
 - [ ] freeze the shard manifest schema and create `data/bilingual/manifest.jsonl`;
-- [ ] pilot: ~100 MB per language across the five domains, run the full
-      pipeline and inspect samples;
+- [ ] pilot: ~250 MB per language across the five domains, run the full
+      pipeline and inspect samples (this is a pipeline test, not training);
 - [ ] train 8K and 16K tokenizers on the pilot, compare fertility;
-- [ ] only then start the full download and the 0.5–2B-token build.
+- [ ] only then start the full 0.5–2B-token download and build.
 
 The pilot is deliberately small: it is cheaper to discover a licence or
-quality problem on 200 MB than on 8 GB.
+quality problem on 500 MB than on 8 GB.
