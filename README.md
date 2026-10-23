@@ -22,7 +22,7 @@ single consumer GPU and generate on CPU. On TinyStories, the 926K model reaches
 | Matrix parameterisation | Kronecker products, 4 channels × 2–8 summands; product or sum |
 | Tokenizer | byte-level BPE, 1,024–4,096 tokens, 3.07–3.96 bytes/token |
 | Context | 192 tokens |
-| Validation quality | **0.976 bpb** (Q1, 926K) · **0.839** (Q2, 2.08M) · **0.849** (Q6, 2.47M, 4k steps) |
+| Validation quality | **0.976 bpb** (Q1, 926K) · **0.764** (Q6, 2.47M, 10k steps) · **0.839** (Q2, 2.08M) |
 | Checkpoint size | 8.55 MB fp32 → 2.45 MB int8 → 1.42 MB int4 (Q2/S1) |
 | Training footprint | Fits a single **6 GB** consumer GPU (Q2 4.22 GB, Q6 4.28 GB peak) |
 | Inference | CPU or one consumer GPU; no custom kernels |
@@ -464,6 +464,7 @@ the two assumptions behind the product: stop-gradient and multiplication.
 | **Q2** (Kron, BPE) | 2,079,992 | 1,890,360 | 1.7833 | 5.95 | **0.839** | 10,000 |
 | **Q4** (full backprop, BPE) | 2,079,992 | 1,890,360 | 1.9653 | 7.137 | **0.9248** | 4,000 |
 | **Q6** (BPE-4096, full backprop) | 2,473,208 | 1,890,360 | 2.3292 | 10.27 | **0.8489** | 4,000 |
+| **Q6@10k** (same, full budget) | 2,473,208 | 1,890,360 | 2.0972 | 8.143 | **0.7644** | 10,000 |
 
 `val loss`/`PPL` in this table are in different units (nats/byte for
 E0/E2/E8/E14/E15/E16, nats/token for Q1/Q2/Q4/Q6), so only the last column can
@@ -486,12 +487,13 @@ The stop-gradient stays off in all following runs.
 
 **Wider tokenizer (Q6).** BPE-4096 raises the compression from 3.07 to
 **3.96 bytes/token**. Q6 reaches **0.8489 bpb** at step 4,000 versus Q4's
-0.9248 — **8.2 % better** — and nearly matches Q2's 10,000-step 0.839 in a
-quarter of the steps. The gain is the tokenizer, not new capacity: the matrix
-layers are identical to Q4, and the only extra parameters are 393K in the
-factorised embedding (2,473,208 total). To stay inside 6 GB, the loss is
-computed in checkpointed row chunks (`model.loss_chunk`), so the
-`32 × 192 × 4096` logits tensor is never materialised. Peak VRAM 4.28 GB.
+0.9248 — **8.2 % better** — and at the full 10,000-step budget it reaches
+**0.7644 bpb**, **8.9 % better than Q2's 0.839**. The gain is the tokenizer,
+not new capacity: the matrix layers are identical to Q4, and the only extra
+parameters are 393K in the factorised embedding (2,473,208 total). To stay
+inside 6 GB, the loss is computed in checkpointed row chunks
+(`model.loss_chunk`), so the `32 × 192 × 4096` logits tensor is never
+materialised. Peak VRAM 4.28 GB.
 
 **Kronecker embedding (Q7) is a negative result.** Replacing the `V × r` table
 with `Σ_k A_k ⊗ B_k` cuts the embedding from 565K to 90K parameters at the same
@@ -1090,7 +1092,7 @@ artifacts/
 | **Seed control for grouped/alternating** | the WikiText win is 1.3 % on one seed; E17w/E18w need a second seed before they can become the default | confirms or rejects the hybrid advantage |
 | **Architecture freeze at ~10M** | Q5 (`K=24`) lost 3 % and collapsed layer diversity, so the budget must go to width/depth/context, not more summands | a `B1` config that passes the Phase-0 gate in [docs/roadmap.md](docs/roadmap.md) |
 | **Bilingual tokenizer + corpus** | TinyStories is only the development bench; the product corpus is EN–RU | 8K–16K BPE, measured fertility per language, contamination report |
-| **Q6 long run (10,000 steps)** (running) | Q6 is at 0.849 after 4,000; Q2 is 0.839 after 10,000, so the shipped comparison is not like-for-like yet | a clean Q6-vs-Q2 curve and a possible new shipped model |
+| **Q6 long run (10,000 steps)** (done) | Q6 reached **0.7644 bpb** at 10,000 steps vs Q2's 0.839; package and quantise it | a new shipped checkpoint |
 | **Orthogonal anchor** (`O_l` Householder + `D_l`) | keeps `W_l` full-rank and stable while allowing larger `D_l` | tests H2 without the near-identity compromise; higher risk |
 | **E1 / dense-2M controls** | isolate attention vs FFN and parameter count | the missing controls behind the current claims |
 | **`σ` before normalisation**: `D = τ·rms_norm(σ·Î + prev)` | today `σ` multiplies an already normalised `D`, so its gradient is ~250× smaller than the factors' and H3 is untestable | `σ` starts controlling the scale of memory → `Var σ(θ)` grows by orders of magnitude |
@@ -1101,13 +1103,13 @@ artifacts/
 
 E14 ruled out a sum-composition scaling run (4.9 % worse at 3.1× the FLOPs).
 Q4 confirmed full backprop (0.9248 vs 0.962 bpb at step 4,000) and Q6 confirmed
-the tokenizer (0.8489 at 4,000 steps, 8.2 % better than Q4). Q5 and Q7 are
-negative: `K=24` lost 3 % and collapsed layer diversity (`cos_prev_max =
-0.99999`), and the Kronecker embedding lost 12 %. On WikiText, the hybrid
-compositions (grouped/alternating) beat the product by 1.3 % at matched steps,
-but that is one seed. The horizon is therefore: confirm the hybrid, freeze the
-architecture under 10M, move to the bilingual corpus, and keep TinyStories only
-as a sanity bench — see [docs/roadmap.md](docs/roadmap.md).
+the tokenizer (0.8489 at 4,000 steps; **0.7644 at 10,000 vs Q2's 0.839**). Q5
+and Q7 are negative: `K=24` lost 3 % and collapsed layer diversity
+(`cos_prev_max = 0.99999`), and the Kronecker embedding lost 12 %. On WikiText,
+the hybrid compositions (grouped/alternating) beat the product by 1.3 % at
+matched steps, but that is one seed. The horizon is therefore: confirm the
+hybrid, freeze the architecture under 10M, move to the bilingual corpus, and
+keep TinyStories only as a sanity bench — see [docs/roadmap.md](docs/roadmap.md).
 
 ### Long-term horizon
 

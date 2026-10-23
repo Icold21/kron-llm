@@ -26,6 +26,7 @@ is reproducible with the commands in §6 of the [README](../README.md).
 | Q2 | BPE-1024 | 2,079,992 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 10,000 |
 | Q4 | BPE-1024 | 2,079,992 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 4,000 |
 | Q6 | BPE-4096 | 2,473,208 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 4,000 |
+| Q6@10k | BPE-4096 | 2,473,208 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 10,000 |
 | Q3 (pilot) | BPE-1024 | 3,544,104 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 32 | 400 |
 | Q3warm | BPE-1024 | 3,544,104 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 24 | 500 |
 | Q3long | BPE-1024 | 3,544,104 | 1,890,360 | 320 / 24 | 6 / 4 | 192 / 24 | 2,000 |
@@ -48,6 +49,7 @@ and **14.41 MB** (Q3/Q3warm/Q3long).
 | Q2 | 1.7833 | nats/token | 5.95 | **0.839** | 10,000 steps |
 | Q4 | 1.9653 | nats/token | 7.137 | **0.9248** | full backprop, step 4,000 |
 | Q6 | 2.3292 | nats/token | 10.27 | **0.8489** | BPE-4096, step 4,000 |
+| Q6@10k | 2.0972 | nats/token | 8.143 | **0.7644** | BPE-4096, full 10,000 steps |
 | Q3 (pilot) | 4.4275 | nats/token | 83.7 | 2.083 | routed, step 400; not adopted |
 | Q3warm | 1.7502 | nats/token | 5.76 | **0.824** | routed, warm-started from Q2; not shipped |
 | Q3long | 2.7145 | nats/token | 15.10 | 1.277 | routed from scratch, step 2,000; no jump |
@@ -91,6 +93,7 @@ steps.
 | Q2 | 1,055 | 5.8k | 36.2 | 11.9 | 4.22 GB |
 | Q4 | 820 | 7.5k | 36.2 | 11.9 | 4.31 GB |
 | Q6 | 869 | 7.1k | 37.0 | 9.35 | 4.28 GB |
+| Q6@10k | 847 | 7.3k | 37.0 | 9.35 | 4.28 GB |
 | D1 | 178 | 69k | 3.31 | 1.08 | 1.44 GB |
 | S1 | 844 | 7.3k | 36.2 | 11.9 | 4.22 GB |
 
@@ -340,11 +343,12 @@ Q6 = Q4 + BPE-4096. BPE-1024 compresses to 3.07 bytes/token; BPE-4096 reaches
 materialised; without that the wider vocabulary exceeds the 6 GB card.
 
 At step 4,000 Q6 reaches **0.8489 bpb** (val loss 2.3292, PPL 10.27) versus
-Q4's **0.9248** — **8.2 % better** at matched steps and 4.28 GB peak VRAM. It
-is within 1.2 % of Q2's 10,000-step 0.839 in 4,000 steps. The gain is the
-tokenizer: the matrix layers are identical to Q4; the only extra parameters are
-393K in the embedding. Q2 remains the shipped model until Q6 is re-run to the
-same 10,000-step budget.
+Q4's **0.9248** - **8.2 % better** at matched steps and 4.28 GB peak VRAM.
+At the full 10,000-step budget it reaches **0.7644 bpb** (val loss 2.0972,
+PPL 8.143), **8.9 % better than Q2's 0.839**. The gain is the tokenizer: the
+matrix layers are identical to Q4; the only extra parameters are 393K in the
+embedding. Q6@10k is the new best checkpoint; Q2 remains the packaged artifact
+until Q6 is quantised into `artifacts/`.
 
 Q5 = Q4 + `K=24` (7,747,832 parameters) at the same activation footprint. It
 is a **negative result**: **0.9530 bpb** at step 4,000 versus Q4's 0.9248,

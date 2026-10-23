@@ -9,15 +9,22 @@ not after every run; entries are written in detail.
 
 ## In progress
 
-- **Product-vs-sum on a harder corpus:** the next probe is the E8/E14 recipes on
-  WikiText-103 (matched params/steps), to test whether TinyStories is masking
-  the sum's extra rank.
-- **Q6 to 10,000 steps:** the current best bpb at 4,000 is 0.8489 vs the
-  shipped Q2 0.839 at 10,000; a like-for-like run is needed before shipping.
-- **Bilingual corpus (Phase 1):** mix and pipeline fixed in `docs/data_plan.md`
-  (60/40 bytes, math/science/logic/literature/encyclopedic); pilot next.
+- **Seed control** for the hybrid compositions: E8w_s43 and E17w_s43 are
+  running; then E19 (6 unique ×2), E21 (randomized recursion), E20 (12×2) and
+  E22 (6×4) are queued automatically.
 
 ## Results
+
+## 2026-10-24T02:50+03:00 — Q6 at 10k: 0.7644 bpb, new best
+
+- val loss **2.0972**, PPL **8.143**, bpb **0.7644** (2,473,208 params, BPE-4096)
+- Q2 at the same budget: **0.839**; Q6 is **8.9 % better**, and Q6@4k was
+  0.8489 — the curve was still improving at 10k
+- 0.847 s/step, ~2.4 h, peak **4.28 GB**; `eff_rank(P)` **144.3**,
+  `Var sigma(theta)` **0.0108**, `cos_prev_max` **0.839**
+- Q6 is the new best checkpoint; Q2 remains the packaged int8 artifact until
+  Q6 is quantised and added to `artifacts/`
+- seed control of the hybrid compositions started right after this run
 
 ## 2026-10-24T00:35+03:00 — WikiText composition study: hybrids beat product
 
@@ -79,12 +86,3 @@ not after every run; entries are written in detail.
 - 0.869 s/step, 58 min, peak VRAM **4.28 GB**; diagnostics `eff_rank(P)`
   **139.4**, `Var sigma(theta)` **0.00438**, `cos_prev_max` **0.848**
 - Q2 remains the shipped checkpoint until Q6 is trained to 10,000 steps
-
-## 2026-10-23T10:30+03:00 — Q4 full backprop at 2M: win
-
-- val loss **1.9653**, PPL **7.137**, bpb **0.9248** (2,079,992 params)
-- Q2 at the matched step 4,000: bpb **0.962**; full backprop is **3.9 %
-  better** at the same cost (36.2 MFLOP/token, 4.31 GB peak VRAM)
-- `eff_rank(P)` **140.2**, `Var sigma(theta)` **0.00558**; the stop-gradient
-  stays off for all following runs
-- 0.820 s/step, 54.7 min; Q4 is the new 2M reference
