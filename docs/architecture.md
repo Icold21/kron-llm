@@ -59,6 +59,36 @@ For Q2 (`L=4, K=6, n₁=16, n₂=20`): `4·6·(256+400) + 8 + 1 = 15,753` parame
 per module. A block has five roles (q, k, v, o, ffn), and Q2 has 24 blocks:
 `120 · 15,753 = 1,890,360` matrix parameters.
 
+### Recursive weight sharing (`n_unique_blocks`, `recurse`)
+
+The transformer stack can reuse a smaller set of blocks:
+
+```
+effective_depth = n_unique_blocks * recurse
+parameters       = the unique blocks only (counted once)
+```
+
+`KronTransformer.set_recurse(r)` rebuilds the execution schedule for inference
+without adding parameters. The blocks are applied in order with the effective
+layer index, so `K_win` resets and the depth-recurrence state `D` keep
+evolving across passes.
+
+**The recursion must be trained.** E2, trained with `recurse=1`, degrades
+badly when the same weights are applied more times at inference:
+
+| passes | effective layers | val bpb (E2, no fine-tuning) |
+|---:|---:|---:|
+| 1 | 12 | **1.5747** |
+| 2 | 24 | 2.0776 (+32 %) |
+| 3 | 36 | 2.7789 (+76 %) |
+
+The shared block learns a one-step transformation; composing it shifts the
+residual and attention statistics. Training with the target `recurse`, or
+fine-tuning after changing it, is required. Randomized recursion (sampling
+`1..R` per step) is the standard way to get one model that works at several
+depths; it is not implemented yet. E19 (6 unique × 2 = 12 effective, ~half the
+parameters) and E20 (12 × 2 = 24 effective) test the trained versions.
+
 ## 3. Depth recurrence
 
 Every layer owns its factors, so the composition over channels is not the only

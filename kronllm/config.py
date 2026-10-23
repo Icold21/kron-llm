@@ -33,6 +33,11 @@ DEFAULTS: Dict[str, Any] = {
     "model": {
         "d_model": 128,
         "n_layers": 12,
+        # Recursive weight sharing: use `n_unique_blocks` distinct blocks and
+        # apply the stack `recurse` times.  Effective depth =
+        # n_unique_blocks * recurse; parameters are counted once.
+        "n_unique_blocks": None,
+        "recurse": 1,
         "n_heads": 8,
         "n_kv_heads": None,          # None -> MHA
         "rope_theta": 10000.0,
@@ -493,6 +498,19 @@ EXPERIMENTS["E18w"] = {
                   "data.data_dir": "data/wikitext",
                   "model.kron.composition": "alternating",
                   "model.kron.alternate_start": "sum"},
+}
+
+# E19/E20: recursive weight sharing (Universal-Transformer style).  E19 keeps
+# the effective depth at 12 with 6 unique blocks (half the parameters, same
+# FLOPs); E20 keeps E2's parameter count and doubles the effective depth.
+EXPERIMENTS["E19"] = {
+    "desc": "E2 + weight sharing: 6 unique blocks x2 (12 effective, ~half params)",
+    "overrides": {"model.n_unique_blocks": 6, "model.recurse": 2},
+}
+EXPERIMENTS["E20"] = {
+    "desc": "E2 + weight sharing: 12 unique blocks x2 (24 effective, same params)",
+    "overrides": {"model.n_unique_blocks": 12, "model.recurse": 2,
+                  "training.batch_size": 64},
 }
 
 

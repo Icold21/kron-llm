@@ -419,3 +419,10 @@ and it held at **60/60 matched modules**. Exact ranks saturate at 125–128
 satisfied but uninformative; the ordering is empirical (hypothesis H4, see
 `docs/architecture.md` §3.1). One seed is not enough to declare grouped the new
 default: a seed-43 control is queued after Q6@10k.
+
+**Zero-shot recursion does not transfer.** E2 was trained with `recurse=1`
+(12 layers). Reusing its weights for 2 or 3 passes without fine-tuning makes
+the model much worse: 1.5747 → 2.0776 → 2.7789 bpb. Recursive weight sharing
+must be trained (or fine-tuned) with the target `recurse`; extra passes are
+free in parameters, not in optimisation. E19 (6 unique × 2) and E20
+(12 unique × 2 = 24 effective layers) test the trained versions.

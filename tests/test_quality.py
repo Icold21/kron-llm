@@ -379,3 +379,27 @@ def test_csv_logger_keeps_history_across_restart(tmp_path):
     assert list(df["loss"]) == [1.0, 0.9, 0.8]
     assert "val_bpb" in df.columns
 
+
+def test_recursive_weight_sharing_shares_params():
+    """n_unique blocks used `recurse` times: same params, more effective depth."""
+    cfg = make_cfg(**{"model.n_unique_blocks": 2, "model.recurse": 2})
+    tied = KronTransformer(cfg)
+    base = KronTransformer(make_cfg())
+    assert tied.n_unique == 2 and tied.recurse == 2
+    assert len(tied.blocks) == 4 and tied.blocks[0] is tied.blocks[2]
+    assert tied.n_params == base.n_params   # parameters counted once
+
+    x = torch.randint(0, 256, (2, 8))
+    loss = tied(x, torch.roll(x, -1, dims=1))["loss"]
+    loss.backward()
+    assert tied.blocks[0].q.A.grad is not None
+    assert torch.isfinite(tied.blocks[0].q.A.grad).all()
+
+def test_set_recurse_rebuilds_schedule_without_new_params():
+    m = KronTransformer(make_cfg())
+    base = m.n_params
+    m.set_recurse(3)
+    assert m.recurse == 3 and m.n_layers == m.n_unique * 3
+    assert len(m.blocks) == m.n_layers
+    assert m.blocks[0] is m.blocks[m.n_unique]
+    assert m.n_params == base

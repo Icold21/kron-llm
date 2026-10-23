@@ -509,6 +509,13 @@ class KronTransformer(nn.Module):
         self.vocab_size = int(dc["vocab_size"])
         self.d = int(mc["d_model"])
         self.n_layers = int(mc["n_layers"])
+        # Recursive weight sharing: n_unique blocks applied `recurse` times.
+        # The effective depth is n_unique * recurse; parameters are counted once.
+        self.n_unique = int(mc.get("n_unique_blocks") or self.n_layers)
+        self.recurse = int(mc.get("recurse") or 1)
+        if self.n_unique < 1 or self.recurse < 1:
+            raise ValueError("n_unique_blocks and recurse must be >= 1")
+        self.n_layers = self.n_unique * self.recurse
         self.n_heads = int(mc["n_heads"])
         self.d_head = self.d // self.n_heads
         self.rope_theta = float(mc["rope_theta"])
@@ -571,7 +578,8 @@ class KronTransformer(nn.Module):
             if mc["tie_embeddings"]:
                 self.lm_head.weight = self.embed.weight
 
-        self.blocks = nn.ModuleList([KronBlock(cfg) for _ in range(self.n_layers)])
+        self.blocks = nn.ModuleList([KronBlock(cfg)
+                                     for _ in range(self.n_unique)])
         self.norm_f = RMSNorm(self.d, float(mc["norm_eps"]))
 
         self._rope_cache: Dict[Tuple[int, torch.device], Tuple[torch.Tensor, torch.Tensor]] = {}
@@ -585,6 +593,12 @@ class KronTransformer(nn.Module):
         self.apply(self._init_weights)
         if self.routed is not None:
             self.routed.reset_parameters()
+        if self.recurse > 1:
+            # Reference the same blocks again instead of duplicating weights;
+            # `parameters()` deduplicates, so the parameter count is unchanged.
+            unique = list(self.blocks)
+            self.blocks = nn.ModuleList(
+                [unique[i % self.n_unique] for i in range(self.n_layers)])
         self._banks: List[KronBank] = self._build_banks() if self.use_bank else []
         # >0: compute the training loss in row chunks of this size (through
         # torch.utils.checkpoint) so that a wide vocabulary never materialises
@@ -842,6 +856,25 @@ class KronTransformer(nn.Module):
         if use_cache:
             out["past_kv"] = new_kv
         return out
+
+    def set_recurse(self, recurse: int) -> None:
+        """Change the number of block passes at inference time.
+
+        The blocks are shared, so this only rebuilds the execution schedule and
+        the batched prelude.  A model trained with ``recurse=1`` is *not*
+        guaranteed to work at ``recurse>1``; this method exists to measure that
+        extrapolation explicitly.
+        """
+        recurse = int(recurse)
+        if recurse < 1:
+            raise ValueError("recurse must be >= 1")
+        unique = list(self.blocks[:self.n_unique])
+        self.recurse = recurse
+        self.n_layers = self.n_unique * recurse
+        self.blocks = nn.ModuleList(
+            [unique[i % self.n_unique] for i in range(self.n_layers)])
+        self._prelude_cache = None
+        self._banks = self._build_banks() if self.use_bank else []
 
     # -- introspection ----------------------------------------------------
     @property
