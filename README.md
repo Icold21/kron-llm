@@ -818,6 +818,29 @@ the initial mean weight 1, so both start exactly at the static sum.
 Dynamic weighting is a real effect, but it does not make the sum competitive
 with the product at this scale. The product remains the default.
 
+### 8.10 Composition on a harder corpus: grouped and alternating (WikiText)
+
+TinyStories may be too easy to expose the cost of rank compression. The four
+compositions were re-run on WikiText-103 bytes at the E8 geometry (190K
+parameters, 131M tokens, 4,000 steps, one seed):
+
+| composition | mult. depth | bpb @ 4k | eff_rank(P) | s/step |
+|---|---:|---:|---:|---:|
+| product (E8w) | 3 | 2.1848 | 60.1 | 0.421 |
+| **alternating (E18w)** | 2 | **2.1578** | 73.5 | 0.517 |
+| **grouped G=2 (E17w)** | 1 | **2.1561** | 79.0 | 0.502 |
+| sum (E14w) | 0 | 2.2118 | 97.7 | 0.427 |
+
+Grouped and alternating tie (0.002 bpb apart), **1.3 % better than the product**
+and **2.5 % better than the sum**. The effective rank is monotone in the
+additive depth: `60.1 < 73.5 < 79.0 < 97.7`, holding at 60/60 modules. Exact
+rank saturates at `d`, so only the effective rank distinguishes the methods; the
+ordering is empirical (H4, `docs/architecture.md` §3.1).
+
+This is the first evidence that a hybrid composition can beat the product.
+It is one seed: a seed-43 control is queued before changing the default. The
+hybrids also cost 0.50–0.52 s/step and 3.58 GB because they bypass `KronBank`.
+
 ---
 
 ## 9. Hypotheses H1–H3: verdicts
@@ -1064,13 +1087,14 @@ artifacts/
 
 | step | why | expected effect |
 |---|---|---|
+| **Seed control for grouped/alternating** | the WikiText win is 1.3 % on one seed; E17w/E18w need a second seed before they can become the default | confirms or rejects the hybrid advantage |
 | **Architecture freeze at ~10M** | Q5 (`K=24`) lost 3 % and collapsed layer diversity, so the budget must go to width/depth/context, not more summands | a `B1` config that passes the Phase-0 gate in [docs/roadmap.md](docs/roadmap.md) |
 | **Bilingual tokenizer + corpus** | TinyStories is only the development bench; the product corpus is EN–RU | 8K–16K BPE, measured fertility per language, contamination report |
-| **Q6 long run (10,000 steps)** | Q6 is at 0.849 after 4,000; Q2 is 0.839 after 10,000, so the shipped comparison is not like-for-like yet | a clean Q6-vs-Q2 curve and a possible new shipped model |
+| **Q6 long run (10,000 steps)** (running) | Q6 is at 0.849 after 4,000; Q2 is 0.839 after 10,000, so the shipped comparison is not like-for-like yet | a clean Q6-vs-Q2 curve and a possible new shipped model |
 | **Orthogonal anchor** (`O_l` Householder + `D_l`) | keeps `W_l` full-rank and stable while allowing larger `D_l` | tests H2 without the near-identity compromise; higher risk |
 | **E1 / dense-2M controls** | isolate attention vs FFN and parameter count | the missing controls behind the current claims |
 | **`σ` before normalisation**: `D = τ·rms_norm(σ·Î + prev)` | today `σ` multiplies an already normalised `D`, so its gradient is ~250× smaller than the factors' and H3 is untestable | `σ` starts controlling the scale of memory → `Var σ(θ)` grows by orders of magnitude |
-| **KV cache + `torch.compile`** | generation is currently O(T²) per token | ×10–20 sampling speed at no quality cost |
+| **Fused kernel / long-context KV cache** | the KV cache is bit-exact but launch-bound here (32.4 → 32.9 tok/s); a fused kernel is the missing piece | ×2–10 sampling speed at long context |
 | **Distillation from the 10M base** | a smaller student at a similar bpb | a compact artefact for CPU and edge deployment |
 | **Vector gate `γ` per layer** (`γ` is a scalar today) | `γ` learned to 0.05–0.19, i.e. the model already switches layers off | a soft per-layer depth selector |
 | **Separate the Q1/Q2 contributions** (tokenizer / capacity / steps) | §8.3–8.4 compare several changes at once | a clean answer to "what exactly produced the bpb" |
@@ -1079,9 +1103,11 @@ E14 ruled out a sum-composition scaling run (4.9 % worse at 3.1× the FLOPs).
 Q4 confirmed full backprop (0.9248 vs 0.962 bpb at step 4,000) and Q6 confirmed
 the tokenizer (0.8489 at 4,000 steps, 8.2 % better than Q4). Q5 and Q7 are
 negative: `K=24` lost 3 % and collapsed layer diversity (`cos_prev_max =
-0.99999`), and the Kronecker embedding lost 12 %. The horizon is therefore:
-freeze the architecture under 10M, move to the bilingual corpus, and keep
-TinyStories only as a sanity bench — see [docs/roadmap.md](docs/roadmap.md).
+0.99999`), and the Kronecker embedding lost 12 %. On WikiText, the hybrid
+compositions (grouped/alternating) beat the product by 1.3 % at matched steps,
+but that is one seed. The horizon is therefore: confirm the hybrid, freeze the
+architecture under 10M, move to the bilingual corpus, and keep TinyStories only
+as a sanity bench — see [docs/roadmap.md](docs/roadmap.md).
 
 ### Long-term horizon
 

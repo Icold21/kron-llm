@@ -388,3 +388,34 @@ does not beat the product; the Kron gate stays essentially uniform and is
 neutral. Both cost `L·d²` per token and need checkpointing (peak 3.56 GB) to
 fit 6 GB. Conclusion: dynamic weighting is a real effect, but it does not make
 the sum competitive with the product at this scale.
+
+## 12. Composition study on WikiText-103 (E8w/E14w/E17w/E18w)
+
+TinyStories is easy enough that the product-vs-sum gap could be a corpus
+artefact. The same four compositions were therefore trained on WikiText-103
+bytes at the E8 geometry: 190K parameters, batch 128, seq 256, 4,000 steps
+(131M tokens), one seed.
+
+| run | composition | multiplicative depth | bpb @ 4k | eff_rank(P) | Var σ | cos_prev | s/step |
+|---|---|---:|---:|---:|---:|---:|---:|
+| E8w | product | 3 | 2.1848 | 60.1 | 0.00273 | 0.773 | 0.421 |
+| E18w | alternating | 2 | **2.1578** | 73.5 | 0.00415 | 0.728 | 0.517 |
+| E17w | grouped G=2 | 1 | **2.1561** | 79.0 | 0.00422 | 0.752 | 0.502 |
+| E14w | sum | 0 | 2.2118 | 97.7 | 0.00708 | 0.741 | 0.427 |
+
+Grouped and alternating are statistically tied (+0.0017 bpb apart), **1.3 %
+better than the product** and **2.5 % better than the sum**. Peak VRAM is
+2.59 GB (product) vs 3.58 GB (hybrids), because the hybrids are not yet fused
+into `KronBank`.
+
+The effective-rank ordering is monotone in the additive depth:
+
+```
+product 60.1  <  alternating 73.5  <  grouped 79.0  <  sum 97.7
+```
+
+and it held at **60/60 matched modules**. Exact ranks saturate at 125–128
+(d=128), so the exact-rank bounds (Sylvester, subadditivity, Kronecker) are
+satisfied but uninformative; the ordering is empirical (hypothesis H4, see
+`docs/architecture.md` §3.1). One seed is not enough to declare grouped the new
+default: a seed-43 control is queued after Q6@10k.

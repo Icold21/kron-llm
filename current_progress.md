@@ -19,6 +19,23 @@ not after every run; entries are written in detail.
 
 ## Results
 
+## 2026-10-24T00:35+03:00 — WikiText composition study: hybrids beat product
+
+- WikiText-103 bytes, 190K params, 4,000 steps, 131M tokens, one seed:
+  E8w product **2.1848** · E18w alternating **2.1578** · E17w grouped G=2
+  **2.1561** · E14w sum **2.2118** bpb
+- grouped and alternating tie (0.002 bpb apart): **−1.3 % vs product**,
+  **−2.5 % vs sum**; hybrids cost 0.50–0.52 s/step and 3.58 GB because they
+  bypass `KronBank` (product: 0.421 s, 2.59 GB)
+- effective rank is monotone in additive depth: product **60.1** < alternating
+  **73.5** < grouped **79.0** < sum **97.7**; the non-strict ordering held at
+  **60/60 matched modules**
+- exact ranks saturate at 125–128 (d=128), so Sylvester/subadditivity/Kronecker
+  bounds hold but are uninformative; H4 (effective-rank ordering) is empirical,
+  not a theorem — documented in `docs/architecture.md` §3.1 with references
+- one seed only: seed-43 control for E8w/E17w queued after Q6@10k; Q6@10k is
+  running now (10,000 steps, ~2.4 h)
+
 ## 2026-10-23T22:10+03:00 — E15/E16 dynamic gates + serving measurements
 
 - **E15 (dense softmax gate):** bpb **1.5091** vs E14 **1.551** (+2.7 %),
@@ -71,15 +88,3 @@ not after every run; entries are written in detail.
 - `eff_rank(P)` **140.2**, `Var sigma(theta)` **0.00558**; the stop-gradient
   stays off for all following runs
 - 0.820 s/step, 54.7 min; Q4 is the new 2M reference
-
-## 2026-10-23T09:32+03:00 — E14 sum composition: final
-
-- val loss **1.0750**, PPL **2.93**, bpb **1.551** (190,348 params)
-- E8 product at the same step: bpb **1.479**; the sum is **4.9 % worse** while
-  using **3.1×** the FLOPs/token (11.5 vs 3.70 MFLOP)
-- `eff_rank(P)` **97.66** vs E8's **60.27**: the sum removes rank compression,
-  but that does not translate into quality
-- `alpha` mean **0.993**, std **0.044**, range 0.915–1.206: no channel
-  specialisation; `Var sigma(theta)` **0.00767** is still below 0.01
-- 0.428 s/step, 28.6 min, peak VRAM **2.58 GB**; the product remains the
-  default and E14 is a negative result, not a shipped model

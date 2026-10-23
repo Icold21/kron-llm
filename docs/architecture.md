@@ -138,23 +138,24 @@ Measured on WikiText-103 at 4,000 steps (60 modules each):
 
 | composition | mean effective rank | range |
 |---|---:|---:|
-| product (E8w) | **60.1** | 45.4–78.5 |
-| grouped `G=2` (E17w) | **79.0** | 67.6–90.8 |
-| sum (E14w) | **97.7** | 90.4–103.0 |
+| product, depth 3 (E8w) | **60.1** | 45.4–78.5 |
+| alternating, depth 2 (E18w) | **73.5** | 61.0–85.0 |
+| grouped `G=2`, depth 1 (E17w) | **79.0** | 67.6–90.8 |
+| sum, depth 0 (E14w) | **97.7** | 90.4–103.0 |
 
 The non-strict ordering
 
 ```
-eff_rank(P_product) <= eff_rank(P_grouped) <= eff_rank(P_sum)
+eff_rank(product) <= eff_rank(alternating) <= eff_rank(grouped) <= eff_rank(sum)
 ```
 
-held at **60 / 60 matched modules**. This is consistent with the multiplicative
-depth (0 for the sum, 1 for grouped, 3 for the product) and with Sylvester's
-bound, but it is **not a theorem**: effective rank is not monotone under matrix
-products, and counterexamples exist for exact rank. We record it as hypothesis
-**H4** and keep it empirical (one corpus, one seed so far). The sum-product
-construction is motivated by SPNs, where sum and product nodes alternate by
-design (Poon & Domingos, 2012).
+held at **60 / 60 matched modules**, and is monotone in the number of additive
+(vs multiplicative) steps. This is consistent with Sylvester's bound, but it is
+**not a theorem**: effective rank is not monotone under matrix products, and
+counterexamples exist for exact rank. We record it as hypothesis **H4** and keep
+it empirical (one corpus, one seed so far). The sum-product construction is
+motivated by SPNs, where sum and product nodes alternate by design (Poon &
+Domingos, 2012).
 
 ## 4. Attention
 
