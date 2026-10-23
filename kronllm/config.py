@@ -143,6 +143,9 @@ DEFAULTS: Dict[str, Any] = {
         "eval_every": 500,
         "eval_batches": 64,
         "early_stop_patience": 4,
+        # Recursive weight sharing: sample r ~ U{1..recurse} per training step
+        # so one model works at several depths (adaptive compute).
+        "recurse_random": False,
         "num_workers": 0,
         "device": "cuda",
         "compile": False,
@@ -511,6 +514,12 @@ EXPERIMENTS["E20"] = {
     "desc": "E2 + weight sharing: 12 unique blocks x2 (24 effective, same params)",
     "overrides": {"model.n_unique_blocks": 12, "model.recurse": 2,
                   "training.batch_size": 64},
+}
+EXPERIMENTS["E21"] = {
+    "desc": "E19 + randomized recursion r~U{1,2} + pass embedding",
+    "overrides": {**EXPERIMENTS["E19"]["overrides"],
+                  "training.recurse_random": True,
+                  "model.pass_embedding": True},
 }
 
 

@@ -111,7 +111,7 @@ def build_param_groups(model: nn.Module, tc: Mapping[str, Any]) -> List[dict]:
         elif name.endswith(".s"):
             s_params.append(p)
         elif ("norm" in name or "embed" in name or "lm_head" in name
-              or "route" in name or "bank" in name):
+              or "route" in name or "bank" in name or "pass_bias" in name):
             no_decay.append(p)
         else:
             decay.append(p)
@@ -263,6 +263,8 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     spectral_every = int(cfg["metrics"].get("spectral_every", 2000))
     eval_batches = int(tc.get("eval_batches", 64))
     patience = int(tc.get("early_stop_patience", 4))
+    random_recurse = (bool(tc.get("recurse_random"))
+                      and getattr(model, "max_recurse", 1) > 1)
 
     logger = CSVLogger(run_dir / "log.csv")
     tb = None
@@ -318,6 +320,8 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
 
     while step < total_steps and not stop:
         for _ in range(accum):
+            if random_recurse:
+                model.set_recurse(random.randint(1, model.max_recurse))
             x, y = train_ds.get_batch(bs, device, gen)
             with torch.amp.autocast("cuda", dtype=torch.float16, enabled=use_amp):
                 out = model(x, y)
@@ -372,6 +376,8 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
             running, running_n = 0.0, 0
 
         if step % eval_every == 0 or step == total_steps:
+            if random_recurse:
+                model.set_recurse(model.max_recurse)
             ev = evaluate(model, val_ds, bs, device, eval_batches, str(tc["amp"]))
             ev["val_bpb"] = bits_per_byte(ev["val_loss"], bpt)
             row = {"step": step, "split": "val", **ev}
@@ -412,6 +418,8 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                             if isinstance(v, (int, float))}, step=step)
                 history.append({"step": step, **dg})
 
+    if random_recurse:
+        model.set_recurse(model.max_recurse)
     torch.save({"model": model.state_dict(), "cfg": dict(cfg),
                 "step": step, "val_ppl": best_ppl}, run_dir / "last.pt")
 

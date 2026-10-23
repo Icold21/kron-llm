@@ -599,6 +599,12 @@ class KronTransformer(nn.Module):
             unique = list(self.blocks)
             self.blocks = nn.ModuleList(
                 [unique[i % self.n_unique] for i in range(self.n_layers)])
+        self.max_recurse = self.recurse
+        # Optional per-pass learned bias, so a shared block can tell which
+        # pass it is in (Universal-Transformer-style step signal).
+        self.pass_bias = (nn.Parameter(torch.zeros(self.max_recurse, self.d))
+                          if bool(mc.get("pass_embedding"))
+                          and self.max_recurse > 1 else None)
         self._banks: List[KronBank] = self._build_banks() if self.use_bank else []
         # >0: compute the training loss in row chunks of this size (through
         # torch.utils.checkpoint) so that a wide vocabulary never materialises
@@ -806,6 +812,8 @@ class KronTransformer(nn.Module):
         new_kv: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = (
             [] if use_cache else None)
         for i, block in enumerate(self.blocks):
+            if self.pass_bias is not None and i % self.n_unique == 0:
+                x = x + self.pass_bias[i // self.n_unique]
             if D_map:
                 for role in ROLES:
                     if (i, role) in D_map:
@@ -887,7 +895,7 @@ class KronTransformer(nn.Module):
         total = 0
         for name, p in self.named_parameters():
             if ("norm" in name or "embed" in name or "lm_head" in name
-                    or "route" in name or "bank" in name):
+                    or "route" in name or "bank" in name or "pass_bias" in name):
                 continue
             total += p.numel()
         return total

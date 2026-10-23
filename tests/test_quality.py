@@ -403,3 +403,16 @@ def test_set_recurse_rebuilds_schedule_without_new_params():
     assert len(m.blocks) == m.n_layers
     assert m.blocks[0] is m.blocks[m.n_unique]
     assert m.n_params == base
+
+def test_pass_embedding_bias_is_per_pass():
+    cfg = make_cfg(**{"model.n_unique_blocks": 2, "model.recurse": 2,
+                      "model.pass_embedding": True})
+    m = KronTransformer(cfg)
+    assert m.pass_bias is not None
+    assert tuple(m.pass_bias.shape) == (2, m.d)
+    assert torch.count_nonzero(m.pass_bias) == 0   # zero init
+    x = torch.randint(0, 256, (2, 8))
+    loss = m(x, torch.roll(x, -1, dims=1))["loss"]
+    loss.backward()
+    assert m.pass_bias.grad is not None
+    assert torch.isfinite(m.pass_bias.grad).all()
