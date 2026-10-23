@@ -9,14 +9,33 @@ not after every run; entries are written in detail.
 
 ## In progress
 
-- **Architecture freeze (gate A):** Q5 and Q7 are closed as negative, so the
-  10M budget must go to width/depth/context, not more Kronecker summands or a
-  compressed embedding table. Next: allocation runs at matched activation
-  footprint, then `seq_len=256`.
-- **Bilingual data + tokenizer (roadmap Phase 1):** 8K BPE on mixed EN/RU with
-  fertility and contamination reports. TinyStories remains only the bench.
+- **Product-vs-sum on a harder corpus:** the next probe is the E8/E14 recipes on
+  WikiText-103 (matched params/steps), to test whether TinyStories is masking
+  the sum's extra rank.
+- **Q6 to 10,000 steps:** the current best bpb at 4,000 is 0.8489 vs the
+  shipped Q2 0.839 at 10,000; a like-for-like run is needed before shipping.
+- **Bilingual corpus (Phase 1):** mix and pipeline fixed in `docs/data_plan.md`
+  (60/40 bytes, math/science/logic/literature/encyclopedic); pilot next.
 
 ## Results
+
+## 2026-10-23T22:10+03:00 — E15/E16 dynamic gates + serving measurements
+
+- **E15 (dense softmax gate):** bpb **1.5091** vs E14 **1.551** (+2.7 %),
+  221,308 params; the gate specialises (std **0.54**, range **0.07–3.1**) —
+  but it is still 2 % behind the product E8 **1.479**
+- **E16 (Kron gate, 52 params/module):** bpb **1.5504** — neutral; the gate
+  stays uniform (std **0.02**) and is too weak to specialise
+- both cost `L·d²` per token and need checkpointing; peak VRAM **3.56 GB**
+- **KV cache:** implemented and bit-exact (logits match to **2.8e-7**), but no
+  speedup on this GPU: Q2 32.4 → 32.9 tok/s, E2 81.9 → 79.7 — generation is
+  launch-bound, not attention-bound
+- **factorized innovation apply:** exact, but **0.20–0.31×** the speed of a
+  dense GEMM from d=320 to d=2048; the `O(d^1.5)` win needs a fused kernel and
+  a factorized recurrence state
+- `torch.compile` unavailable: Windows PyTorch 2.6 has no Triton
+- E15/E16 checkpoints cleaned; conclusions in `docs/results.md` §11 and
+  `docs/architecture.md` §6.1
 
 ## 2026-10-23T19:15+03:00 — Q7 kron embedding: negative
 
@@ -64,12 +83,3 @@ not after every run; entries are written in detail.
   specialisation; `Var sigma(theta)` **0.00767** is still below 0.01
 - 0.428 s/step, 28.6 min, peak VRAM **2.58 GB**; the product remains the
   default and E14 is a negative result, not a shipped model
-
-## 2026-10-23T09:03+03:00 — E8 stopped; best at step 4,000
-
-- best val loss **1.0251**, PPL **2.79**, bpb **1.479** (190,108 params)
-- at step 2,500: bpb **1.586** vs E2 **1.659**; full backprop helps quality
-- diagnostics at 4,000: `eff_rank(P)` **60.27**, `eff_rank(sum)` **101.23**,
-  ratio **1.70**; `Var sigma(theta)` **0.00248**, `cos_prev_max` **0.761**
-- full backprop does **not** remove the product's rank compression; H3 is not
-  confirmed

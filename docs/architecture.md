@@ -198,6 +198,36 @@ The prelude depends only on the weights, so in `eval()` mode it is cached in
 cache is cleared. This is what makes generation practical: without it the
 prelude alone would cost ~13 ms per token.
 
+### 6.1 Serving: KV cache and factorized application
+
+**KV cache.** `KronBlock.forward` accepts `past_kv=(k, v)` (already
+RoPE-rotated, before GQA expansion) and returns the updated cache; RoPE uses
+absolute positions, and chunked prefill gets an explicit causal mask. Logits
+match a full forward to `2.8e-7`. On the reference GPU it is **not faster**:
+Q2 goes from 32.4 to 32.9 tok/s and E2 from 81.9 to 79.7, because per-token
+cost is dominated by 24 layers of small kernel launches, not by attention
+(`O(T²)` is tiny at `T≤192`). It becomes useful at long context or with a
+fused kernel.
+
+**Factorized application.** `KronCompose.apply_innovation` computes
+`(A ⊗ B)x = A X Bᵀ` without materialising `d×d`:
+
+```
+cost per summand  = n1_out·n1_in·n2_in + n2_out·n2_in·n1_out
+dense cost        = d_in·d_out
+```
+
+With square factors this is `O(d^1.5)` per summand; the crossover against the
+dense map is `K · 2 · d^1.5 < d²`. Measured on the reference GPU, PyTorch's
+dense GEMM still wins everywhere we can afford to train: 0.21× at
+`d=320, K=6`, 0.31× at `d=320, K=1`, 0.20× at `d=1024, K=6`. The reasons are
+kernel-launch overhead, the `K`-summand loop, and the recurrence state `prev`
+being dense. A real `O(d^1.5)` win needs a fused kernel **and** a factorized
+recurrence state.
+
+`torch.compile` is not available on this machine: the Windows PyTorch 2.6
+build ships without Triton, so Inductor CUDA cannot run.
+
 ## 7. FLOPs
 
 Per token, forward:

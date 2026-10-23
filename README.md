@@ -458,14 +458,16 @@ the two assumptions behind the product: stop-gradient and multiplication.
 | **E2** (Kron, bytes) | 190,108 | 154,140 | 1.1502 | 3.159 | **1.659** | 2,500 |
 | **E8** (full backprop, bytes) | 190,108 | 154,140 | 1.0251 | 2.79 | **1.479** | 4,000 |
 | **E14** (sum, bytes) | 190,348 | 154,380 | 1.0750 | 2.93 | **1.551** | 4,000 |
+| **E15** (sum + dense gate, bytes) | 221,308 | 154,380 | 1.0460 | 2.846 | **1.509** | 4,000 |
+| **E16** (sum + Kron gate, bytes) | 193,468 | 154,380 | 1.0747 | 2.929 | **1.550** | 4,000 |
 | **Q1** (Kron, BPE) | 926,468 | 800,900 | 2.0735 | 7.953 | **0.976** | 4,200 |
 | **Q2** (Kron, BPE) | 2,079,992 | 1,890,360 | 1.7833 | 5.95 | **0.839** | 10,000 |
 | **Q4** (full backprop, BPE) | 2,079,992 | 1,890,360 | 1.9653 | 7.137 | **0.9248** | 4,000 |
 | **Q6** (BPE-4096, full backprop) | 2,473,208 | 1,890,360 | 2.3292 | 10.27 | **0.8489** | 4,000 |
 
 `val loss`/`PPL` in this table are in different units (nats/byte for
-E0/E2/E8/E14, nats/token for Q1/Q2/Q4/Q6), so only the last column can be
-compared across rows.
+E0/E2/E8/E14/E15/E16, nats/token for Q1/Q2/Q4/Q6), so only the last column can
+be compared across rows.
 
 **Full backprop (E8).** Removing the stop-gradient from the depth recurrence
 improves quality: at the matched 2,500-step point E8 reaches **1.586 bpb**
@@ -801,6 +803,21 @@ bottleneck at this scale**. The product remains the default; the sum costs
 3.1× the FLOPs and does not buy quality. E14 is an ablation, not a shipped
 model.
 
+### 8.9 Input-dependent channel gates (E15/E16)
+
+E15/E16 replace the static `α_l` with weights generated from the layer input:
+`w_t = L·softmax(g(x_t))`, `P_t = sI + Σ_l w_{t,l} D_l`. The `L` factor makes
+the initial mean weight 1, so both start exactly at the static sum.
+
+- **E15 (dense `d×L` gate):** **1.509 bpb**, 221,308 params, 3.56 GB peak. The
+  gate really specialises: per-channel std **0.54**, range **0.07–3.1**. This
+  is +2.7 % over E14, but still 2 % behind the product E8 (1.479).
+- **E16 (Kron `g1×g2` gate, 52 params/module):** **1.550 bpb** — neutral, gate
+  stays uniform (std 0.02). The 52-parameter gate is too weak.
+
+Dynamic weighting is a real effect, but it does not make the sum competitive
+with the product at this scale. The product remains the default.
+
 ---
 
 ## 9. Hypotheses H1–H3: verdicts
@@ -937,6 +954,14 @@ Q1 has 4.9× the parameters of E2 but is faster in bytes: one token is 3.05
 bytes. The Kronecker prelude is cached between steps in eval mode
 (`_prelude_cache`); without it the prelude alone would cost ~13 ms/token.
 
+**KV cache does not speed up generation on this GPU.** It is implemented and
+bit-exact (logits match the full forward to 2.8e-7), but measured generation
+is unchanged: Q2 32.4 → 32.9 tok/s, E2 81.9 → 79.7 tok/s. At these sizes the
+per-token cost is dominated by ~24 layers × many small kernel launches on
+Windows/WDDM, not by the O(T²) attention. The cache will matter at long
+context and on a fused kernel; today it is a correctness-preserving building
+block, not a speed win.
+
 Why the implementation is shaped this way:
 
 * **Kernel-launch overhead.** On Windows/WDDM every launch costs ~45 µs, so
@@ -959,7 +984,7 @@ kronllm/
   tokenizer.py     ByteTokenizer + byte-level BPE, bits_per_byte, corpus encoding
   quantization.py  int8/int4 per-channel post-training quantisation
   hf.py            Hugging Face PreTrainedModel / AutoClass wrapper
-  config.py        DEFAULTS + EXPERIMENTS E0-E14, Q1-Q7, D1, S1
+  config.py        DEFAULTS + EXPERIMENTS E0-E16, Q1-Q7, D1, S1
   train.py         training loop, param groups, diagnostics, CSV log with bpb
   diagnostics.py   spectral_report (eff_rank D/W/P, cos, τ, γ), σ(θ),
                    routed_report (Q3 usage/rank), gradients
@@ -988,6 +1013,8 @@ notebooks/
 docs/
   architecture.md      the Kronecker parameterisation and the depth recurrence
   results.md           all measured numbers in one place
+  roadmap.md           long-term plan: bilingual 10M pretraining, SFT, SOTA comparison
+  data_plan.md         EN-RU corpus mix, sources, licences, pipeline
 artifacts/
   q2_fp32.pt           final Q2 weights
   s1_fp32.pt           Q2 fine-tuned on Dolly-15k
@@ -1012,15 +1039,24 @@ artifacts/
    default. The orthogonal-anchor fix is not implemented, and the dense-2M and
    E1 controls are not run. Treat the product as an empirical choice, not a
    proven advantage.
-4. **No KV cache** at generation time: every new token is a full forward. The
-   Kronecker prelude is cached in eval mode (a 3× speed-up), but attention is
-   still recomputed from scratch: ~16 ms/token for Q1.
-5. **One GPU, fp32.** Neither DDP nor gradient checkpointing was tested.
-6. `sigma_theta_report` computes SVDs on CPU tensors for stability — about 2 s
+4. **KV cache exists but does not speed up this GPU.** Generation accepts
+   `past_kv`/`use_cache` and is bit-exact, yet 24 layers of small kernels are
+   the bottleneck, not attention (Q2 32.4 → 32.9 tok/s). The cache will pay off
+   at long context or with a fused kernel.
+5. **Factorised application is slower in PyTorch.** `(A ⊗ B)x = A X Bᵀ` is
+   implemented and exact, but measured 0.2–0.37× the speed of dense GEMM from
+   d=320 to d=2048: launch overhead and the dense recurrence state eat the
+   theoretical `O(d^1.5)` win. It needs a fused kernel and a factorised state.
+6. **One GPU, fp32.** Neither DDP nor gradient checkpointing of the transformer
+   bodies was tested (only the dynamic-gate sum and the chunked loss use
+   checkpointing).
+7. `sigma_theta_report` computes SVDs on CPU tensors for stability — about 2 s
    for 20 layers, and it only runs during evaluation.
-7. **S1 is not an assistant.** With 2.08M parameters the fine-tuned model learns
+8. **S1 is not an assistant.** With 2.08M parameters the fine-tuned model learns
    the question/answer format and a handful of frequent patterns; it hallucinates
    on everything else. It is a demonstration of the pipeline, not a product.
+9. **`torch.compile` is unavailable here**: the Windows PyTorch 2.6 build has no
+   Triton, so Inductor CUDA cannot run. The flag is kept for Linux.
 
 ---
 

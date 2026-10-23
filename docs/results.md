@@ -360,5 +360,31 @@ also a **negative result**: **0.9533 bpb** at step 4,000 versus Q6's 0.8489
 (**12 % worse**), with the same spectral geometry (`eff_rank(P) = 140.5`,
 `Var_l σ(θ_l) = 0.00462`). The dense factorised table stays the default. The
 Kronecker table code is kept and tested, but it needs a better initialisation
-or training scheme before it is useful at this scale. Both follow-ups are
-recorded in `current_progress.md`.
+or training scheme before it is useful at this scale.
+
+## 11. Input-dependent channel gates (E15/E16)
+
+E15/E16 replace the static `α_l` of the sum composition with weights generated
+from the layer input:
+
+```
+w_t = L · softmax(g(x_t)),   P_t = sI + Σ_l w_{t,l} D_l
+```
+
+The `L` factor keeps the mean weight at 1, so at initialisation both variants
+are exactly the static `α = 1` sum. E15 uses a dense `d × L` gate (`+30,960`
+parameters); E16 uses a factorised gate whose `g1 × g2` output is reshaped to
+`L` logits (`+3,120` parameters).
+
+| run | gate | bpb @ 4k | params | gate std | range |
+|---|---|---:|---:|---:|---|
+| E14 | static α | 1.551 | 190,348 | 0.044 | 0.92–1.21 |
+| **E15** | dense | **1.509** | 221,308 | **0.54** | **0.07–3.1** |
+| E16 | Kron | 1.550 | 193,468 | 0.02 | 0.95–1.05 |
+| E8 | product | **1.479** | 190,108 | — | — |
+
+The dense gate **does** specialise and improves the sum by 2.7 %, but still
+does not beat the product; the Kron gate stays essentially uniform and is
+neutral. Both cost `L·d²` per token and need checkpointing (peak 3.56 GB) to
+fit 6 GB. Conclusion: dynamic weighting is a real effect, but it does not make
+the sum competitive with the product at this scale.
