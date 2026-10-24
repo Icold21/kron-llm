@@ -407,10 +407,13 @@ bytes at the E8 geometry: 190K parameters, batch 128, seq 256, 4,000 steps
 | E17w | grouped G=2 | 1 | **2.1561** | 79.0 | 0.00422 | 0.752 | 0.502 |
 | E14w | sum | 0 | 2.2118 | 97.7 | 0.00708 | 0.741 | 0.427 |
 
-Grouped and alternating are statistically tied (+0.0017 bpb apart), **1.3 %
-better than the product** and **2.5 % better than the sum**. Peak VRAM is
-2.59 GB (product) vs 3.58 GB (hybrids), because the hybrids are not yet fused
-into `KronBank`.
+Grouped and alternating are tied on seed 42 (+0.0017 bpb apart), 1.3 % better
+than the product and 2.5 % better than the sum. **This did not reproduce on
+seed 43:** product **2.1559**, grouped **2.1624**. The seed-to-seed spread
+(~0.03 bpb) is larger than the apparent gain, so the quality difference is
+within noise and the product remains the default. Peak VRAM is 2.59 GB
+(product) vs 3.58 GB (hybrids), because the hybrids are not yet fused into
+`KronBank`.
 
 The effective-rank ordering is monotone in the additive depth:
 
@@ -421,8 +424,8 @@ product 60.1  <  alternating 73.5  <  grouped 79.0  <  sum 97.7
 and it held at **60/60 matched modules**. Exact ranks saturate at 125–128
 (d=128), so the exact-rank bounds (Sylvester, subadditivity, Kronecker) are
 satisfied but uninformative; the ordering is empirical (hypothesis H4, see
-`docs/architecture.md` §3.1). One seed is not enough to declare grouped the new
-default: a seed-43 control is queued after Q6@10k.
+`docs/architecture.md` §3.1). The rank ordering survived the seed check
+(product 60.5 < grouped 79.2 on seed 43), but the bpb advantage did not.
 
 **Zero-shot recursion does not transfer.** E2 was trained with `recurse=1`
 (12 layers). Reusing its weights for 2 or 3 passes without fine-tuning makes

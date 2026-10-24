@@ -183,7 +183,8 @@ held at **60 / 60 matched modules**, and is monotone in the number of additive
 (vs multiplicative) steps. This is consistent with Sylvester's bound, but it is
 **not a theorem**: effective rank is not monotone under matrix products, and
 counterexamples exist for exact rank. We record it as hypothesis **H4** and keep
-it empirical (one corpus, one seed so far). The sum-product construction is
+it empirical (one corpus; the rank ordering survived a second seed, while the
+bpb advantage of the hybrids did not). The sum-product construction is
 motivated by SPNs, where sum and product nodes alternate by design (Poon &
 Domingos, 2012).
 

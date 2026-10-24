@@ -9,11 +9,29 @@ not after every run; entries are written in detail.
 
 ## In progress
 
-- **Seed control** for the hybrid compositions: E8w_s43 and E17w_s43 are
-  running; then E19 (6 unique ×2), E21 (randomized recursion), E20 (12×2) and
-  E22 (6×4) are queued automatically.
+- **E19** (6 unique blocks ×2 = 12 effective) is running; E21 (randomized
+  recursion), E20 (12×2) and E22 (6×4) are queued automatically.
 
 ## Results
+
+## 2026-10-24T03:50+03:00 — seed control: hybrid advantage does not reproduce
+
+- WikiText product vs grouped, two seeds at 4,000 steps:
+
+  | seed | product (E8w) | grouped (E17w) |
+  |---|---:|---:|
+  | 42 | 2.1848 | **2.1561** |
+  | 43 | **2.1559** | 2.1624 |
+
+- seed-to-seed spread is ~**0.03 bpb** (product 2.1848 → 2.1559), larger than
+  the 0.029 “win” seen on seed 42; on seed 43 grouped is 0.007 worse
+- **verdict: H5 (hybrid beats product) is not confirmed.** Product remains the
+  default; grouped/alternating stay as tested code and a rank experiment, not
+  as a quality claim
+- the *rank* ordering is stable across seeds: product 60.5 < grouped 79.2
+  (seed 43), matching 60.1 < 79.0 (seed 42); H4 (rank vs depth) survives, the
+  quality claim does not
+- E19 (6 unique ×2) started right after; E21/E20/E22 queued
 
 ## 2026-10-24T02:50+03:00 — Q6 at 10k: 0.7644 bpb, new best
 
@@ -72,17 +90,3 @@ not after every run; entries are written in detail.
   default, and the kron table is kept only as tested code for large vocabularies
 - both Q5 and Q7 are now cleaned from `runs/`; conclusions live in
   `docs/results.md` and `docs/roadmap.md`
-
-## 2026-10-23T16:55+03:00 — Q6 BPE-4096: tokenizer is the win
-
-- val loss **2.3292**, PPL **10.27**, bpb **0.8489** (2,473,208 params)
-- Q4 at the matched step 4,000: bpb **0.9248**; Q6 is **8.2 % better** and
-  within 1.2 % of Q2's 10,000-step 0.839 in 40 % of the steps
-- tokenizer compression **3.07 → 3.96 bytes/token**; matrix layers are
-  identical to Q4, the only extra parameters are 393K in the factorised
-  embedding — this is a tokenizer gain, not new architectural capacity
-- the first attempt OOMed (the `32×192×4096` logits tensor is ~100 MB fp32);
-  the loss now runs in checkpointed row chunks (`model.loss_chunk=1024`)
-- 0.869 s/step, 58 min, peak VRAM **4.28 GB**; diagnostics `eff_rank(P)`
-  **139.4**, `Var sigma(theta)` **0.00438**, `cos_prev_max` **0.848**
-- Q2 remains the shipped checkpoint until Q6 is trained to 10,000 steps

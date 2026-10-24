@@ -824,24 +824,26 @@ with the product at this scale. The product remains the default.
 
 TinyStories may be too easy to expose the cost of rank compression. The four
 compositions were re-run on WikiText-103 bytes at the E8 geometry (190K
-parameters, 131M tokens, 4,000 steps, one seed):
+parameters, 131M tokens, 4,000 steps, seed 42):
 
 | composition | mult. depth | bpb @ 4k | eff_rank(P) | s/step |
 |---|---:|---:|---:|---:|
 | product (E8w) | 3 | 2.1848 | 60.1 | 0.421 |
-| **alternating (E18w)** | 2 | **2.1578** | 73.5 | 0.517 |
-| **grouped G=2 (E17w)** | 1 | **2.1561** | 79.0 | 0.502 |
+| alternating (E18w) | 2 | 2.1578 | 73.5 | 0.517 |
+| grouped G=2 (E17w) | 1 | 2.1561 | 79.0 | 0.502 |
 | sum (E14w) | 0 | 2.2118 | 97.7 | 0.427 |
 
-Grouped and alternating tie (0.002 bpb apart), **1.3 % better than the product**
-and **2.5 % better than the sum**. The effective rank is monotone in the
-additive depth: `60.1 < 73.5 < 79.0 < 97.7`, holding at 60/60 modules. Exact
-rank saturates at `d`, so only the effective rank distinguishes the methods; the
-ordering is empirical (H4, `docs/architecture.md` §3.1).
+On one seed this looked like a 1.3 % win for the hybrids. **It did not
+reproduce.** With seed 43 the product reaches **2.1559** and grouped
+**2.1624**: the seed-to-seed spread (~0.03 bpb) is larger than the apparent
+gain, and grouped is slightly worse. The honest verdict is that the quality
+difference is within seed noise; the product remains the default.
 
-This is the first evidence that a hybrid composition can beat the product.
-It is one seed: a seed-43 control is queued before changing the default. The
-hybrids also cost 0.50–0.52 s/step and 3.58 GB because they bypass `KronBank`.
+The **rank** ordering, however, is stable across seeds: product 60.5 < grouped
+79.2 on seed 43, matching 60.1 < 79.0 on seed 42. Effective rank is monotone in
+additive depth at 60/60 modules (H4, `docs/architecture.md` §3.1), but rank does
+not translate into a reproducible bpb win. The hybrids also cost 0.50–0.52
+s/step and 3.58 GB because they bypass `KronBank`.
 
 ---
 
@@ -1089,7 +1091,7 @@ artifacts/
 
 | step | why | expected effect |
 |---|---|---|
-| **Seed control for grouped/alternating** | the WikiText win is 1.3 % on one seed; E17w/E18w need a second seed before they can become the default | confirms or rejects the hybrid advantage |
+| **Seed control for grouped/alternating** (done) | the WikiText win did not reproduce on seed 43 (grouped 2.1624 vs product 2.1559); the difference is seed noise | product stays the default |
 | **Architecture freeze at ~10M** | Q5 (`K=24`) lost 3 % and collapsed layer diversity, so the budget must go to width/depth/context, not more summands | a `B1` config that passes the Phase-0 gate in [docs/roadmap.md](docs/roadmap.md) |
 | **Bilingual tokenizer + corpus** | TinyStories is only the development bench; the product corpus is EN–RU | 8K–16K BPE, measured fertility per language, contamination report |
 | **Q6 long run (10,000 steps)** (done) | Q6 reached **0.7644 bpb** at 10,000 steps vs Q2's 0.839; package and quantise it | a new shipped checkpoint |
@@ -1106,10 +1108,11 @@ Q4 confirmed full backprop (0.9248 vs 0.962 bpb at step 4,000) and Q6 confirmed
 the tokenizer (0.8489 at 4,000 steps; **0.7644 at 10,000 vs Q2's 0.839**). Q5
 and Q7 are negative: `K=24` lost 3 % and collapsed layer diversity
 (`cos_prev_max = 0.99999`), and the Kronecker embedding lost 12 %. On WikiText,
-the hybrid compositions (grouped/alternating) beat the product by 1.3 % at
-matched steps, but that is one seed. The horizon is therefore: confirm the
-hybrid, freeze the architecture under 10M, move to the bilingual corpus, and
-keep TinyStories only as a sanity bench — see [docs/roadmap.md](docs/roadmap.md).
+the hybrids looked 1.3 % better on seed 42, but **seed 43 reversed the sign**
+(2.1624 vs 2.1559): the quality effect is seed noise, so the product remains
+the default. The horizon is therefore: freeze the architecture under 10M, move
+to the bilingual corpus, and keep TinyStories only as a sanity bench - see
+[docs/roadmap.md](docs/roadmap.md).
 
 ### Long-term horizon
 
