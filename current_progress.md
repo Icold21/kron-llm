@@ -9,10 +9,23 @@ not after every run; entries are written in detail.
 
 ## In progress
 
-- **E19** (6 unique blocks ×2 = 12 effective) is running; E21 (randomized
-  recursion), E20 (12×2) and E22 (6×4) are queued automatically.
+- **E21** (randomized recursion r∈{1,2} + pass embedding) is starting; E20
+  (12×2 = 24 effective) and E22 (6×4 = 24 effective) are queued after it.
 
 ## Results
+
+## 2026-10-24T04:20+03:00 — E19 recursive sharing at half params: negative
+
+- **1.7172 bpb** (loss 1.1902, PPL 3.288), 111,502 params, effective depth 12
+  (6 unique blocks ×2), 0.407 s/step, 2.58 GB
+- E8 (12 unique blocks, 190,108 params) reaches **1.479**: sharing the same
+  depth with 59 % of the parameters costs **+16 % bpb**. The recursion does not
+  replace unique layers at this scale
+- `eff_rank(P)` **59.2** (close to product 60), `Var sigma(theta)` 0.00408,
+  `cos_prev_max` 0.718 — no collapse, just less capacity/diversity
+- verdict: weight sharing is a parameter-saving tool, not a free quality win;
+  E21/E20/E22 test randomized recursion and extra depth
+- E19 checkpoint removed (not a shipped candidate)
 
 ## 2026-10-24T03:50+03:00 — seed control: hybrid advantage does not reproduce
 
@@ -78,15 +91,3 @@ not after every run; entries are written in detail.
 - `torch.compile` unavailable: Windows PyTorch 2.6 has no Triton
 - E15/E16 checkpoints cleaned; conclusions in `docs/results.md` §11 and
   `docs/architecture.md` §6.1
-
-## 2026-10-23T19:15+03:00 — Q7 kron embedding: negative
-
-- val loss **2.6155**, PPL **13.67**, bpb **0.9533** (1,998,072 params)
-- Q6 at the same step: bpb **0.8489**; the compressed table is **12 % worse**
-  despite an identical rank ceiling
-- embedding+head budget 565,248 → **90,112** params; the matrix layers are
-  unchanged (`eff_rank(P)` **140.5**, `Var sigma(theta)` **0.00462**)
-- 0.930 s/step, peak **4.27 GB**; the dense factorised table stays the
-  default, and the kron table is kept only as tested code for large vocabularies
-- both Q5 and Q7 are now cleaned from `runs/`; conclusions live in
-  `docs/results.md` and `docs/roadmap.md`
