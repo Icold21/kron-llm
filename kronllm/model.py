@@ -338,6 +338,12 @@ class KronBlock(nn.Module):
             self.glu_a = nn.Linear(d, r, bias=False)
             self.glu_b = nn.Linear(d, r, bias=False)
             self.glu_o = nn.Linear(r, d, bias=False)
+            # The generic 0.02 init leaves the bilinear branch ~300x smaller
+            # than a Kron block, i.e. effectively switched off; mark the
+            # modules so `_init_weights` scales them to unit activation.
+            self.glu_a._glu_role = "in"
+            self.glu_b._glu_role = "in"
+            self.glu_o._glu_role = "out"
             # Optional non-interacting Kronecker component alongside the
             # bilinear term (Q9k): "plus the standard Kronecker product".
             self.ffn = (self._make(d, n1, n2, self.L, s_of("f"), self.anchor)
@@ -554,6 +560,7 @@ class KronTransformer(nn.Module):
         self.eot_id = int(dc.get("eot_id") or (self.vocab_size - 1))
 
         self.embed_rank = int(mc.get("embed_rank") or 0)
+        self._glu_rank = int(mc.get("ffn_mix_rank", 16))
         mode = str(mc.get("embed_mode", "auto")).lower()
         if mode == "auto":
             mode = "factorised" if self.embed_rank > 0 else "dense"
@@ -649,8 +656,14 @@ class KronTransformer(nn.Module):
         if isinstance(module, nn.Linear):
             # the up-projection of a factorised embedding needs std 1/sqrt(r)
             # so that E@U has the same scale as a direct V x d table
-            std = 1.0 / max(1.0, float(self.embed_rank) ** 0.5) \
-                if module is getattr(self, "embed_up", None) else 0.02
+            glu_role = getattr(module, "_glu_role", None)
+            if glu_role == "in":
+                std = 1.0 / max(1.0, float(self.d) ** 0.5)
+            elif glu_role == "out":
+                std = 1.0 / max(1.0, float(self._glu_rank) ** 0.5)
+            else:
+                std = 1.0 / max(1.0, float(self.embed_rank) ** 0.5) \
+                    if module is getattr(self, "embed_up", None) else 0.02
             nn.init.normal_(module.weight, mean=0.0, std=std)
             if module.bias is not None:
                 nn.init.zeros_(module.bias)

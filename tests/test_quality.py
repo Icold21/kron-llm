@@ -454,3 +454,12 @@ def test_glu_matches_kron_param_budget():
     q9k = KronTransformer(experiment_config("Q9k")).n_params
     for n in (q9, q9k):
         assert abs(n - q6) / q6 < 0.01, (n, q6)
+
+def test_glu_branch_is_alive_at_init():
+    from kronllm.config import experiment_config
+    m = KronTransformer(experiment_config("Q9"))
+    b = m.blocks[0]
+    x = torch.randn(4, 32, m.d)
+    h = b.norm2(x)
+    f = b.glu_o(torch.nn.functional.silu(b.glu_a(h)) * b.glu_b(h))
+    assert f.std().item() > 0.2, "GLU branch is effectively switched off at init"
