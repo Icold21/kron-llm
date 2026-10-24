@@ -17,6 +17,7 @@ import numpy as np
 from kronllm.config import DEFAULTS, experiment_config
 from kronllm.data import dataset_paths
 from kronllm.model import KronTransformer, RMSNorm
+from kronllm.kron import KronCompose
 from kronllm.testutils import make_cfg
 from kronllm.tokenizer import (ByteTokenizer, bits_per_byte, load_tokenizer,
                                meta_path)
@@ -416,3 +417,40 @@ def test_pass_embedding_bias_is_per_pass():
     loss.backward()
     assert m.pass_bias.grad is not None
     assert torch.isfinite(m.pass_bias.grad).all()
+
+def test_glu_ffn_is_param_matched_and_finite():
+    from kronllm.config import experiment_config
+    cfg = experiment_config("Q9")
+    m = KronTransformer(cfg)
+    b = m.blocks[0]
+    assert b.ffn_mix == "glu"
+    assert not isinstance(b.ffn, KronCompose)      # no linear Kron term
+    assert b.glu_a.weight.shape == (16, m.d)
+    assert b.glu_b.weight.shape == (16, m.d)
+    assert b.glu_o.weight.shape == (m.d, 16)
+    x = torch.randint(0, 256, (2, 8))
+    out = m(x, torch.roll(x, -1, dims=1))
+    assert torch.isfinite(out["loss"])
+
+
+def test_glu_plus_kron_keeps_both_paths():
+    from kronllm.config import experiment_config
+    cfg = experiment_config("Q9k")
+    m = KronTransformer(cfg)
+    b = m.blocks[0]
+    assert b.ffn_mix == "glu" and b.ffn_mix_kron
+    assert isinstance(b.ffn, KronCompose)          # linear term is back
+    x = torch.randint(0, 256, (2, 8))
+    out = m(x, torch.roll(x, -1, dims=1))
+    out["loss"].backward()
+    assert b.glu_a.weight.grad is not None
+    assert b.ffn.A.grad is not None
+
+
+def test_glu_matches_kron_param_budget():
+    from kronllm.config import experiment_config
+    q6 = KronTransformer(experiment_config("Q6")).n_params
+    q9 = KronTransformer(experiment_config("Q9")).n_params
+    q9k = KronTransformer(experiment_config("Q9k")).n_params
+    for n in (q9, q9k):
+        assert abs(n - q6) / q6 < 0.01, (n, q6)

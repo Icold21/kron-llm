@@ -265,6 +265,15 @@ class KronBlock(nn.Module):
         self.use_kron_ffn = bool(mc["use_kron_ffn"])
         self.ffn_silu = bool(mc.get("ffn_silu", True))
         self.ffn_gated = bool(mc.get("ffn_gated", False)) and self.use_kron_ffn
+        # Feature interaction: a bilinear (GLU) FFN mixes features
+        # multiplicatively, ``W_out(act(W_a x) * (W_b x))``, which the linear
+        # Kronecker composition cannot express.  ``ffn_mix_kron`` adds the
+        # standard Kronecker map back as a non-interacting component.
+        self.ffn_mix = str(mc.get("ffn_mix", "kron")).lower()
+        if self.ffn_mix not in {"kron", "glu"}:
+            raise ValueError("ffn_mix must be 'kron' or 'glu'")
+        self.ffn_mix_rank = int(mc.get("ffn_mix_rank", 16))
+        self.ffn_mix_kron = bool(mc.get("ffn_mix_kron", False))
 
         self.norm1 = RMSNorm(d, float(mc["norm_eps"]))
         self.norm2 = RMSNorm(d, float(mc["norm_eps"]))
@@ -318,12 +327,22 @@ class KronBlock(nn.Module):
             self.v = nn.Linear(d, d_kv, bias=False)
             self.o = nn.Linear(d, d, bias=False)
 
-        if self.use_kron_ffn:
+        if self.use_kron_ffn and self.ffn_mix == "kron":
             self.ffn = self._make(d, n1, n2, self.L, s_of("f"), self.anchor)
             if self.ffn_gated:
                 self.ffn_g = self._make(d, n1, n2, self.L, s_of("fg"), self.anchor)
             else:
                 self.ffn_g = None
+        elif self.use_kron_ffn and self.ffn_mix == "glu":
+            r = self.ffn_mix_rank
+            self.glu_a = nn.Linear(d, r, bias=False)
+            self.glu_b = nn.Linear(d, r, bias=False)
+            self.glu_o = nn.Linear(r, d, bias=False)
+            # Optional non-interacting Kronecker component alongside the
+            # bilinear term (Q9k): "plus the standard Kronecker product".
+            self.ffn = (self._make(d, n1, n2, self.L, s_of("f"), self.anchor)
+                        if self.ffn_mix_kron else None)
+            self.ffn_g = None
         else:
             self.ffn = DenseFFN(d, float(mc.get("dense_ffn_mult", 1.0)))
             self.ffn_g = None
@@ -460,7 +479,15 @@ class KronBlock(nn.Module):
         x = x + o
 
         h2 = self.norm2(x)
-        if not isinstance(self.ffn, KronCompose):
+        if self.ffn_mix == "glu":
+            # Bilinear feature interaction: act(W_a x) * (W_b x).
+            f = self.glu_o(F.silu(self.glu_a(h2)) * self.glu_b(h2))
+            if isinstance(self.ffn, KronCompose):
+                fk, Df = apply(self.ffn, "f", h2)
+                if Df is not None:
+                    state["f"] = Df
+                f = f + fk
+        elif not isinstance(self.ffn, KronCompose):
             f = self.ffn(h2)
         elif self.ffn_gated:
             fa, Da = apply(self.ffn, "f", h2)
@@ -967,7 +994,12 @@ class KronTransformer(nn.Module):
             else:
                 macs += 2 * d * d + 2 * d * d_kv
             macs += 2 * T * d                            # QK^T + AV
-            if block.use_kron_ffn:
+            if block.use_kron_ffn and block.ffn_mix == "glu":
+                r = block.ffn_mix_rank
+                macs += 3 * d * r                        # W_a, W_b, W_out
+                if block.ffn_mix_kron:
+                    macs += compose_cost(d, block.L)
+            elif block.use_kron_ffn:
                 macs += compose_cost(d, block.L)
                 if block.ffn_gated:
                     macs += compose_cost(d, block.L)

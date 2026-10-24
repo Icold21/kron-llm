@@ -46,6 +46,11 @@ DEFAULTS: Dict[str, Any] = {
         "tie_embeddings": True,
         "ffn_silu": True,            # E9 is now the *linear* FFN ablation
         "ffn_gated": False,          # E11: SwiGLU-style gated FFN
+        # Feature interaction in the FFN: "kron" is the linear composition,
+        # "glu" is the bilinear (W_a x) * (W_b x) term (Q9/Q9k).
+        "ffn_mix": "kron",
+        "ffn_mix_rank": 16,
+        "ffn_mix_kron": False,
         "use_kron_qkv": True,
         "use_kron_ffn": True,
         "dense_ffn_mult": 1.0,       # only used when use_kron_ffn == False
@@ -533,6 +538,9 @@ EXPERIMENTS["E22"] = {
 }
 
 # E23/E24: nonlinear composition at the E2 geometry.
+# CLOSED (2026-10-24): every variant lost to the linear product
+# (E25 1.519, E26 1.568, E26b 1.591 vs E8 1.479).  Kept for
+# reproducibility only; do not schedule new runs.
 EXPERIMENTS["E23"] = {
     "desc": "E2 + SiLU between composition steps",
     "overrides": {"model.kron.composition": "nonlinear"},
@@ -577,6 +585,21 @@ EXPERIMENTS["Q8g"] = {
 EXPERIMENTS["Q8w"] = {
     "desc": "Q8g with 20 layers: same params as Q6 (2.47M), gated FFN",
     "overrides": {**EXPERIMENTS["Q8g"]["overrides"],
+                  "model.n_layers": 20},
+}
+# Q9/Q9k: multiplicative feature interaction.  The bilinear term is ~one Kron
+# block in parameters (3*d*r = 15,360 vs 15,753), so both runs stay at ~2.47M.
+EXPERIMENTS["Q9"] = {
+    "desc": "Q6 with a bilinear (GLU) FFN instead of the linear Kron FFN (~2.46M)",
+    "overrides": {**EXPERIMENTS["Q6"]["overrides"],
+                  "model.ffn_mix": "glu",
+                  "model.ffn_mix_rank": 16,
+                  "training.batch_size": 24},
+}
+EXPERIMENTS["Q9k"] = {
+    "desc": "Q9 + the Kron map as a non-interacting term (20 layers, ~2.47M)",
+    "overrides": {**EXPERIMENTS["Q9"]["overrides"],
+                  "model.ffn_mix_kron": True,
                   "model.n_layers": 20},
 }
 
