@@ -369,6 +369,7 @@ class KronBlock(nn.Module):
             nonlinearity=str(kc.get("nonlinearity", "silu")),
             norm_between=bool(kc.get("norm_between", False)),
             nonlinear_every=int(kc.get("nonlinear_every", 1)),
+            nonlinear_mode=str(kc.get("nonlinear_mode", "replace")),
         )
 
     def ffn_module(self) -> nn.Module:

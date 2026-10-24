@@ -700,3 +700,47 @@ def test_nonlinear_every_blocks_costs():
     with pytest.raises(ValueError):
         KronCompose(64, 64, 8, 8, L=4, K=2, composition="nonlinear",
                     nonlinear_every=5)
+
+def test_nonlinear_add_mode_keeps_identity_at_zero_D():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=4, K=2, K_win=0, s_init=1.0,
+                    anchor=True, normalize_D=False, innovation_scale=1.0,
+                    use_gate=False, composition="nonlinear",
+                    nonlinear_every=4, nonlinear_mode="add")
+    with torch.no_grad():
+        m.A.zero_(); m.B.zero_()
+    x = torch.randn(2, 5, 64)
+    y, _ = m(x, None, 0)
+    assert torch.allclose(y, x, atol=1e-5)
+
+
+def test_nonlinear_add_differs_from_replace():
+    torch.manual_seed(0)
+    kw = dict(L=4, K=2, K_win=0, s_init=1.0, anchor=True, normalize_D=True,
+              innovation_scale=0.3, use_gate=False, composition="nonlinear",
+              nonlinear_every=4)
+    m_rep = KronCompose(64, 64, 8, 8, nonlinear_mode="replace", **kw)
+    m_add = KronCompose(64, 64, 8, 8, nonlinear_mode="add", **kw)
+    m_add.load_state_dict(m_rep.state_dict())
+    x = torch.randn(2, 5, 64)
+    y_rep, _ = m_rep(x, None, 0)
+    y_add, _ = m_add(x, None, 0)
+    assert not torch.allclose(y_rep, y_add, atol=1e-4)
+    assert torch.isfinite(y_add).all()
+
+
+def test_nonlinear_add_gradients():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=4, K=2, composition="nonlinear",
+                    nonlinear_every=2, nonlinear_mode="add")
+    x = torch.randn(2, 6, 64, requires_grad=True)
+    y, _ = m(x, None, 0)
+    y.square().mean().backward()
+    assert m.A.grad is not None and torch.isfinite(m.A.grad).all()
+
+
+def test_nonlinear_mode_validation():
+    import pytest
+    with pytest.raises(ValueError):
+        KronCompose(64, 64, 8, 8, L=4, K=2, composition="nonlinear",
+                    nonlinear_mode="multiply")

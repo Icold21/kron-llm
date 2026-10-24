@@ -180,6 +180,7 @@ class KronCompose(nn.Module):
         nonlinearity: str = "silu",
         norm_between: bool = False,
         nonlinear_every: int = 1,
+        nonlinear_mode: str = "replace",
     ) -> None:
         super().__init__()
         d_out = d_in if d_out is None else d_out
@@ -211,6 +212,9 @@ class KronCompose(nn.Module):
         self.nonlinear_every = int(nonlinear_every)
         if not 1 <= self.nonlinear_every <= L:
             raise ValueError("nonlinear_every must be in [1, L]")
+        self.nonlinear_mode = str(nonlinear_mode).lower()
+        if self.nonlinear_mode not in {"replace", "add"}:
+            raise ValueError("nonlinear_mode must be 'replace' or 'add'")
         self.groups = int(groups)
         if self.composition == "grouped":
             if self.groups < 1 or L % self.groups != 0:
@@ -528,6 +532,12 @@ class KronCompose(nn.Module):
         Linear factors inside a block are still fused into one matrix, so the
         cost is ``ceil(L / k)`` GEMMs per token instead of ``L``.  ``k=L`` is a
         single nonlinearity after the whole composition (almost free).
+
+        ``nonlinear_mode="replace"`` maps the block to ``y + act(P y - a y)``,
+        which cannot reproduce the pure linear map.  ``"add"`` keeps the linear
+        skeleton and adds the activated deviation as a residual branch,
+        ``P y + act(P y - a y)``, so the product composition is the limit of
+        vanishing ``D`` and the nonlinearity can only add capacity.
         """
         y = xf
         k = self.nonlinear_every
@@ -545,16 +555,15 @@ class KronCompose(nn.Module):
                 for l in idx[1:]:
                     P = D[l] @ P
                 anchor = None
-            z = torch.matmul(y, P.transpose(0, 1))
-            if anchor is not None:
-                z = z - anchor * y
+            u = torch.matmul(y, P.transpose(0, 1))
+            z = u - anchor * y if anchor is not None else u
             if self.nonlinearity == "silu":
                 z = F.silu(z)
             elif self.nonlinearity == "gelu":
                 z = F.gelu(z)
             else:
                 z = torch.tanh(z)
-            y = y + z
+            y = (u + z) if self.nonlinear_mode == "add" else (y + z)
             if self.norm_between:
                 y = F.rms_norm(y, (self.d_in,), None, 1e-6)
         return y

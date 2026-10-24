@@ -102,6 +102,7 @@ DEFAULTS: Dict[str, Any] = {
             "nonlinearity": "silu",
             "norm_between": False,
             "nonlinear_every": 1,
+            "nonlinear_mode": "replace",
             "anchor": True,          # E4 turns the s*I anchor off
             # Per-role anchor, interpreted as the *effective* (post L-fold)
             # value: s = s_init ** (1/L).  See README "Deviations".
@@ -550,6 +551,18 @@ EXPERIMENTS["E26"] = {
     "desc": "nonlinearity after the whole composition (1 GEMM, almost free)",
     "overrides": {"model.kron.composition": "nonlinear",
                   "model.kron.nonlinear_every": 4},
+}
+EXPERIMENTS["E26b"] = {
+    "desc": "E26 but additive: keeps the linear product skeleton",
+    "overrides": {"model.kron.composition": "nonlinear",
+                  "model.kron.nonlinear_every": 4,
+                  "model.kron.nonlinear_mode": "add"},
+}
+EXPERIMENTS["E25b"] = {
+    "desc": "E25 (k=2) but additive: linear skeleton + 2 nonlinear branches",
+    "overrides": {"model.kron.composition": "nonlinear",
+                  "model.kron.nonlinear_every": 2,
+                  "model.kron.nonlinear_mode": "add"},
 }
 # Q8g: gated FFN at quality scale (Q6 + SwiGLU).
 EXPERIMENTS["Q8g"] = {
