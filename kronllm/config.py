@@ -571,6 +571,14 @@ EXPERIMENTS["Q8g"] = {
                   "model.ffn_gated": True,
                   "training.batch_size": 24},
 }
+# Q8w: parameter-matched control for Q8g.  20 layers x 6 matrices is the same
+# block count and the same parameter count as Q6's 24 layers x 5 matrices, so
+# the only difference from Q6 is the gated FFN, not extra capacity.
+EXPERIMENTS["Q8w"] = {
+    "desc": "Q8g with 20 layers: same params as Q6 (2.47M), gated FFN",
+    "overrides": {**EXPERIMENTS["Q8g"]["overrides"],
+                  "model.n_layers": 20},
+}
 
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
