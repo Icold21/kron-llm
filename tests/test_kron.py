@@ -653,3 +653,50 @@ def test_alternating_forward_gradients():
     assert torch.isfinite(y).all()
     assert m.alpha.grad is not None and torch.isfinite(m.alpha.grad).all()
     assert m.A.grad is not None and torch.isfinite(m.A.grad).all()
+
+# ---------------------------------------------------------------------------
+# Nonlinear composition
+# ---------------------------------------------------------------------------
+def test_nonlinear_identity_at_zero_D():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=4, K=2, K_win=0, s_init=1.0,
+                    anchor=True, normalize_D=False, innovation_scale=1.0,
+                    use_gate=False, composition="nonlinear")
+    with torch.no_grad():
+        m.A.zero_(); m.B.zero_()
+    x = torch.randn(2, 5, 64)
+    y, _ = m(x, None, 0)
+    # residual nonlinearity: SiLU(0)=0, so the identity map is preserved
+    assert torch.allclose(y, x, atol=1e-5)
+
+
+def test_nonlinear_forward_and_gradients():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=4, K=2, K_win=0, s_init=1.0,
+                    anchor=True, normalize_D=True, innovation_scale=0.1,
+                    use_gate=False, composition="nonlinear")
+    x = torch.randn(2, 6, 64, requires_grad=True)
+    y, _ = m(x, None, 0)
+    y.square().mean().backward()
+    assert torch.isfinite(y).all()
+    assert m.A.grad is not None and torch.isfinite(m.A.grad).all()
+
+
+def test_nonlinear_norm_between_is_finite():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=4, K=2, K_win=0, s_init=1.0,
+                    anchor=True, normalize_D=True, innovation_scale=0.1,
+                    use_gate=False, composition="nonlinear", norm_between=True)
+    x = torch.randn(2, 6, 64)
+    y, _ = m(x, None, 0)
+    assert torch.isfinite(y).all()
+
+def test_nonlinear_every_blocks_costs():
+    import pytest
+    for k in (1, 2, 4):
+        m = KronCompose(64, 64, 8, 8, L=4, K=2, composition="nonlinear",
+                        nonlinear_every=k)
+        assert m.nonlinear_every == k
+    with pytest.raises(ValueError):
+        KronCompose(64, 64, 8, 8, L=4, K=2, composition="nonlinear",
+                    nonlinear_every=5)

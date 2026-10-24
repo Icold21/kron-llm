@@ -98,6 +98,10 @@ DEFAULTS: Dict[str, Any] = {
             # E18: alternating composition -- one operation per micro-depth
             # step: sum, product, sum, product... starting from `sI`.
             "alternate_start": "sum",
+            # E23/E24: elementwise nonlinearity between composition steps.
+            "nonlinearity": "silu",
+            "norm_between": False,
+            "nonlinear_every": 1,
             "anchor": True,          # E4 turns the s*I anchor off
             # Per-role anchor, interpreted as the *effective* (post L-fold)
             # value: s = s_init ** (1/L).  See README "Deviations".
@@ -525,6 +529,34 @@ EXPERIMENTS["E22"] = {
     "desc": "6 unique blocks x4 (24 effective, ~111K params)",
     "overrides": {"model.n_unique_blocks": 6, "model.recurse": 4,
                   "training.batch_size": 64},
+}
+
+# E23/E24: nonlinear composition at the E2 geometry.
+EXPERIMENTS["E23"] = {
+    "desc": "E2 + SiLU between composition steps",
+    "overrides": {"model.kron.composition": "nonlinear"},
+}
+EXPERIMENTS["E24"] = {
+    "desc": "E23 + RMSNorm between composition steps",
+    "overrides": {"model.kron.composition": "nonlinear",
+                  "model.kron.norm_between": True},
+}
+EXPERIMENTS["E25"] = {
+    "desc": "nonlinear composition every 2 factors (2 fused GEMMs/token)",
+    "overrides": {"model.kron.composition": "nonlinear",
+                  "model.kron.nonlinear_every": 2},
+}
+EXPERIMENTS["E26"] = {
+    "desc": "nonlinearity after the whole composition (1 GEMM, almost free)",
+    "overrides": {"model.kron.composition": "nonlinear",
+                  "model.kron.nonlinear_every": 4},
+}
+# Q8g: gated FFN at quality scale (Q6 + SwiGLU).
+EXPERIMENTS["Q8g"] = {
+    "desc": "Q6 + gated FFN (SwiGLU) (~2.85M params, batch 24)",
+    "overrides": {**EXPERIMENTS["Q6"]["overrides"],
+                  "model.ffn_gated": True,
+                  "training.batch_size": 24},
 }
 
 

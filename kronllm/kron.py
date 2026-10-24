@@ -177,6 +177,9 @@ class KronCompose(nn.Module):
         dynamic_gate: Optional[str] = None,
         groups: int = 1,
         alternate_start: str = "sum",
+        nonlinearity: str = "silu",
+        norm_between: bool = False,
+        nonlinear_every: int = 1,
     ) -> None:
         super().__init__()
         d_out = d_in if d_out is None else d_out
@@ -196,10 +199,18 @@ class KronCompose(nn.Module):
         assert self.square or L == 1, "non-square KronCompose requires L == 1"
 
         self.composition = str(composition).lower()
-        if self.composition not in {"product", "sum", "grouped", "alternating"}:
+        if self.composition not in {"product", "sum", "grouped", "alternating",
+                                    "nonlinear"}:
             raise ValueError(
-                "composition must be 'product', 'sum', 'grouped' or "
-                f"'alternating', got {composition!r}")
+                "composition must be 'product', 'sum', 'grouped', "
+                f"'alternating' or 'nonlinear', got {composition!r}")
+        self.nonlinearity = str(nonlinearity).lower()
+        if self.nonlinearity not in {"silu", "gelu", "tanh"}:
+            raise ValueError("nonlinearity must be silu/gelu/tanh")
+        self.norm_between = bool(norm_between)
+        self.nonlinear_every = int(nonlinear_every)
+        if not 1 <= self.nonlinear_every <= L:
+            raise ValueError("nonlinear_every must be in [1, L]")
         self.groups = int(groups)
         if self.composition == "grouped":
             if self.groups < 1 or L % self.groups != 0:
@@ -465,6 +476,10 @@ class KronCompose(nn.Module):
             return self.compose_grouped(D)
         if self.composition == "alternating":
             return self.compose_alternating(D)
+        if self.composition == "nonlinear":
+            # No single matrix exists; return the linearised product for the
+            # spectral diagnostics only.
+            return self.compose_product(D)
         return self.compose_product(D)
 
     @property
@@ -504,6 +519,44 @@ class KronCompose(nn.Module):
         y = xf * s
         for l in range(self.L):
             y = y + w[:, l:l + 1] * torch.matmul(xf, D[l].transpose(0, 1))
+        return y
+
+    def _nonlinear_forward(self, xf: torch.Tensor, D: torch.Tensor,
+                          s: torch.Tensor) -> torch.Tensor:
+        """Nonlinearity every ``nonlinear_every`` factors.
+
+        Linear factors inside a block are still fused into one matrix, so the
+        cost is ``ceil(L / k)`` GEMMs per token instead of ``L``.  ``k=L`` is a
+        single nonlinearity after the whole composition (almost free).
+        """
+        y = xf
+        k = self.nonlinear_every
+        eye = cached_eye(self.d_in, xf.device, xf.dtype)
+        for start in range(0, self.L, k):
+            idx = list(range(start, min(start + k, self.L)))
+            b = len(idx)
+            if self.s is not None:
+                P = s * eye + D[idx[0]]
+                for l in idx[1:]:
+                    P = (s * eye + D[l]) @ P
+                anchor = s ** b
+            else:
+                P = D[idx[0]]
+                for l in idx[1:]:
+                    P = D[l] @ P
+                anchor = None
+            z = torch.matmul(y, P.transpose(0, 1))
+            if anchor is not None:
+                z = z - anchor * y
+            if self.nonlinearity == "silu":
+                z = F.silu(z)
+            elif self.nonlinearity == "gelu":
+                z = F.gelu(z)
+            else:
+                z = torch.tanh(z)
+            y = y + z
+            if self.norm_between:
+                y = F.rms_norm(y, (self.d_in,), None, 1e-6)
         return y
 
     # -- forward ----------------------------------------------------------
@@ -549,7 +602,18 @@ class KronCompose(nn.Module):
         #                  tokens in the batch, so for B*T >> L*d it is ~L x
         #                  cheaper in FLOPs than the sequential form.
         tokens = B * T
-        if self.composition == "sum":
+        if self.composition == "nonlinear":
+            xf = xm.reshape(tokens, self.d_in)
+            s = (self.s if self.s is not None
+                 else torch.zeros((), device=xf.device, dtype=xf.dtype))
+            if self.training:
+                # L sequential matvecs per token; checkpoint so the L
+                # intermediate activations are recomputed, not retained.
+                y = checkpoint(self._nonlinear_forward, xf, D, s,
+                               use_reentrant=False)
+            else:
+                y = self._nonlinear_forward(xf, D, s)
+        elif self.composition == "sum":
             if self.dynamic_gate is not None:
                 xf = xm.reshape(tokens, self.d_in)
                 if self.training:

@@ -366,6 +366,9 @@ class KronBlock(nn.Module):
                              if L_eff == L and str(kc.get("composition",
                                                           "product")) == "alternating"
                              else "sum"),
+            nonlinearity=str(kc.get("nonlinearity", "silu")),
+            norm_between=bool(kc.get("norm_between", False)),
+            nonlinear_every=int(kc.get("nonlinear_every", 1)),
         )
 
     def ffn_module(self) -> nn.Module:
@@ -645,7 +648,7 @@ class KronTransformer(nn.Module):
                     # The composed map depends on the input token, so it cannot
                     # be fused into one weight-only prelude per layer.
                     continue
-                if mod.composition in {"grouped", "alternating"}:
+                if mod.composition in {"grouped", "alternating", "nonlinear"}:
                     # These have their own composition path; keep them out of
                     # the batched prelude until they are benchmarked.
                     continue
@@ -930,6 +933,13 @@ class KronTransformer(nn.Module):
         composition = str(mc["kron"].get("composition", "product"))
 
         def compose_cost(out_d: int, L: int) -> float:
+            if composition == "nonlinear":
+                # ceil(L/k) fused GEMMs per token; k=1 is L matvecs, k=L is
+                # one composed GEMM plus one activation.
+                k = max(1, int(mc["kron"].get("nonlinear_every", 1)))
+                blocks = math.ceil(L / k)
+                extra = L * d if mc["kron"].get("norm_between") else 0
+                return blocks * d * out_d + L * d + extra
             if fused and out_d == d and L > 1:
                 if composition == "sum":
                     return d * out_d + L * d * d + L * d
