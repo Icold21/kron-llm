@@ -845,6 +845,33 @@ additive depth at 60/60 modules (H4, `docs/architecture.md` §3.1), but rank doe
 not translate into a reproducible bpb win. The hybrids also cost 0.50–0.52
 s/step and 3.58 GB because they bypass `KronBank`.
 
+### 8.11 Recursive weight sharing (E19–E22)
+
+A stack can reuse `n_unique` blocks for `recurse` passes (effective depth =
+`n_unique × recurse`; parameters counted once). At 131M tokens:
+
+| run | unique | passes | effective | params | bpb |
+|---|---:|---:|---:|---:|---:|
+| E8 | 12 | 1 | 12 | 190,108 | **1.479** |
+| E19 | 6 | 2 | 12 | 111,502 | 1.717 |
+| E21 (random r) | 6 | 1–2 | 6–12 | 111,758 | 1.734 @ r=1 · 1.718 @ r=2 |
+| E20 | 12 | 2 | 24 | 190,108 | **1.427** |
+| E22 | 6 | 4 | 24 | 111,502 | 1.521 |
+
+Three findings:
+
+1. **Sharing is not free quality.** E19 at half the parameters and the same
+   effective depth is 16 % worse than E8.
+2. **Depth helps.** E20 beats E8 by 3.5 % at the same parameters, but with 2×
+   compute per token.
+3. **Randomized recursion works.** E21 matches E19 at r=2 and stays usable at
+   r=1 (1.734), where E19 (trained only at r=2) collapses to 2.554. Adaptive
+   compute needs randomized training plus a per-pass embedding, but it removes
+   the need for a separate model per depth.
+
+The product remains the default; recursive sharing is a deployment/compute
+trade-off, not a quality upgrade.
+
 ---
 
 ## 9. Hypotheses H1–H3: verdicts
@@ -1092,6 +1119,7 @@ artifacts/
 | step | why | expected effect |
 |---|---|---|
 | **Seed control for grouped/alternating** (done) | the WikiText win did not reproduce on seed 43 (grouped 2.1624 vs product 2.1559); the difference is seed noise | product stays the default |
+| **Recursive weight sharing** (done) | 6×2 is 16 % worse at half params; 12×2 gains 3.5 % at 2× compute; randomized r∈{1,2} gives usable adaptive compute | not the default; a deployment/compute option |
 | **Architecture freeze at ~10M** | Q5 (`K=24`) lost 3 % and collapsed layer diversity, so the budget must go to width/depth/context, not more summands | a `B1` config that passes the Phase-0 gate in [docs/roadmap.md](docs/roadmap.md) |
 | **Bilingual tokenizer + corpus** | TinyStories is only the development bench; the product corpus is EN–RU | 8K–16K BPE, measured fertility per language, contamination report |
 | **Q6 long run (10,000 steps)** (done) | Q6 reached **0.7644 bpb** at 10,000 steps vs Q2's 0.839; package and quantise it | a new shipped checkpoint |

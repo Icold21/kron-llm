@@ -9,10 +9,28 @@ not after every run; entries are written in detail.
 
 ## In progress
 
-- **E21** (randomized recursion r∈{1,2} + pass embedding) is starting; E20
-  (12×2 = 24 effective) and E22 (6×4 = 24 effective) are queued after it.
+- No GPU run is active. Next: bilingual corpus pilot (Phase 1) and packaging
+  Q6@10k; architecture freeze follows the corpus.
 
 ## Results
+
+## 2026-10-24T06:50+03:00 — recursion: depth helps, sharing costs, randomization works
+
+- **E20** (12 unique ×2 = 24 effective, 190K params, 8k steps × batch64 =
+  131M tokens): bpb **1.4271** vs E8 **1.479** at the same params/tokens —
+  extra depth buys **3.5 %** for 2× compute
+- **E22** (6 unique ×4 = 24 effective, 111K params, same tokens): **1.5214** —
+  11 % better than E19 (1.7172) but still worse than E8: depth does not close
+  the capacity gap
+- **E21** (randomized recursion r∈{1,2}, pass embedding): r=2 **1.7180** ≈ E19
+  fixed r=2 **1.7172**; r=1 **1.7344** vs E19 at r=1 **2.5541**. One model now
+  works at both depths, and the r=1 mode costs only ~1 % bpb
+- **H6 confirmed** (randomized recursion gives usable adaptive compute);
+  **H5 rejected** (sharing at the same effective depth costs 16 %);
+  **H7 partially confirmed** (extra depth helps, but 2× compute, and half-param
+  sharing stays behind)
+- E19/E21/E22 checkpoints removed; conclusions in `docs/results.md` §12 and
+  `docs/architecture.md` §2
 
 ## 2026-10-24T04:20+03:00 — E19 recursive sharing at half params: negative
 
@@ -57,7 +75,7 @@ not after every run; entries are written in detail.
   Q6 is quantised and added to `artifacts/`
 - seed control of the hybrid compositions started right after this run
 
-## 2026-10-24T00:35+03:00 — WikiText composition study: hybrids beat product
+## 2026-10-24T00:35+03:00 — WikiText composition study (seed 42)
 
 - WikiText-103 bytes, 190K params, 4,000 steps, 131M tokens, one seed:
   E8w product **2.1848** · E18w alternating **2.1578** · E17w grouped G=2
@@ -73,21 +91,3 @@ not after every run; entries are written in detail.
   not a theorem — documented in `docs/architecture.md` §3.1 with references
 - one seed only: seed-43 control for E8w/E17w queued after Q6@10k; Q6@10k is
   running now (10,000 steps, ~2.4 h)
-
-## 2026-10-23T22:10+03:00 — E15/E16 dynamic gates + serving measurements
-
-- **E15 (dense softmax gate):** bpb **1.5091** vs E14 **1.551** (+2.7 %),
-  221,308 params; the gate specialises (std **0.54**, range **0.07–3.1**) —
-  but it is still 2 % behind the product E8 **1.479**
-- **E16 (Kron gate, 52 params/module):** bpb **1.5504** — neutral; the gate
-  stays uniform (std **0.02**) and is too weak to specialise
-- both cost `L·d²` per token and need checkpointing; peak VRAM **3.56 GB**
-- **KV cache:** implemented and bit-exact (logits match to **2.8e-7**), but no
-  speedup on this GPU: Q2 32.4 → 32.9 tok/s, E2 81.9 → 79.7 — generation is
-  launch-bound, not attention-bound
-- **factorized innovation apply:** exact, but **0.20–0.31×** the speed of a
-  dense GEMM from d=320 to d=2048; the `O(d^1.5)` win needs a fused kernel and
-  a factorized recurrence state
-- `torch.compile` unavailable: Windows PyTorch 2.6 has no Triton
-- E15/E16 checkpoints cleaned; conclusions in `docs/results.md` §11 and
-  `docs/architecture.md` §6.1

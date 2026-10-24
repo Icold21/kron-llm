@@ -433,3 +433,26 @@ the model much worse: 1.5747 → 2.0776 → 2.7789 bpb. Recursive weight sharing
 must be trained (or fine-tuned) with the target `recurse`; extra passes are
 free in parameters, not in optimisation. E19 (6 unique × 2) and E20
 (12 unique × 2 = 24 effective layers) test the trained versions.
+
+### Recursive weight sharing (E19–E22)
+
+E19–E22 reuse `n_unique` blocks for `recurse` passes. E20/E22 use batch 64 and
+8,000 steps to match E8's 131M tokens; E8/E19/E21 use batch 128 and 4,000
+steps.
+
+| run | unique | passes | effective | params | bpb @ 131M tokens |
+|---|---:|---:|---:|---:|---:|
+| E8 | 12 | 1 | 12 | 190,108 | **1.479** |
+| E19 | 6 | 2 | 12 | 111,502 | 1.717 |
+| E21 | 6 | 1–2 (random) | 6–12 | 111,758 | 1.734 @ r=1 · **1.718** @ r=2 |
+| E20 | 12 | 2 | 24 | 190,108 | **1.427** |
+| E22 | 6 | 4 | 24 | 111,502 | 1.521 |
+
+- **Sharing at equal effective depth costs quality:** E19 is 16 % worse than
+  E8 with 59 % of the parameters (H5 rejected). The recursion does not replace
+  unique layers at this scale.
+- **Extra depth helps:** E20 beats E8 by 3.5 % with the same parameters, but at
+  2× compute per token (H7, partial).
+- **Randomized recursion works:** E21 at r=2 matches E19 (1.718 vs 1.717),
+  while at r=1 it reaches 1.734 — versus 2.554 for E19, which was trained only
+  at r=2. One model, two usable depths (H6 confirmed); pass embedding is used.
