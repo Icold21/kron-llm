@@ -500,6 +500,77 @@ def write_heldout(docs: Iterable[dict], out_dir: Path, per_language_bytes: int,
     return path
 
 
+def quota_mix(docs: Sequence[dict], budget_per_language: int,
+              quotas: Optional[dict[str, float]] = None,
+              heldout_bytes: int = 0) -> dict:
+    """Split a held-out slice and apply the domain quotas.
+
+    Fetching is deliberately generous and uneven; this is where the plan is
+    enforced.  Both the held-out reservation and the quota selection walk
+    documents in SHA-256 order, so the same input always yields the same
+    corpus.
+
+    Args:
+        docs: deduplicated documents with ``language``, ``domain``, ``sha256``
+            and ``text``.
+        budget_per_language: maximum training bytes per language.
+        quotas: domain shares inside a language; defaults to
+            :data:`DOMAIN_QUOTAS`.
+        heldout_bytes: total held-out budget, split evenly across
+            ``2 * len(quotas)`` buckets.
+
+    Returns:
+        ``{"train": {lang: {domain: [docs]}}, "heldout": {lang: [docs]},
+        "shortfalls": [str], "bytes": {lang: {domain: int}}}``.
+    """
+    quotas = quotas or DOMAIN_QUOTAS
+    ordered = sorted(docs, key=lambda d: d.get("sha256") or "")
+    buckets: dict[tuple, list[dict]] = {}
+    for doc in ordered:
+        buckets.setdefault((doc["language"], doc["domain"]), []).append(doc)
+
+    per_bucket = int(heldout_bytes / max(1, 2 * len(quotas)))
+    heldout: dict[str, list[dict]] = {"en": [], "ru": []}
+    pool: dict[tuple, list[dict]] = {}
+    for key, items in buckets.items():
+        taken = 0
+        n = 0
+        while n < len(items) and taken < per_bucket:
+            taken += len(items[n]["text"].encode("utf-8"))
+            n += 1
+        heldout.setdefault(key[0], []).extend(items[:n])
+        pool[key] = items[n:]
+
+    train: dict[str, dict[str, list[dict]]] = {"en": {}, "ru": {}}
+    sizes: dict[str, dict[str, int]] = {"en": {}, "ru": {}}
+    shortfalls: list[str] = []
+    for lang in ("en", "ru"):
+        available = sum(len(d["text"].encode("utf-8"))
+                        for key, items in pool.items() if key[0] == lang
+                        for d in items)
+        budget = min(available, budget_per_language)
+        for domain, quota in quotas.items():
+            want = int(budget * quota)
+            items = pool.get((lang, domain), [])
+            chosen: list[dict] = []
+            taken = 0
+            for doc in items:
+                if taken >= want:
+                    break
+                chosen.append(doc)
+                taken += len(doc["text"].encode("utf-8"))
+            if not chosen:
+                shortfalls.append(f"{lang}/{domain}: empty")
+                continue
+            if taken < want * 0.8:
+                shortfalls.append(f"{lang}/{domain}: "
+                                  f"{taken/1e6:.1f} MB of {want/1e6:.1f} MB")
+            train[lang][domain] = chosen
+            sizes[lang][domain] = taken
+    return {"train": train, "heldout": heldout, "shortfalls": shortfalls,
+            "bytes": sizes}
+
+
 def iter_jsonl(path: Path) -> Iterator[dict]:
     """Stream documents from a JSONL file."""
     with open(path, encoding="utf-8") as f:

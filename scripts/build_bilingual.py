@@ -38,8 +38,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from kronllm.bilingual import (DOMAIN_QUOTAS, append_jsonl, clean_wikitext,
                                corpus_report, dedup, mix_corpus, normalize,
-                               pack_shard, quality, read_manifest, record_shard,
-                               write_heldout)
+                               pack_shard, quality, quota_mix, read_manifest,
+                               record_shard, write_heldout)
 from kronllm.bilingual import Shard
 
 UA = {"User-Agent": "KronLLM-research/0.1 (bilingual corpus pilot; "
@@ -277,7 +277,7 @@ _RE_GUT_END = re.compile(r"\*\*\*\s*END OF (?:THE|THIS) PROJECT GUTENBERG.*?\*\*
 
 def _gutendex(lang: str, page: int) -> dict:
     url = f"https://gutendex.com/books?languages={lang}&page={page}"
-    return json.loads(_get(url))
+    return json.loads(_get(url, timeout=120))
 
 
 def cmd_fetch_gutenberg(args: argparse.Namespace) -> None:
@@ -392,16 +392,28 @@ def _iter_shard(path: Path) -> Iterator[dict]:
                 yield json.loads(line)
 
 
+def _doc_bytes(doc: dict) -> int:
+    """UTF-8 size of one document."""
+    return len(doc["text"].encode("utf-8"))
+
+
 def cmd_build(args: argparse.Namespace) -> None:
-    """Deduplicate, mix by language and domain, and write the final corpus."""
+    """Deduplicate, quota-mix by language and domain, and write the corpus.
+
+    Fetching is deliberately generous and uneven; this step enforces the plan:
+    a per-language budget, the 60/40 language split and the domain quotas.
+    Selection order is SHA-256, so the same manifest always yields the same
+    corpus.
+    """
     shards = read_manifest(MANIFEST)
     if not shards:
         print("manifest is empty; run the fetchers first")
         return
     out_dir = ROOT / "mix"
     out_dir.mkdir(parents=True, exist_ok=True)
+    for stale in out_dir.glob("*.jsonl.gz"):
+        stale.unlink()
 
-    # 1. stream every shard through dedup, newest source order is manifest order
     all_docs: list[dict] = []
     before = 0
     for shard in shards:
@@ -413,50 +425,42 @@ def cmd_build(args: argparse.Namespace) -> None:
         before += len(docs)
         all_docs.extend(docs)
         print(f"  loaded {len(docs):6d} docs from {path.name}")
+
     kept, dropped = dedup(all_docs, threshold=args.dedup_threshold)
-    print(f"[dedup] {len(kept)} kept, {dropped} dropped "
-          f"(exact + near-duplicate, Jaccard >= {args.dedup_threshold})")
+    kept_bytes = sum(len(d["text"].encode("utf-8")) for d in kept)
+    print(f"[dedup] {len(kept)} kept ({kept_bytes/1e6:.1f} MB), {dropped} dropped "
+          f"(Jaccard >= {args.dedup_threshold})")
 
-    # 2. per-language held-out slice (half of the budget per language)
-    heldout_bytes = int(args.heldout_mb * 1_000_000)
+    result = quota_mix(kept, int(args.budget_per_language_mb * 1e6),
+                       heldout_bytes=int(args.heldout_mb * 1e6))
     for lang in ("en", "ru"):
-        docs = [d for d in kept if d["language"] == lang]
-        docs.sort(key=lambda d: d["sha256"])
-        write_heldout(docs, ROOT, heldout_bytes // 2, lang)
+        write_heldout(result["heldout"][lang], ROOT,
+                      int(args.heldout_mb * 1e6) // 2, lang)
+    print(f"[heldout] {sum(len(v) for v in result['heldout'].values())} docs")
 
-    # 3. mix by language and domain quota
-    by_lang: dict[str, list[dict]] = {"en": [], "ru": []}
-    for d in kept:
-        by_lang[d["language"]].append(d)
     report_mix: dict[str, dict[str, int]] = {}
-    for lang, docs in by_lang.items():
-        for domain in DOMAIN_QUOTAS:
-            bucket = [d for d in docs if d["domain"] == domain]
-            if not bucket:
-                continue
-            pack_shard(bucket, out_dir / f"{lang}_{domain}.jsonl.gz")
-            report_mix.setdefault(lang, {})[domain] = sum(
-                len(d["text"].encode("utf-8")) for d in bucket)
-            print(f"  {lang}/{domain}: {len(bucket)} docs, "
-                  f"{report_mix[lang][domain]/1e6:.1f} MB")
+    for lang, domains in result["train"].items():
+        for domain, chosen in domains.items():
+            pack_shard(chosen, out_dir / f"{lang}_{domain}.jsonl.gz")
+            report_mix.setdefault(lang, {})[domain] = result["bytes"][lang][domain]
+            print(f"  {lang}/{domain}: {len(chosen)} docs, "
+                  f"{result['bytes'][lang][domain]/1e6:.1f} MB")
 
-    # 4. report
     rep = corpus_report(shards, ROOT / "corpus_report.json")
-    rep["dedup"] = {"before": before, "kept": len(kept), "dropped": dropped}
-    rep["mix"] = report_mix
-    total = sum(sum(v.values()) for v in report_mix.values())
-    plan = mix_corpus(shards, total_bytes=total)
-    plan_bytes = {lang: sum(b for _, b in alloc) for lang, alloc in plan.items()}
-    rep["mix_plan_at_60_40"] = {
-        "total_bytes": total, "allocated": plan_bytes,
-        "ru_share": round(plan_bytes["ru"] / max(1, sum(plan_bytes.values())), 4),
-    }
+    mixed_bytes = sum(sum(v.values()) for v in report_mix.values())
+    ru_bytes = sum(report_mix.get("ru", {}).values())
+    rep["dedup"] = {"before": before, "kept": len(kept), "dropped": dropped,
+                    "kept_bytes": kept_bytes}
+    rep["mixed"] = report_mix
+    rep["mixed_total_bytes"] = mixed_bytes
+    rep["ru_share"] = round(ru_bytes / max(1, mixed_bytes), 4)
+    rep["shortfalls"] = result["shortfalls"]
     (ROOT / "corpus_report.json").write_text(
         json.dumps(rep, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"[report] {ROOT / 'corpus_report.json'}")
-    print(json.dumps({k: rep[k] for k in ("total_bytes", "language_share",
-                                          "domain_share")},
-                     indent=2, ensure_ascii=False))
+    print(f"[mix] {mixed_bytes/1e6:.1f} MB total, RU share {rep['ru_share']:.1%}")
+    if result["shortfalls"]:
+        print("[shortfall] " + "; ".join(result["shortfalls"]))
 
 
 # ---------------------------------------------------------------------------
@@ -551,7 +555,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.set_defaults(func=cmd_fetch_code)
 
     p = sub.add_parser("build")
-    p.add_argument("--target-mb", type=float, default=250.0)
+    p.add_argument("--budget-per-language-mb", type=float, default=200.0)
     p.add_argument("--dedup-threshold", type=float, default=0.8)
     p.add_argument("--heldout-mb", type=float, default=2.0)
     p.set_defaults(func=cmd_build)

@@ -8,7 +8,7 @@ import pytest
 
 from kronllm.bilingual import (DOMAIN_QUOTAS, Shard, clean_wikitext, corpus_report,
                                dedup, minhash, mix_corpus, normalize, quality,
-                               read_manifest, record_shard)
+                               quota_mix, read_manifest, record_shard)
 
 
 def test_clean_wikitext_drops_markup_keeps_prose():
@@ -116,3 +116,41 @@ def test_corpus_report_aggregates(tmp_path: Path):
     assert rep["by_language"]["ru"]["bytes"] == 300
     assert rep["by_licence"]["public-domain"] == 300
     assert json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
+
+
+def _synthetic_docs(n_per_domain=20, size=1000):
+    import hashlib
+    docs = []
+    for lang in ("en", "ru"):
+        for domain in DOMAIN_QUOTAS:
+            for i in range(n_per_domain):
+                text = f"{lang} {domain} {i} " + "x" * size
+                docs.append({"text": text, "language": lang, "domain": domain,
+                             "sha256": hashlib.sha256(text.encode()).hexdigest()})
+    return docs
+
+
+def test_quota_mix_hits_the_budget_and_keeps_heldout_disjoint():
+    docs = _synthetic_docs()
+    res = quota_mix(docs, budget_per_language=60_000, heldout_bytes=6_000)
+    heldout = {d["sha256"] for v in res["heldout"].values() for d in v}
+    train = {d["sha256"] for doms in res["train"].values()
+             for items in doms.values() for d in items}
+    assert heldout and not (heldout & train), "held-out must be disjoint"
+    for lang in ("en", "ru"):
+        size = sum(res["bytes"][lang].values())
+        assert 50_000 <= size <= 65_000, (lang, size)
+        assert set(res["train"][lang]) == set(DOMAIN_QUOTAS)
+
+
+def test_quota_mix_is_deterministic_and_reports_shortfalls():
+    docs = _synthetic_docs()
+    a = quota_mix(docs, budget_per_language=60_000)
+    b = quota_mix(list(reversed(docs)), budget_per_language=60_000)
+    assert a["bytes"] == b["bytes"]
+    assert [d["sha256"] for d in a["train"]["en"]["math"]] == \
+           [d["sha256"] for d in b["train"]["en"]["math"]]
+    # a language with no code documents must report the gap, not fail
+    no_code = [d for d in docs if d["domain"] != "code"]
+    res = quota_mix(no_code, budget_per_language=60_000)
+    assert any("code: empty" in s for s in res["shortfalls"])
