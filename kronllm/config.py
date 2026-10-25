@@ -621,6 +621,36 @@ EXPERIMENTS["Q8g"] = {
                   "model.ffn_gated": True,
                   "training.batch_size": 24},
 }
+# Q10: the 10M bilingual run.  d=512, 25 layers, K=10, 8K BPE with reserved
+# chat ids, seq 512.  24,576 tokens per optimiser step on two GPUs (batch 24 x
+# seq 512 x 2 ranks), so ~82k steps cover 2B tokens.
+EXPERIMENTS["Q10"] = {
+    "desc": "10M bilingual: d=512, 25 layers, K=10, 8K BPE, seq 512",
+    "overrides": {
+        **EXPERIMENTS["Q8g"]["overrides"],
+        "model.d_model": 512,
+        "model.n_layers": 25,
+        "model.n_heads": 8,
+        "model.embed_rank": 256,
+        "model.kron.n1": 16,
+        "model.kron.n2": 32,
+        "model.kron.K": 10,
+        "data.vocab_size": 8192,
+        "data.eot_id": 8191,
+        "data.seq_len": 512,
+        "data.train_bin": "train.bpe.bin",
+        "data.val_bin": "val.bpe.bin",
+        "data.meta_file": "tokenizer_meta.json",
+        "training.batch_size": 24,
+        "training.seq_len": 512,
+        "training.lr": 3e-4,
+        "training.warmup_steps": 1000,
+        "training.max_steps": 82000,
+        "training.eval_every": 1000,
+        "training.save_every": 500,
+        "training.log_every": 100,
+    },
+}
 # Q8w: parameter-matched control for Q8g.  20 layers x 6 matrices is the same
 # block count and the same parameter count as Q6's 24 layers x 5 matrices, so
 # the only difference from Q6 is the gated FFN, not extra capacity.
