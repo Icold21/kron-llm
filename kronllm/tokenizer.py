@@ -126,12 +126,18 @@ def bits_per_byte(loss_nats: float, bytes_per_token: float) -> float:
 # training / corpus encoding
 # ---------------------------------------------------------------------------
 def train_bpe_merges(texts, vocab_size: int, out_path: str | Path,
-                     min_frequency: int = 2) -> None:
+                     min_frequency: int = 2,
+                     special_tokens: Sequence[str] = ()) -> None:
     """Train a byte-level BPE whose ids are ``0..vocab_size-1``.
 
-    ``vocab_size`` already includes the 256 byte ids.  The end-of-story id is
-    *not* part of the tokenizer: callers reserve ``vocab_size`` itself and
-    insert it manually (see ``encode_corpus``).
+    ``vocab_size`` already includes the 256 byte ids and the special tokens.
+    The end-of-story id is *not* part of the tokenizer: callers reserve
+    ``vocab_size`` itself and insert it manually (see ``encode_corpus``).
+
+    ``special_tokens`` are added after the merges, in the given order, so their
+    ids are deterministic: ``vocab_size, vocab_size+1, ...``.  The chat
+    template (``<|user|>``, ``<|assistant|>``) lives here so fine-tuning and
+    inference share one encoding.
     """
     from tokenizers import Tokenizer, decoders, models, pre_tokenizers, trainers
 
@@ -147,6 +153,8 @@ def train_bpe_merges(texts, vocab_size: int, out_path: str | Path,
         show_progress=False,
     )
     tok.train_from_iterator(list(texts), trainer=trainer)
+    if special_tokens:
+        tok.add_special_tokens(list(special_tokens))
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tok.save(str(out_path))

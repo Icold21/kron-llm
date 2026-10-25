@@ -95,11 +95,21 @@ def main() -> None:
     sample_bytes = sum(len(s.encode('utf-8')) for s in sample)
     print(f"[bpe] learning merges on {len(sample):,} docs "
           f"({sample_bytes/1e6:.1f} MB)")
-    train_bpe_merges(sample, vocab_size=args.vocab - 1, out_path=tok_path,
-                     min_frequency=2)
+    # Reserve three ids: <|user|>, <|assistant|> (chat template for the SFT
+    # stage) and EOT.  Reserving them now means fine-tuning never has to
+    # resize the embedding.
+    chat_tokens = ["<|user|>", "<|assistant|>"]
+    n_base = args.vocab - 1 - len(chat_tokens)
+    train_bpe_merges(sample, vocab_size=n_base, out_path=tok_path,
+                     min_frequency=2, special_tokens=chat_tokens)
     tok = BPETokenizer(tok_path, vocab_size=args.vocab, bytes_per_token=1.0,
                        eot_id=args.vocab - 1)
-    print(f"[bpe] vocabulary {tok._tok.get_vocab_size()} ids (+ EOT)")
+    special_ids = {"eot": args.vocab - 1,
+                   "user": n_base,
+                   "assistant": n_base + 1}
+    print(f"[bpe] vocabulary {tok._tok.get_vocab_size()} ids "
+          f"(user={special_ids['user']}, assistant={special_ids['assistant']}, "
+          f"eot={special_ids['eot']})")
 
     def as_bytes(items: list[dict]) -> list[bytes]:
         out = []
@@ -143,6 +153,9 @@ def main() -> None:
         "tokenizer": str(tok_path).replace("\\", "/"),
         "vocab_size": args.vocab,
         "eot_id": args.vocab - 1,
+        "chat_tokens": {"user": special_ids["user"],
+                        "assistant": special_ids["assistant"],
+                        "eot": special_ids["eot"]},
         "bytes_per_token": bpt,
         "train_tokens": tr["tokens"],
         "val_tokens": va["tokens"],
