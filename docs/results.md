@@ -456,3 +456,54 @@ steps.
 - **Randomized recursion works:** E21 at r=2 matches E19 (1.718 vs 1.717),
   while at r=1 it reaches 1.734 — versus 2.554 for E19, which was trained only
   at r=2. One model, two usable depths (H6 confirmed); pass embedding is used.
+
+## 13. Gated FFN and the current best model (Q8g / Q8w / Q9 / Q9k)
+
+Q8g adds a second Kronecker module to the FFN and gates the first with SiLU:
+`f = (W_a x) * SiLU(W_b x)`. Six modules per layer instead of five.
+
+| run | layout | modules/token | parameters | tokens | bpb |
+|---|---|---:|---:|---:|---:|
+| Q6 | 24 layers x 5 | 120 | 2,473,208 | 24.58M | 0.8489 |
+| Q8w | 20 layers x 6 | 120 | 2,470,328 | 24.58M | **0.8359** |
+| Q8g | 24 layers x 6 | 144 | 2,851,280 | 24.58M | 0.8318 |
+| Q8g-long | 24 layers x 6 | 144 | 2,851,280 | 61.44M | **0.7542** |
+
+Q8w is the parameter-matched control: 0.1 % fewer parameters than Q6, the same
+120 modules per token, the same data. The gate is worth **1.5 %** on its own;
+the remaining 0.5 % of Q8g is the extra capacity. Q8g-long at the Q6@10k token
+budget (61.44M) reaches 0.7542 versus 0.7644 — **1.3 % better** — and is the
+current best checkpoint. int8 costs +0.0003 bpb at 3.29 MB.
+
+**Bilinear interaction (negative).** Q9 replaces the linear FFN with
+`W_out(SiLU(W_a x) * (W_b x))` at `rank=16`, which costs 15,360 parameters per
+layer versus 15,753 for a Kron module, so the comparison is parameter-matched:
+
+| run | FFN | layers | parameters | bpb | cos_prev_max |
+|---|---|---:|---:|---:|---:|
+| Q6 | linear Kron | 24 | 2,473,208 | **0.8489** | 0.848 |
+| Q9 | GLU only | 24 | 2,463,776 | 0.8740 | 0.939 |
+| Q9k | GLU + Kron | 20 | 2,462,468 | 0.8673 | 0.869 |
+
+Both are worse (+2.9 % and +2.2 %), and Q9 shows layer collapse. The first Q9
+run was invalid because the generic `std=0.02` initialisation left the branch
+300x smaller than a Kron module (output std 0.005 vs 1.76); the corrected
+initialisation is unit-activation and is guarded by a regression test.
+
+## 14. Nonlinear composition (negative, closed)
+
+Activation between composition steps breaks the single-GEMM fusion, so the
+layer costs `ceil(L/k)` matmuls instead of one:
+
+| run | k | mode | bpb | s/step | MFLOP/token |
+|---|---:|---|---:|---:|---:|
+| E8 | - | product | **1.4789** | 0.405 | 3.67 |
+| E26 | 4 | replace | 1.5675 | 0.655 | 3.67 |
+| E25 | 2 | replace | 1.5189 | 0.868 | 5.63 |
+| E26b | 4 | add | 1.5906 | 0.647 | 3.67 |
+
+More nonlinearity helped (k=2 beat k=4), but every variant lost to the linear
+product, and the additive form that keeps the linear skeleton was the worst.
+`eff_rank(P)` rose while bpb fell, the third sign that rank is not the
+bottleneck. E23 (k=1) and E24 (k=1 + RMSNorm) were dropped rather than run: the
+trend is monotone and points away from the hypothesis.
