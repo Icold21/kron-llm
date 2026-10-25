@@ -54,7 +54,7 @@ and [§8.3](#83-gated-ffn-the-one-architectural-win).
 - [11. Efficiency](#11-efficiency)
 - [12. Repository layout](#12-repository-layout)
 - [13. Limitations](#13-limitations)
-- [14. Next: the bilingual corpus](#14-next-the-bilingual-corpus)
+- [14. The bilingual corpus](#14-the-bilingual-corpus)
 - [15. License and citation](#15-license-and-citation)
 
 ---
@@ -197,9 +197,11 @@ All results in this README are on **TinyStories-200K**, byte-level or BPE-4096,
 and this is deliberate: it is a *development bench* that separates architecture
 effects from data effects, and it fits in a few minutes of GPU time.
 
-TinyStories is **not** the target corpus. The final model is meant to be trained
-on a bilingual English/Russian corpus (60/40 by bytes, with code at ~15 %);
-the plan, licenses and pipeline live in [docs/data_plan.md](docs/data_plan.md).
+TinyStories is **not** the target corpus. The final model is trained on a
+bilingual English/Russian corpus (60/40 by bytes, code at ~15 %); the pilot
+build and its measured composition are in [§14](#14-the-bilingual-corpus)
+and [docs/data_plan.md](docs/data_plan.md).
+
 Every conclusion below that mentions "quality" should be read as "quality on
 the development bench".
 
@@ -538,8 +540,11 @@ all speed-ups are structural, not compiler-driven.
 ```
 kronllm/            library: kron.py (composition), model.py, train.py,
                     config.py (experiments), data.py, tokenizer.py,
-                    quantization.py, hf.py, cli.py
-scripts/            data prep (TinyStories, BPE, WikiText, SFT), dashboard
+                    bilingual.py (corpus pipeline), quantization.py,
+                    hf.py, cli.py
+scripts/            data prep (TinyStories, BPE, WikiText, SFT,
+                    build_bilingual.py, prepare_bilingual_bin.py),
+                    dashboard
 tests/              102 tests, CPU-only
 docs/               architecture.md, results.md (full tables),
                     data_plan.md (bilingual corpus), roadmap.md
@@ -552,9 +557,9 @@ current_progress.md rolling log of the experiment queue
 
 ## 13. Limitations
 
-- **Development bench only.** Every number is TinyStories, English, ~4M
-  training tokens. Nothing here proves the same ordering on a bilingual
-  corpus.
+- **Development bench only.** Every quality number is TinyStories, English.
+  Nothing here proves the same ordering on the bilingual corpus; the corpus
+  pilot is built but no model has been trained on it yet.
 - **One GPU, one seed.** Most experiments are single-seed; the one seed control
   performed (hybrid compositions) reversed a published-looking result, which is
   a warning about the rest.
@@ -567,16 +572,40 @@ current_progress.md rolling log of the experiment queue
 - **int8 only.** int4 is implemented but the delta at this size is not yet
   worth the extra complexity.
 
-## 14. Next: the bilingual corpus
+## 14. The bilingual corpus
 
-The architecture is frozen at Q8g. The next phase is data, not layers:
+The architecture is frozen at Q8g; the next phase is data. The first
+end-to-end build of the English/Russian pilot is in place, with the full plan,
+sources and licences in [docs/data_plan.md](docs/data_plan.md):
 
-1. Build the English/Russian corpus (60/40 by bytes, code ~15 %), with the
-   domain mix and licenses fixed in [docs/data_plan.md](docs/data_plan.md).
-2. Re-tokenise with a joint BPE vocabulary sized for both languages.
-3. Train Q8g at 10M-parameter scale on the new corpus; TinyStories stays as a
-   sanity bench only.
-4. Package the result, then evaluate against public small-model baselines
+| stage | result |
+|---|---|
+| shards fetched | 12 · 420 MB · 35,919 documents |
+| by language | EN 231 MB · RU 189 MB |
+| licences | CC BY-SA 4.0 (408 MB) · PSF-2.0 (13 MB) |
+| exact + near dedup | 34,912 kept · 2.8 % removed |
+| mixed corpus | **273 MB · RU share 39 %** |
+| tokenizer | 8K BPE · 80.3M train tokens · 3.34 bytes/token |
+
+**One finding changes the ratio policy.** Bytes per token is not comparable
+across scripts: both languages receive ≈2.8 characters per token, but Cyrillic
+costs two UTF-8 bytes per character. A 60/40 *byte* split therefore gives only
+**33 % of tokens** to Russian, not the 45-47 % the plan predicted. The next
+stage has to choose byte share or token share as the contract and record one of
+them; the meta file stores both.
+
+Known gaps, reported rather than hidden: code is 4.2 % of the mixed corpus
+against a 15 % target (the CPython standard library was the only permissively
+licensed source in the pilot) and Russian code is absent; `en/math` reached
+33.5 of 52.2 MB. The next build adds MIT/Apache repositories with
+per-repository licence records and grows the pilot toward 250 MB per language.
+
+Next steps:
+
+1. close the code gap, then retrain the tokenizer (8K vs 16K) on the larger mix;
+2. train Q8g at 10M scale on the corpus, with TinyStories kept only as a sanity
+   bench;
+3. package the result, then compare against public small-model baselines
    before any distillation step.
 
 The long-term plan, including the SFT families and the comparison phase, is in

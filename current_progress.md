@@ -10,11 +10,34 @@ detail.
 - No GPU run is active. The architecture is frozen at **Q8g** (gated Kronecker
   FFN, 2.85M parameters); Q8g-long is the new best checkpoint and the new
   shipped candidate.
-- Next: total build of the bilingual English/Russian corpus (Phase 1), then
-  re-tokenisation, then a 10M-scale run on the real corpus. TinyStories remains
-  a sanity bench only.
+- The bilingual corpus pilot is built (273.4 MB mixed, 80.3M tokens, 8K BPE).
+  Next: close the code gap (4.2 % vs 15 %), decide byte vs token ratio policy,
+  then a 10M-scale run on the corpus. TinyStories remains a sanity bench only.
 
 ## Results
+
+## 2026-10-25T08:30+03:00 — bilingual corpus pilot built end to end
+
+- **12 shards, 420.2 MB, 35,919 documents**: EN Wikipedia 231.4 MB (25,715
+  docs), RU Wikipedia 188.8 MB (10,204), RU Wikisource 25.4 MB, CPython
+  standard library 12.6 MB. Licences: CC BY-SA 4.0 (407.7 MB), PSF-2.0
+  (12.6 MB); every shard is registered in `data/bilingual/manifest.jsonl`
+- **dedup** (SHA-256 + MinHash, Jaccard 0.8): 34,912 kept (394.0 MB), 1,007
+  dropped (2.8 %) — lower than expected because category crawls overlap little
+- **mixed corpus 273.4 MB, RU share 39.3 %** at a 60/40 byte policy, with
+  per-domain quotas and a 196-document held-out split disjoint from training
+- **8K BPE**: 80.3M train tokens, 1.52M val, 3.34 bytes/token. Round-trip is
+  exact on Russian, English and LaTeX
+- **Finding (changes the ratio policy):** bytes per token is not comparable
+  across scripts. Both languages get ≈2.8 characters/token, but Cyrillic costs
+  two UTF-8 bytes per character, so 60/40 by *bytes* gives only **33 % of
+  tokens** to Russian, not the 45-47 % the plan predicted. The next stage must
+  pick byte share or token share as the contract
+- **Gaps, reported not hidden:** code 4.2 % vs a 15 % target (only the stdlib
+  is permissively licensed in the pilot; no RU code corpus found), `en/math`
+  33.5 of 52.2 MB, `ru/code` empty
+- pipeline lives in `kronllm/bilingual.py` + `scripts/build_bilingual.py` +
+  `scripts/prepare_bilingual_bin.py`, guarded by 12 tests (114 total pass)
 
 ## 2026-10-25T05:10+03:00 — Q8g-long 0.7542 bpb: new best; bilinear interaction dead
 
@@ -92,20 +115,3 @@ Chain: Q9 → Q9k → Q8g-long, all at 61.4M tokens where applicable.
   **H5 rejected** (sharing at equal effective depth costs 16 %);
   **H7 partially confirmed**
 - recursion stays a deployment/compute option, not a default
-
-## 2026-10-24T03:50+03:00 — seed control: the hybrid advantage does not reproduce
-
-- WikiText-103, product vs grouped, 4,000 steps:
-
-  | seed | product (E8w) | grouped (E17w) |
-  |---|---:|---:|
-  | 42 | 2.1848 | **2.1561** |
-  | 43 | **2.1559** | 2.1624 |
-
-- seed-to-seed spread is ~**0.03 bpb** (product 2.1848 → 2.1559), larger than
-  the 0.029 "win" on seed 42; on seed 43 grouped is 0.007 worse
-- **verdict:** the quality difference is seed noise; the product remains the
-  default. The *rank* ordering is stable across seeds (product 60.5 < grouped
-  79.2), so H4 survives as a diagnostic but does not predict bpb
-- this result is the reason every later comparison in this file is quoted with
-  an explicit token budget and, where possible, a parameter-matched control

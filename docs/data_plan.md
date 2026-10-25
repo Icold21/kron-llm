@@ -107,7 +107,59 @@ At ~7k tokens/s, 1B tokens is ≈40 h of GPU time and 2B is ≈80 h.
   samples that parse (Python `ast.parse`) and the character-level round-trip
   after tokenization.
 
-## 6. Implementation
+## 6. Pilot build (2026-10-25)
+
+First end-to-end run of the pipeline. Sources: English and Russian Wikipedia,
+Russian Wikisource and the CPython standard library. Every shard is registered
+with its licence in `data/bilingual/manifest.jsonl`.
+
+| stage | result |
+|---|---|
+| shards fetched | 12 · 420.2 MB · 35,919 documents |
+| by language | EN 231.4 MB / 25,715 docs · RU 188.8 MB / 10,204 docs |
+| licences | CC BY-SA 4.0 (407.7 MB) · PSF-2.0 (12.6 MB) |
+| exact + near dedup | 34,912 kept (394.0 MB) · 1,007 dropped (2.8 %) |
+| mixed corpus | **273.4 MB** · RU share **39.3 %** |
+| held-out | 196 docs (1 MB per language, disjoint from training) |
+| tokenizer | 8K BPE · 80.3M train tokens · 1.52M val tokens · 3.34 bytes/token |
+
+Achieved domain mix against the targets in §1 (by bytes, both languages):
+
+| domain | target | achieved |
+|---|---:|---:|
+| mathematics | 25 % | 22.3 % |
+| science | 20 % | 25.4 % |
+| code | 15 % | 4.2 % |
+| logic | 10 % | 9.8 % |
+| literature | 15 % | 19.2 % |
+| encyclopedic | 15 % | 19.1 % |
+
+Shortfalls are reported rather than hidden: `en/math` 33.5 of 52.2 MB,
+`en/code` 11.4 of 31.4 MB, `en/logic` 16.6 of 20.9 MB, `ru/math` 27.4 of
+34.8 MB, `ru/logic` 10.3 of 13.9 MB, `ru/code` empty. **Code is the largest
+gap**: the Python standard library was the only permissively licensed code
+source in the pilot, and no Russian-language code corpus with a clear licence
+was found. The next build needs MIT/Apache repositories with per-repository
+licence records to reach 15 %.
+
+### 6.1 Finding: bytes per token is not comparable across scripts
+
+| language | bytes/token | characters/token |
+|---|---:|---:|
+| English | 2.79 | ≈2.8 |
+| Russian | 5.24 | ≈2.6 |
+
+Both languages receive roughly the same number of *characters* per token, but
+Cyrillic costs two UTF-8 bytes per character. Consequence: at the planner's
+60/40 **byte** split the corpus is 39.3 % Russian by bytes and only **33 % of
+tokens** are Russian.
+
+The 45-47 % token share predicted in §1 would need Russian at ~55-58 % of
+bytes. The pilot deliberately honoured the stated 60/40 byte policy; the next
+stage must decide whether the target is byte share or token share and record
+one of them as the contract. `data/bilingual/tokenizer_meta.json` stores both.
+
+## 7. Implementation
 
 The pipeline is implemented and does not depend on anything outside the
 standard library:
@@ -133,12 +185,13 @@ Every fetcher writes one JSONL shard and one manifest row with `source`,
 refuses an unknown licence, so a shard without provenance cannot enter the
 mix.
 
-## 7. Immediate steps
+## 8. Immediate steps
 
 - [x] freeze the shard manifest schema and create `data/bilingual/manifest.jsonl`;
 - [x] implement normalisation, quality filters, deduplication, mixing and the
       held-out split;
-- [ ] reach the 250 MB-per-language pilot target (the first build is smaller);
+- [ ] grow the pilot toward 250 MB per language and close the code gap
+      (MIT/Apache repositories with per-repository licence records);
 - [ ] compare 8K and 16K tokenizers on the pilot;
 - [ ] only then start the full 0.5-2B-token download and build.
 

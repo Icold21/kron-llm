@@ -1,0 +1,34 @@
+{
+  "type": "bpe",
+  "tokenizer": "data/bilingual/tokenizer.json",
+  "vocab_size": 8192,
+  "eot_id": 8191,
+  "bytes_per_token": 3.326858124725372,
+  "train_tokens": 80300881,
+  "val_tokens": 1524790,
+  "train_bytes": 268296677,
+  "val_bytes": 5072760,
+  "merge_docs": 1080,
+  "merge_bytes": 33822389,
+  "language": {
+    "en": {
+      "bytes": 2006063,
+      "tokens": 717951,
+      "bytes_per_token": 2.794
+    },
+    "ru": {
+      "bytes": 1846818,
+      "tokens": 352506,
+      "bytes_per_token": 5.239
+    }
+  },
+  "token_share": {
+    "en": 0.6707,
+    "ru": 0.3293
+  },
+  "byte_share": {
+    "en": 0.5207,
+    "ru": 0.4793
+  },
+  "val_fraction": 0.02
+}

@@ -1,0 +1,105 @@
+{
+  "total_bytes": 420230518,
+  "total_docs": 35919,
+  "by_language": {
+    "ru": {
+      "bytes": 188820180,
+      "docs": 10204,
+      "domains": {
+        "math": 28913443,
+        "science": 40662556,
+        "logic": 13028333,
+        "literature": 60920478,
+        "encyclopedic": 45295370
+      }
+    },
+    "en": {
+      "bytes": 231410338,
+      "docs": 25715,
+      "domains": {
+        "code": 12574406,
+        "logic": 17686654,
+        "science": 57380419,
+        "math": 39476872,
+        "literature": 53884008,
+        "encyclopedic": 50407979
+      }
+    }
+  },
+  "by_domain": {
+    "math": {
+      "bytes": 68390315,
+      "docs": 8638
+    },
+    "science": {
+      "bytes": 98042975,
+      "docs": 8413
+    },
+    "logic": {
+      "bytes": 30714987,
+      "docs": 3534
+    },
+    "literature": {
+      "bytes": 114804486,
+      "docs": 8658
+    },
+    "encyclopedic": {
+      "bytes": 95703349,
+      "docs": 6061
+    },
+    "code": {
+      "bytes": 12574406,
+      "docs": 615
+    }
+  },
+  "by_licence": {
+    "CC-BY-SA-4.0": 407656112,
+    "PSF-2.0": 12574406
+  },
+  "shards": 12,
+  "language_share": {
+    "ru": 0.4493,
+    "en": 0.5507
+  },
+  "domain_share": {
+    "math": 0.1627,
+    "science": 0.2333,
+    "logic": 0.0731,
+    "literature": 0.2732,
+    "encyclopedic": 0.2277,
+    "code": 0.0299
+  },
+  "dedup": {
+    "before": 35919,
+    "kept": 34912,
+    "dropped": 1007,
+    "kept_bytes": 394047924
+  },
+  "mixed": {
+    "en": {
+      "math": 33533898,
+      "science": 41802110,
+      "code": 11430663,
+      "logic": 16581021,
+      "literature": 31350924,
+      "encyclopedic": 31353096
+    },
+    "ru": {
+      "math": 27366894,
+      "science": 27822111,
+      "logic": 10277380,
+      "literature": 20974604,
+      "encyclopedic": 20876736
+    }
+  },
+  "mixed_total_bytes": 273369437,
+  "ru_share": 0.3926,
+  "shortfalls": [
+    "en/math: 33.5 MB of 52.2 MB",
+    "en/code: 11.4 MB of 31.4 MB",
+    "en/logic: 16.6 MB of 20.9 MB",
+    "ru/math: 27.4 MB of 34.8 MB",
+    "ru/code: empty",
+    "ru/logic: 10.3 MB of 13.9 MB"
+  ]
+}
