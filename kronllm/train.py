@@ -315,6 +315,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     min_ratio = float(tc["min_lr"]) / float(tc["lr"])
     eval_every = int(tc["eval_every"])
     log_every = int(tc["log_every"])
+    save_every = int(tc.get("save_every", 0) or 0)
     spectral_every = int(cfg["metrics"].get("spectral_every", 2000))
     eval_batches = int(tc.get("eval_batches", 64))
     patience = int(tc.get("early_stop_patience", 4))
@@ -402,6 +403,12 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
         opt.zero_grad(set_to_none=True)
         step += 1
 
+        if save_every and step % save_every == 0 and is_main:
+            # Crash / quota resilience: a resumed run continues from here.
+            torch.save({"model": raw_model.state_dict(), "cfg": dict(cfg),
+                        "optimizer": opt.state_dict(), "step": step,
+                        "val_ppl": best_ppl}, run_dir / "last.pt")
+
         if step % log_every == 0 or step == 1:
             dt = time.time() - last_log
             last_log = time.time()
@@ -487,6 +494,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
         raw_model.set_recurse(raw_model.max_recurse)
     if is_main:
         torch.save({"model": raw_model.state_dict(), "cfg": dict(cfg),
+                    "optimizer": opt.state_dict(),
                     "step": step, "val_ppl": best_ppl}, run_dir / "last.pt")
 
     elapsed = time.time() - t_start

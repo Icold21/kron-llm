@@ -156,6 +156,11 @@ DEFAULTS: Dict[str, Any] = {
         "amp": "none",   # fp16 autocast is slower than fp32 on the reference GPU
         "log_every": 100,
         "eval_every": 500,
+        # Periodic checkpoint for crash / GPU-quota resilience.  ``last.pt``
+        # is rewritten every ``save_every`` steps; ``best.pt`` follows the
+        # validation curve.  `kronllm.cli train --resume runs/<run>/last.pt`
+        # continues from the step counter stored in the file.
+        "save_every": 1000,
         "eval_batches": 64,
         "early_stop_patience": 4,
         # Recursive weight sharing: sample r ~ U{1..recurse} per training step
