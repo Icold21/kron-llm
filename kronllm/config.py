@@ -126,6 +126,11 @@ DEFAULTS: Dict[str, Any] = {
             "gate_init": 0.1,         # ReZero gamma init
             "gate": True,             # E12 keeps tau but drops the normaliser
             "theta_std": 0.1,
+            # Depth-recurrence strength.  "learned" = sigmoid(theta) (default);
+            # "fixed" pins it to sigma_value and freezes theta; "off" removes
+            # the carry, leaving independent factors.  Ablations R1/R2.
+            "sigma_mode": "learned",
+            "sigma_value": 0.5,
             "rezero_eps": 0.0,
         },
     },
@@ -571,6 +576,38 @@ EXPERIMENTS["E25b"] = {
     "overrides": {"model.kron.composition": "nonlinear",
                   "model.kron.nonlinear_every": 2,
                   "model.kron.nonlinear_mode": "add"},
+}
+# E27-E30: depth-recurrence ablation (2026-10-25).
+# Motivated by an external review: with K_win=2 the state only crosses pairs of
+# layers, sigma(theta) is one scalar per module, and no run isolated the carry
+# itself.  All four share the E8 geometry and parameter count (theta stays in
+# the state dict, so only 4 scalars per module are inert).
+# E8r is the control: E8 re-run after the sigma_mode plumbing, so the four
+# ablations are compared against a number produced by the same code path.
+EXPERIMENTS["E8r"] = {
+    "desc": "E8 re-run as the control for the E27-E30 sigma/K_win ablation",
+    "overrides": {**EXPERIMENTS["E8"]["overrides"]},
+}
+EXPERIMENTS["E27"] = {
+    "desc": "E8 without the depth carry: independent factors (sigma = 0)",
+    "overrides": {**EXPERIMENTS["E8"]["overrides"],
+                  "model.kron.sigma_mode": "off"},
+}
+EXPERIMENTS["E28"] = {
+    "desc": "E8 with sigma frozen at 0.5 (the reviewer's ablation)",
+    "overrides": {**EXPERIMENTS["E8"]["overrides"],
+                  "model.kron.sigma_mode": "fixed",
+                  "model.kron.sigma_value": 0.5},
+}
+EXPERIMENTS["E29"] = {
+    "desc": "E8 with K_win=4: state crosses four layers instead of two",
+    "overrides": {**EXPERIMENTS["E8"]["overrides"],
+                  "model.kron.K_win": 4},
+}
+EXPERIMENTS["E30"] = {
+    "desc": "E8 with K_win=0: state crosses the whole 12-layer stack",
+    "overrides": {**EXPERIMENTS["E8"]["overrides"],
+                  "model.kron.K_win": 0},
 }
 # Q8g: gated FFN at quality scale (Q6 + SwiGLU).
 EXPERIMENTS["Q8g"] = {

@@ -181,6 +181,8 @@ class KronCompose(nn.Module):
         norm_between: bool = False,
         nonlinear_every: int = 1,
         nonlinear_mode: str = "replace",
+        sigma_mode: str = "learned",
+        sigma_value: float = 0.5,
     ) -> None:
         super().__init__()
         d_out = d_in if d_out is None else d_out
@@ -242,6 +244,13 @@ class KronCompose(nn.Module):
         self.rezero_eps = rezero_eps
         self.normalize_D = bool(normalize_D)
         self.innovation_scale = float(innovation_scale)
+        # Depth-recurrence strength: sigmoid(theta) by default.  "off" removes
+        # the carry (independent factors), "fixed" pins it to sigma_value and
+        # freezes theta.  Both exist as ablations, not as design choices.
+        self.sigma_mode = str(sigma_mode).lower()
+        if self.sigma_mode not in {"learned", "fixed", "off"}:
+            raise ValueError("sigma_mode must be 'learned', 'fixed' or 'off'")
+        self.sigma_value = float(sigma_value)
 
         self.A = nn.Parameter(torch.empty(L, K, n1_out, n1_in))
         self.B = nn.Parameter(torch.empty(L, K, n2_out, n2_in))
@@ -310,6 +319,22 @@ class KronCompose(nn.Module):
             self.tau.fill_(self.innovation_scale)
             if self.alpha is not None:
                 self.alpha.fill_(self.sum_alpha_init)
+
+    def sigma_values(self) -> torch.Tensor:
+        """Depth-carry coefficient for each composition step, shape ``(L,)``.
+
+        ``learned`` uses ``sigmoid(theta)``; ``fixed`` pins the value (the
+        critic's "sigma frozen at 0.5" ablation); ``off`` removes the carry so
+        the factors become independent.  ``theta`` is kept in the state dict in
+        every mode, so the parameter count is unchanged across the ablation.
+        """
+        if self.sigma_mode == "off":
+            return torch.zeros(self.L, device=self.theta.device,
+                               dtype=self.theta.dtype)
+        if self.sigma_mode == "fixed":
+            return torch.full((self.L,), self.sigma_value,
+                              device=self.theta.device, dtype=self.theta.dtype)
+        return torch.sigmoid(self.theta)
 
     @property
     def n_params(self) -> int:
@@ -597,7 +622,7 @@ class KronCompose(nn.Module):
             if in_window:
                 prev = rms_norm_matrix(prev)
 
-        sig = torch.sigmoid(self.theta)             # (L,)
+        sig = self.sigma_values()                  # (L,)
         D = I + sig.view(self.L, 1, 1) * prev       # (L, d_out, d_in)
         if self.normalize_D:
             D = rms_norm_matrix(D)
@@ -722,6 +747,8 @@ class KronBank:
                     and m.normalize_D == m0.normalize_D
                     and m.stop_gradient == m0.stop_gradient
                     and m.K_win == m0.K_win
+                    and m.sigma_mode == m0.sigma_mode
+                    and m.sigma_value == m0.sigma_value
                     and (m.gate is None) == (m0.gate is None))
             if not same:
                 raise ValueError("KronBank modules must share shape and flags")
@@ -737,6 +764,8 @@ class KronBank:
         self.stop_gradient = m0.stop_gradient
         self.normalize_D = m0.normalize_D
         self.anchor = m0.anchor
+        self.sigma_mode = m0.sigma_mode
+        self.sigma_value = m0.sigma_value
         self.composition = m0.composition
         self._m0 = m0
         assert all(m.composition == self.composition for m in mods), \
@@ -764,7 +793,6 @@ class KronBank:
 
         A = torch.stack([m.A for m in mods])            # (M,L,K,n1o,n1i)
         B = torch.stack([m.B for m in mods])            # (M,L,K,n2o,n2i)
-        theta = torch.stack([m.theta for m in mods])    # (M,L)
         tau = torch.stack([m.tau for m in mods])        # (M,L)
 
         # innovation  I[m,l,i,j,m2,n2] = sum_k A[m,l,k,i,j] B[m,l,k,m2,n2]
@@ -777,7 +805,7 @@ class KronBank:
         if self.normalize_D:
             I = rms_norm_matrix(I)
 
-        sig = torch.sigmoid(theta).view(M, L, 1, 1)
+        sig = torch.stack([m.sigma_values() for m in mods]).view(M, L, 1, 1)
         init = self._m0.initial_state(I.device, I.dtype)      # (L,d,d), cached
 
         Ds: List[torch.Tensor] = []

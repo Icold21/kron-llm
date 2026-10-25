@@ -1,0 +1,207 @@
+"""Generate the self-identity slice of the pretraining corpus.
+
+The model should know its own name.  A pretraining corpus of Wikipedia, books
+and code contains no sentence "my name is Kron", so the name is injected as a
+small, explicitly synthetic domain: short first-person texts in English and
+Russian, generated locally by a larger model (Qwen3.5-4B via Ollama) from a
+fixed set of prompt families.
+
+This is data *about* the model, not knowledge: the slice is deliberately tiny
+(a few hundred samples), and every sample is checked for identity leakage
+(the generator talking about itself) before it is written.
+
+Usage::
+
+    python scripts/gen_identity.py --samples-per-prompt 20
+    python scripts/gen_identity.py --check          # verify an existing shard
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import random
+import re
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from kronllm.bilingual import append_jsonl, normalize, quality, record_shard
+
+ROOT = Path("data/bilingual")
+SHARDS = ROOT / "shards"
+MANIFEST = ROOT / "manifest.jsonl"
+OLLAMA = "http://localhost:11434/api/generate"
+MODEL = "qwen3.5:4b"
+
+#: Facts the generator is allowed to use.  Everything else is a hallucination
+#: and is filtered out below.
+FACTS_EN = (
+    "Kron is a small bilingual English/Russian language model built by the "
+    "KronLLM project. It is compact: about 3 million parameters, designed to "
+    "run on a 6 GB consumer GPU. Its weights are Kronecker products, which is "
+    "where the name comes from. It is a research model, not a chatbot, and it "
+    "can be wrong."
+)
+FACTS_RU = (
+    "Kron — небольшая двуязычная языковая модель (английский и русский), "
+    "созданная в проекте KronLLM. Она компактная: около 3 миллионов "
+    "параметров, рассчитана на потребительскую видеокарту с 6 ГБ памяти. "
+    "Её веса построены на кронекеровых произведениях — отсюда имя. Это "
+    "исследовательская модель, а не чат-бот, и она может ошибаться."
+)
+
+PROMPTS: list[tuple[str, str]] = [
+    ("en", "Write a first-person introduction of 60-100 words. You are Kron. "
+           "Use only these facts: {facts}"),
+    ("en", "Answer the question 'Who are you?' in the first person, 3-5 "
+           "sentences. You are Kron. Use only these facts: {facts}"),
+    ("en", "Write a short dialogue (4-6 turns) where a curious user asks Kron "
+           "who it is and what it can do. Kron answers in the first person, "
+           "briefly and honestly. Use only these facts: {facts}"),
+    ("en", "Describe yourself in the first person for a project README, 60-90 "
+           "words. You are Kron. Mention the name, the size, the languages and "
+           "one limitation. Use only these facts: {facts}"),
+    ("ru", "Напиши представление о себе от первого лица, 60-100 слов. Ты — "
+           "Kron. Используй только эти факты: {facts}"),
+    ("ru", "Ответь на вопрос «Кто ты?» от первого лица, 3-5 предложений. Ты — "
+           "Kron. Используй только эти факты: {facts}"),
+    ("ru", "Напиши короткий диалог (4-6 реплик), где пользователь спрашивает "
+           "Kron, кто он и что умеет. Kron отвечает от первого лица, коротко и "
+           "честно. Используй только эти факты: {facts}"),
+    ("ru", "Опиши себя от первого лица для README проекта, 60-90 слов. Ты — "
+           "Kron. Упомяни имя, размер, языки и одно ограничение. Используй "
+           "только эти факты: {facts}"),
+]
+
+#: The generator's own identity leaking into the text.
+LEAK = re.compile(
+    r"\b(Qwen|Alibaba|Tongyi|OpenAI|ChatGPT|GPT-4|Anthropic|Claude|Google|"
+    r"DeepSeek|Llama|Meta AI)\b", re.I)
+META = re.compile(
+    r"(here is|here's|sure[,!]|certainly[,!]|below is|вот (?:текст|вариант)|"
+    r"конечно[,!]|разумеется[,!])", re.I)
+BAD_NAME = re.compile(r"\b(KronLLM is a person|I am a human|я человек)\b", re.I)
+
+
+def ollama_generate(prompt: str, seed: int, num_predict: int = 260) -> str:
+    """Call the local Ollama server and return the completion text."""
+    payload = {
+        "model": MODEL,
+        "prompt": prompt,
+        "stream": False,
+        # qwen3.5 is a reasoning model: without this it spends the whole
+        # num_predict budget in `thinking` and returns an empty response.
+        "think": False,
+        "options": {"temperature": 0.95, "top_p": 0.92, "seed": seed,
+                    "num_predict": num_predict, "repeat_penalty": 1.1},
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(OLLAMA, data=data,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as r:
+        out = json.loads(r.read())
+    return out.get("response", "")
+
+
+def clean(text: str) -> str:
+    """Strip markdown scaffolding and the generator's own preamble."""
+    text = text.strip()
+    text = re.sub(r"^```[a-z]*\n?|```$", "", text).strip()
+    text = re.sub(r"^(Sure|Certainly|Here is|Here's)[^\n]*\n+", "", text,
+                  flags=re.I)
+    text = re.sub(r"^\s*(Kron|Крон)\s*:\s*", "", text, flags=re.I)
+    return normalize(text)
+
+
+def acceptable(text: str, lang: str) -> tuple[bool, str]:
+    """Return ``(ok, reason)`` for one generated sample."""
+    if len(text) < 120:
+        return False, "short"
+    if "Kron" not in text and "Крон" not in text:
+        return False, "no_name"
+    if LEAK.search(text):
+        return False, "leak"
+    if BAD_NAME.search(text):
+        return False, "identity"
+    st = quality(text, lang, min_chars=120, max_symbol_ratio=0.25,
+                 max_repeat_ratio=0.45)
+    if not st.ok:
+        return False, ",".join(st.reasons)
+    return True, ""
+
+
+def generate(lang: str, n: int, seed: int) -> list[dict]:
+    """Generate ``n`` accepted samples for one language."""
+    facts = FACTS_EN if lang == "en" else FACTS_RU
+    prompts = [(lg, p) for lg, p in PROMPTS if lg == lang]
+    docs: list[dict] = []
+    attempts = 0
+    while len(docs) < n and attempts < n * 6:
+        lg, template = prompts[attempts % len(prompts)]
+        attempts += 1
+        prompt = template.format(facts=facts)
+        try:
+            raw = ollama_generate(prompt, seed=seed + attempts)
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            print(f"  [warn] ollama: {exc}")
+            time.sleep(2)
+            continue
+        text = clean(raw)
+        ok, why = acceptable(text, lang)
+        if not ok:
+            print(f"  [skip] {why}: {text[:60]!r}")
+            continue
+        docs.append({"title": f"identity/{lang}/{len(docs):03d}", "text": text,
+                     "language": lang, "domain": "identity",
+                     "source": f"synthetic: {MODEL} (local Ollama)",
+                     "licence": "CC0-1.0",
+                     "url": "https://github.com/Icold21/kron_llm",
+                     "note": "generated from a fixed prompt family; "
+                             "identity facts supplied in the prompt"})
+        print(f"  [{len(docs):3d}/{n}] {len(text):4d} chars")
+    return docs
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--samples-per-language", type=int, default=120)
+    ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--force", action="store_true")
+    ap.add_argument("--check", action="store_true",
+                    help="only verify the existing shards")
+    args = ap.parse_args()
+
+    SHARDS.mkdir(parents=True, exist_ok=True)
+    if args.check:
+        for lang in ("en", "ru"):
+            path = SHARDS / f"identity_{lang}.jsonl"
+            rows = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+            print(lang, len(rows), "docs",
+                  round(sum(len(r["text"]) for r in rows) / 1e3, 1), "KB")
+            print("  sample:", rows[0]["text"][:160].replace("\n", " "))
+        return
+
+    for lang in ("en", "ru"):
+        path = SHARDS / f"identity_{lang}.jsonl"
+        if path.exists() and not args.force:
+            print(f"[skip] {path} exists")
+            continue
+        print(f"[gen] {lang}: {args.samples_per_language} samples")
+        docs = generate(lang, args.samples_per_language, args.seed)
+        if path.exists():
+            path.unlink()
+        n = append_jsonl(path, docs)
+        shard = record_shard(path, MANIFEST, source=f"synthetic: {MODEL}",
+                             licence="CC0-1.0",
+                             url="https://github.com/Icold21/kron_llm",
+                             language=lang, domain="identity", docs=n,
+                             note="self-identity slice, prompt-constrained")
+        print(f"[done] {n} docs -> {path} ({shard.bytes/1e3:.1f} KB)")
+
+
+if __name__ == "__main__":
+    main()

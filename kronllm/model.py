@@ -395,6 +395,8 @@ class KronBlock(nn.Module):
             norm_between=bool(kc.get("norm_between", False)),
             nonlinear_every=int(kc.get("nonlinear_every", 1)),
             nonlinear_mode=str(kc.get("nonlinear_mode", "replace")),
+            sigma_mode=str(kc.get("sigma_mode", "learned")),
+            sigma_value=float(kc.get("sigma_value", 0.5)),
         )
 
     def ffn_module(self) -> nn.Module:

@@ -29,6 +29,17 @@ never the target corpus. Every comparison below is made at equal tokens,
 because step counts alone are misleading: Q6 trained with `batch 32` and Q8g
 with `batch 24`, so 10,000 steps of one is not 10,000 steps of the other.
 
+### The next run: 10M parameters on 2B tokens
+
+The current checkpoint is a development bench. The real target is a **10M
+model trained on a 2B-token bilingual corpus** and shipped as an int8 artifact
+under 10 MB, so it fits a 6 GB GPU and runs on CPU. The reference
+configuration is 9,938,886 parameters (d=512, 25 layers, d×d = 16×32
+Kronecker factors, K=10, 8K bilingual BPE). Purpose, success criteria, corpus
+contract and compute plan are in [`docs/goal_10m.md`](docs/goal_10m.md); the
+training is scheduled for a Kaggle T4, with the 1660 Ti as the restartable
+fallback.
+
 | model | parameters | tokens | bits/byte | note |
 |---|---:|---:|---:|---|
 | Q2 | 2,079,992 | 61.4M | 0.8391 | previous shipped model |
@@ -145,7 +156,7 @@ Measured on a real 300-step TinyStories run:
 |---|---|---|
 | `∂L/∂D` norm | **0.000** | the recurrence receives no gradient |
 | `cos(W_i, W_{i−1})` | **1.000** | all layers are the same matrix |
-| `eff_rank(W)` | **128** (all layers) | full rank comes from the anchor, not the factors |
+| `eff_rank(W)` | **128** (all layers) | full algebraic rank comes from the anchor, not the factors; effective rank is far lower |
 | val PPL | **20.06** | ≈ a unigram model |
 | samples | "letter soup" | — |
 
@@ -487,7 +498,7 @@ composition, regardless of how much rank or nonlinearity it promises.
 | # | hypothesis | verdict |
 |---|---|---|
 | H1 | normalising the branch scale is what makes the Kron layer trainable | **confirmed** (PPL 20.06 → 12.3 after the fix) |
-| H2 | the depth recurrence adds useful state beyond independent factors | **confirmed** (removing it costs 3.4 % at equal parameters) |
+| H2 | the depth recurrence adds useful state beyond independent factors | **untested** — no run removes the carry (E27/E28 pending); E8 vs E14 (1.479 vs 1.551, −4.9 %) tests the composition, not the recurrence |
 | H3 | a wider tokenizer is worth more than extra parameters | **confirmed** (BPE-4096: −8.2 % at equal params) |
 | H4 | effective rank is monotone in additive depth | **confirmed empirically** (60/60 modules; survives seeds) — but rank does not predict bpb |
 | H5 | hybrid compositions beat the product | **rejected** (seed noise) |

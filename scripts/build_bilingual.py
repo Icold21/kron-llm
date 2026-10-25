@@ -60,6 +60,8 @@ CATEGORIES: dict[str, dict[str, list[str]]] = {
         "logic": ["Логика", "Теория множеств", "Основания математики"],
         "literature": ["Литература", "Русская литература", "Поэзия"],
         "encyclopedic": ["География", "История", "Культура", "Техника"],
+        "ml": ["Машинное обучение", "Искусственный интеллект",
+               "Нейронные сети", "Обработка естественного языка"],
     },
     "en": {
         "math": ["Mathematics", "Algebra", "Mathematical analysis",
@@ -68,6 +70,8 @@ CATEGORIES: dict[str, dict[str, list[str]]] = {
         "logic": ["Logic", "Set theory", "Mathematical logic"],
         "literature": ["Literature", "Poetry", "Novels"],
         "encyclopedic": ["Geography", "History", "Culture", "Technology"],
+        "ml": ["Machine learning", "Artificial intelligence",
+               "Artificial neural networks", "Deep learning"],
     },
 }
 
@@ -385,6 +389,343 @@ def cmd_fetch_code(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Machine learning: textbooks, course notes and framework documentation
+# ---------------------------------------------------------------------------
+
+#: Repositories whose licence is unambiguous at the repository level.  The
+#: licence string is recorded per shard, so an audit can check it against the
+#: repository's LICENSE file.
+ML_REPOS: list[tuple[str, str, str, str]] = [
+    # owner/repo, branch, licence, what
+    ("d2l-ai/d2l-en", "master", "CC-BY-SA-4.0", "Dive into Deep Learning"),
+    ("pytorch/tutorials", "main", "BSD-3-Clause", "PyTorch tutorials"),
+    ("scikit-learn/scikit-learn", "main", "BSD-3-Clause", "scikit-learn docs"),
+    ("huggingface/course", "main", "Apache-2.0", "HF LLM course"),
+    ("tensorflow/docs", "master", "Apache-2.0", "TensorFlow docs"),
+    ("microsoft/ML-For-Beginners", "main", "MIT", "ML for beginners"),
+    ("rasbt/LLMs-from-scratch", "main", "Apache-2.0", "LLMs from scratch"),
+    ("karpathy/nanoGPT", "master", "MIT", "nanoGPT"),
+    ("karpathy/micrograd", "master", "MIT", "micrograd"),
+    ("jakevdp/PythonDataScienceHandbook", "master", "MIT", "DS handbook"),
+]
+
+ML_TEXT_EXT = {".md", ".rst", ".txt", ".tex", ".ipynb"}
+
+
+def _notebook_text(raw: str) -> str:
+    """Flatten a Jupyter notebook into markdown + fenced code."""
+    try:
+        nb = json.loads(raw)
+    except json.JSONDecodeError:
+        return ""
+    parts: list[str] = []
+    for cell in nb.get("cells", []):
+        src = "".join(cell.get("source", []))
+        if cell.get("cell_type") == "markdown":
+            parts.append(src)
+        elif cell.get("cell_type") == "code" and len(src) > 40:
+            parts.append("```python\n" + src + "\n```")
+    return "\n\n".join(parts)
+
+
+def _download_tarball(repo: str, branch: str) -> bytes:
+    """Download a repository tarball (codeload) into memory."""
+    url = f"https://codeload.github.com/{repo}/tar.gz/refs/heads/{branch}"
+    return _get(url, timeout=300, retries=2)
+
+
+def cmd_fetch_github(args: argparse.Namespace) -> None:
+    """Collect machine-learning prose from permissively licensed repositories.
+
+    Only documentation formats are read (markdown, rst, text, LaTeX and
+    notebooks): the point is to teach the model ML *content*, not to duplicate
+    the code slice.
+    """
+    import io
+    import tarfile
+
+    target = int(args.target_mb * 1_000_000)
+    cap = int(args.repo_cap_mb * 1_000_000)
+    total = 0
+    for repo, branch, licence, what in ML_REPOS:
+        if total >= target:
+            break
+        slug = repo.replace("/", "__")
+        out = SHARDS / f"github_{slug}.jsonl"
+        if args.force:
+            reset_shard(out, MANIFEST)
+        elif out.exists():
+            print(f"[skip] {out.name} exists")
+            total += out.stat().st_size
+            continue
+        try:
+            blob = _download_tarball(repo, branch)
+        except RuntimeError as exc:
+            print(f"[warn] {repo}: {exc}")
+            continue
+        written = 0
+        kept = 0
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar, \
+                open(out, "a", encoding="utf-8") as sink:
+            for member in tar:
+                if not member.isfile() or written >= cap:
+                    continue
+                suffix = Path(member.name).suffix.lower()
+                if suffix not in ML_TEXT_EXT:
+                    continue
+                if member.size > 2_000_000:
+                    continue
+                handle = tar.extractfile(member)
+                if handle is None:
+                    continue
+                raw = handle.read().decode("utf-8", errors="replace")
+                text = (_notebook_text(raw) if suffix == ".ipynb"
+                        else normalize(raw))
+                if suffix == ".ipynb":
+                    text = normalize(text)
+                if len(text) < args.min_chars:
+                    continue
+                st = quality(text, "en", min_chars=args.min_chars)
+                if not st.ok:
+                    continue
+                doc = {"title": member.name, "text": text, "language": "en",
+                       "domain": "ml", "source": f"GitHub {repo}",
+                       "licence": licence,
+                       "url": f"https://github.com/{repo}"}
+                sink.write(json.dumps(doc, ensure_ascii=False) + "\n")
+                written += len(text.encode("utf-8"))
+                kept += 1
+            sink.flush()
+        if not kept:
+            print(f"[warn] {repo}: nothing passed the filters")
+            if out.exists():
+                out.unlink()
+            continue
+        shard = record_shard(out, MANIFEST, source=f"GitHub {repo}",
+                             licence=licence,
+                             url=f"https://github.com/{repo}",
+                             language="en", domain="ml", docs=kept,
+                             note=what)
+        total += shard.bytes
+        print(f"[done] {repo}: {kept} docs, {shard.bytes/1e6:.1f} MB")
+    print(f"[ml] {total/1e6:.1f} MB total")
+
+
+# ---------------------------------------------------------------------------
+# Hugging Face datasets (the 2B-token corpus scale)
+# ---------------------------------------------------------------------------
+#: Lower-case substrings used to route wiki/web documents into domains.  The
+#: label is a heuristic, not a curated taxonomy: a document needs ``>= 2``
+#: distinct hits to be routed away from its source default, otherwise it goes to
+#: the default domain (Wikipedia) or is dropped (FineWeb).  Kept short on
+#: purpose: long lists start matching everything.
+KEYWORDS: dict[str, dict[str, tuple[str, ...]]] = {
+    "en": {
+        "math": ("theorem", "lemma", "equation", "integral", "derivative",
+                 "algebra", "geometry", "probability", "matrix", "polynomial",
+                 "topology", "combinator", "corollary", "differential equation",
+                 "prime number"),
+        "science": ("physics", "chemistry", "biology", "molecule", "quantum",
+                    "cell", "gene", "evolution", "experiment", "particle",
+                    "protein", "thermodynamic", "electromagnetic", "organism",
+                    "astronomy"),
+        "logic": ("logic", "syllogism", "inference", "propositional",
+                  "predicate", "axiom", "deduction", "fallacy", "formal proof",
+                  "consistency"),
+        "ml": ("neural network", "machine learning", "gradient descent",
+               "transformer", "training data", "language model", "embedding",
+               "attention head", "supervised learning", "dataset"),
+        "literature": ("novel", "poem", "chapter", "protagonist", "narrative",
+                       "verse", "fiction", "story", "plot", "author"),
+    },
+    "ru": {
+        "math": ("теорем", "уравнени", "лемм", "интеграл", "производн",
+                 "алгебр", "геометри", "вероятност", "матриц", "многочлен",
+                 "топологи", "комбинатор", "доказательств", "следстви",
+                 "дифференциальн"),
+        "science": ("физик", "хими", "биолог", "молекул", "квант", "клетк",
+                    "ген", "эволюци", "эксперимент", "частиц", "белок",
+                    "термодинамик", "электромагнит", "организм", "астроном"),
+        "logic": ("логик", "силлогизм", "высказывани", "предикат", "аксиом",
+                  "дедукци", "умозаключени", "противоречи", "формальн"),
+        "ml": ("нейросет", "машинное обучение", "машинного обучения",
+               "градиент", "трансформер", "датасет", "функция потерь",
+               "обратное распространение", "переобучени"),
+        "literature": ("роман", "повест", "рассказ", "стихотвор", "глава",
+                       "герой", "сюжет", "проза", "поэм"),
+    },
+}
+
+#: Targets are text bytes, not file bytes.  The sum (~7.2 GB) is the 2B-token
+#: budget at the measured 3.34 bytes/token with ~10 % headroom for dedup and
+#: the held-out split.
+HF_ROUTES: dict[str, dict] = {
+    "wiki_en": {
+        "dataset": "wikimedia/wikipedia", "config": "20231101.en",
+        "text": "text", "title": "title", "url": "url", "lang": "en",
+        "licence": "CC-BY-SA-3.0", "source": "Wikipedia 2023-11-01 (HF)",
+        "default_domain": "encyclopedic",
+        "targets_mb": {"encyclopedic": 550, "math": 250, "science": 250,
+                       "logic": 120, "ml": 80},
+    },
+    "wiki_ru": {
+        "dataset": "wikimedia/wikipedia", "config": "20231101.ru",
+        "text": "text", "title": "title", "url": "url", "lang": "ru",
+        "licence": "CC-BY-SA-3.0", "source": "Википедия 2023-11-01 (HF)",
+        "default_domain": "encyclopedic",
+        "targets_mb": {"encyclopedic": 550, "math": 150, "science": 150,
+                       "logic": 80, "ml": 70},
+    },
+    "owm": {
+        "dataset": "open-web-math/open-web-math", "config": "default",
+        "text": "text", "url": "url", "lang": "en",
+        "licence": "ODC-By-1.0", "source": "OpenWebMath (HF)",
+        "default_domain": "math", "targets_mb": {"math": 1100},
+    },
+    "arxiv": {
+        "dataset": "ccdv/arxiv-summarization", "config": "document",
+        "fields": {"article": "science", "abstract": "ml"},
+        "lang": "en", "licence": "arXiv non-exclusive (see dataset card)",
+        "source": "arXiv full text + abstracts (HF ccdv/arxiv-summarization)",
+        "targets_mb": {"science": 700, "ml": 300},
+    },
+    "gutenberg": {
+        "dataset": "sedthh/gutenberg_english", "config": "default",
+        "text": "TEXT", "lang": "en", "licence": "public domain (US)",
+        "source": "Project Gutenberg (HF sedthh/gutenberg_english)",
+        "default_domain": "literature", "targets_mb": {"literature": 550},
+    },
+    "fineweb_ru": {
+        "dataset": "HuggingFaceFW/fineweb-2", "config": "rus_Cyrl",
+        "text": "text", "url": "url", "lang": "ru",
+        "licence": "ODC-By-1.0", "source": "FineWeb-2 rus_Cyrl (HF)",
+        "default_domain": None,
+        "targets_mb": {"math": 450, "science": 400, "logic": 200,
+                       "ml": 300, "literature": 250},
+    },
+}
+
+
+def _route_domain(text: str, lang: str, default: Optional[str]) -> Optional[str]:
+    """Return the keyword-routed domain for one document."""
+    low = text.lower()
+    best, best_hits = default, 0
+    for domain, stems in KEYWORDS[lang].items():
+        hits = sum(1 for stem in stems if stem in low)
+        if hits > best_hits:
+            best, best_hits = domain, hits
+    # Three distinct stems: two are too easy to hit by accident ("matrix" and
+    # "equation" in an article about a film, say), and the router's precision
+    # matters more than its recall -- the default domain catches the rest.
+    if best_hits < 3:
+        return default
+    return best
+
+
+def cmd_fetch_hf(args: argparse.Namespace) -> None:
+    """Stream Hugging Face datasets into per-domain shards.
+
+    One pass per route: each document is routed by keywords (see
+    :data:`KEYWORDS`), written to the matching shard, and stopped once the
+    per-domain byte target is met.  A ``.done`` marker prevents a re-run from
+    appending to a finished shard; ``--force`` starts it over.
+    """
+    from datasets import load_dataset
+
+    routes = [args.source] if args.source != "all" else list(HF_ROUTES)
+    if args.skip:
+        routes = [r for r in routes if r not in args.skip.split(",")]
+    for route in routes:
+        spec = HF_ROUTES[route]
+        targets = {d: int(mb * 1e6) for d, mb in spec["targets_mb"].items()}
+        fields = spec.get("fields") or {spec["text"]: spec["default_domain"]}
+        write = {d: 0 for d in targets}
+        sinks: dict[str, "object"] = {}
+        paths: dict[str, Path] = {}
+        for d in targets:
+            path = SHARDS / f"hf_{route}_{d}.jsonl"
+            done = path.with_suffix(".done")
+            paths[d] = path
+            if done.exists() and not args.force:
+                print(f"[skip] {route}/{d}: already done")
+                write[d] = targets[d]
+                continue
+            if args.force:
+                reset_shard(path, MANIFEST)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            sinks[d] = open(path, "a", encoding="utf-8")
+        if all(write[d] >= targets[d] for d in targets):
+            print(f"[skip] {route}: all targets met")
+            continue
+
+        print(f"[hf] {route}: {spec['dataset']} ({spec['config']}) -> "
+              f"{sum(targets.values())/1e6:.0f} MB")
+        kw = {"split": "train", "streaming": True}
+        if spec.get("config"):
+            kw["name"] = spec["config"]
+        ds = load_dataset(spec["dataset"], **kw)
+        seen = kept = 0
+        counts = {d: 0 for d in targets}
+        last = time.time()
+        try:
+            for ex in ds:
+                seen += 1
+                if all(write[d] >= targets[d] for d in targets):
+                    break
+                if spec.get("fields"):
+                    pairs = list(fields.items())
+                else:
+                    dom = _route_domain(str(ex.get(spec["text"]) or ""),
+                                        spec["lang"], spec["default_domain"])
+                    if dom is None or dom not in targets:
+                        continue
+                    pairs = [(spec["text"], dom)]
+                for field, dom in pairs:
+                    if write[dom] >= targets[dom]:
+                        continue
+                    raw = ex.get(field)
+                    if not isinstance(raw, str) or len(raw) < args.min_chars:
+                        continue
+                    text = normalize(raw)
+                    if not text or len(text) < args.min_chars:
+                        continue
+                    st = quality(text, spec["lang"], min_chars=args.min_chars)
+                    if not st.ok:
+                        continue
+                    doc = {"title": str(ex.get(spec.get("title", "")) or "")[:200],
+                           "text": text, "language": spec["lang"],
+                           "domain": dom, "source": spec["source"],
+                           "licence": spec["licence"],
+                           "url": str(ex.get(spec.get("url", "")) or "")}
+                    sinks[dom].write(json.dumps(doc, ensure_ascii=False) + "\n")
+                    write[dom] += len(text.encode("utf-8"))
+                    counts[dom] += 1
+                    kept += 1
+                if time.time() - last > 30:
+                    got = sum(write.values()) / 1e6
+                    print(f"  {route}: {got:6.1f} MB kept, {seen/1e3:8.1f}K seen")
+                    last = time.time()
+        finally:
+            for s in sinks.values():
+                s.close()
+        for d, path in paths.items():
+            if write[d] < targets[d] * 0.02:
+                if path.exists():
+                    path.unlink()
+                print(f"[warn] {route}/{d}: only {write[d]/1e6:.1f} MB")
+                continue
+            shard = record_shard(path, MANIFEST, source=spec["source"],
+                                 licence=spec["licence"], url="https://huggingface.co/datasets/"
+                                 + spec["dataset"], language=spec["lang"],
+                                 domain=d, docs=counts[d],
+                                 note=f"HF route {route}; keyword-routed, "
+                                      f"{'default domain' if spec.get('default_domain') else 'filtered'}")
+            path.with_suffix(".done").touch()
+            print(f"[done] {route}/{d}: {counts[d]} docs, {shard.bytes/1e6:.1f} MB")
+
+
+# ---------------------------------------------------------------------------
 # Build: dedup, mix, split, report
 # ---------------------------------------------------------------------------
 
@@ -563,6 +904,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--target-mb", type=float, default=15.0)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_fetch_code)
+
+    p = sub.add_parser("fetch-github")
+    p.add_argument("--target-mb", type=float, default=150.0)
+    p.add_argument("--repo-cap-mb", type=float, default=40.0)
+    p.add_argument("--min-chars", type=int, default=600)
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_fetch_github)
+
+    p = sub.add_parser("fetch-hf")
+    p.add_argument("--source", default="all",
+                   help="route name or 'all' (see HF_ROUTES)")
+    p.add_argument("--skip", default="", help="comma-separated routes to skip")
+    p.add_argument("--min-chars", type=int, default=600)
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_fetch_hf)
 
     p = sub.add_parser("build")
     p.add_argument("--budget-per-language-mb", type=float, default=200.0)

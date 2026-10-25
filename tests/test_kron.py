@@ -744,3 +744,44 @@ def test_nonlinear_mode_validation():
     with pytest.raises(ValueError):
         KronCompose(64, 64, 8, 8, L=4, K=2, composition="nonlinear",
                     nonlinear_mode="multiply")
+
+# ---------------------------------------------------------------------------
+# T17 -- sigma_mode: "off" removes the carry, "fixed" pins it, bank agrees
+# ---------------------------------------------------------------------------
+def test_T17_sigma_off_removes_the_carry():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=3, K=2, K_win=0, s_init=0.7,
+                    normalize_D=True, stop_gradient=False, sigma_mode="off")
+    assert torch.count_nonzero(m.sigma_values()) == 0
+    prev = torch.randn(3, 64, 64)
+    x = torch.randn(2, 5, 64)
+    with torch.no_grad():
+        y1, D1 = m(x, prev_D=prev, layer_idx=1)
+        y2, D2 = m(x, prev_D=None, layer_idx=1)
+    assert torch.allclose(y1, y2) and torch.allclose(D1, D2)
+
+
+def test_T17_sigma_fixed_is_constant_and_frozen():
+    torch.manual_seed(0)
+    m = KronCompose(64, 64, 8, 8, L=4, K=2, K_win=2, sigma_mode="fixed",
+                    sigma_value=0.3)
+    assert torch.allclose(m.sigma_values(), torch.full((4,), 0.3))
+    x = torch.randn(2, 4, 64)
+    y, _ = m(x)
+    y.square().mean().backward()
+    assert m.theta.grad is None or torch.count_nonzero(m.theta.grad) == 0
+
+
+@pytest.mark.parametrize("mode", ["off", "fixed"])
+def test_T17_bank_matches_reference_in_sigma_modes(mode):
+    cfg = _tiny_model_cfg()
+    cfg["model"]["kron"].update({"sigma_mode": mode, "sigma_value": 0.5})
+    torch.manual_seed(0)
+    m = KronTransformer(cfg)
+    assert m._banks, "expected the batched prelude to be active"
+    x = torch.randint(0, 256, (2, 16))
+    with torch.no_grad():
+        a = m(x)["logits"].clone()
+        m._banks = []
+        b = m(x)["logits"].clone()
+    assert torch.allclose(a, b, atol=1e-5), (mode, (a - b).abs().max().item())
