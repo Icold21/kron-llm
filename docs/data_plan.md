@@ -107,13 +107,40 @@ At ~7k tokens/s, 1B tokens is ≈40 h of GPU time and 2B is ≈80 h.
   samples that parse (Python `ast.parse`) and the character-level round-trip
   after tokenization.
 
-## 6. Immediate steps
+## 6. Implementation
 
-- [ ] freeze the shard manifest schema and create `data/bilingual/manifest.jsonl`;
-- [ ] pilot: ~250 MB per language across the five domains, run the full
-      pipeline and inspect samples (this is a pipeline test, not training);
-- [ ] train 8K and 16K tokenizers on the pilot, compare fertility;
-- [ ] only then start the full 0.5–2B-token download and build.
+The pipeline is implemented and does not depend on anything outside the
+standard library:
+
+| stage | where |
+|---|---|
+| MediaWiki cleaning, filters, MinHash dedup, mixing | `kronllm/bilingual.py` |
+| fetch (Wikipedia, Wikisource, Gutenberg, CPython stdlib) | `scripts/build_bilingual.py` |
+| tokenisation into uint16 memmaps | `scripts/prepare_bilingual_bin.py` |
+| tests | `tests/test_bilingual.py` (9 tests) |
+
+```bash
+python scripts/build_bilingual.py fetch-wiki --lang ru --domain math --target-mb 40
+python scripts/build_bilingual.py fetch-wikisource --lang ru --domain literature
+python scripts/build_bilingual.py fetch-gutenberg --lang en --domain literature
+python scripts/build_bilingual.py fetch-code --target-mb 12
+python scripts/build_bilingual.py build --target-mb 250
+python scripts/prepare_bilingual_bin.py --vocab 8192
+```
+
+Every fetcher writes one JSONL shard and one manifest row with `source`,
+`licence`, `url`, `sha256`, `bytes`, `language`, `domain`. `record_shard`
+refuses an unknown licence, so a shard without provenance cannot enter the
+mix.
+
+## 7. Immediate steps
+
+- [x] freeze the shard manifest schema and create `data/bilingual/manifest.jsonl`;
+- [x] implement normalisation, quality filters, deduplication, mixing and the
+      held-out split;
+- [ ] reach the 250 MB-per-language pilot target (the first build is smaller);
+- [ ] compare 8K and 16K tokenizers on the pilot;
+- [ ] only then start the full 0.5-2B-token download and build.
 
 The pilot is deliberately small: it is cheaper to discover a licence or
 quality problem on 500 MB than on 8 GB.

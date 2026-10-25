@@ -36,20 +36,27 @@ Once that set exists, every freeze/scale decision moves to its held-out splits;
 TinyStories is kept only to catch regressions in the code path (same config,
 expected bpb), not to choose the final model.
 
-## 2. Where we are (2026-10-23)
+## 2. Where we are (2026-10-25)
 
 | result | status |
 |---|---|
-| Q2 (2.08M, BPE-1024) | **shipped**, 0.839 bpb on TinyStories EN |
+| **Q8g-long** (2.85M, BPE-4096, gated FFN) | **shipped**, **0.7542 bpb** at 61.4M tokens, 4.09 GB |
+| Q6@10k (2.47M, BPE-4096) | previous best, 0.7644 at the same budget |
+| Q6 (BPE-4096) | win: 0.8489 bpb at 24.6M tokens, 4.28 GB peak |
 | Q4 (full backprop) | win: 0.9248 vs Q2 0.962 at step 4,000 |
-| Q6 (BPE-4096) | win: **0.8489 bpb** at step 4,000, 4.28 GB peak |
+| Q8w (gated, 2.47M, 20 layers) | win: 0.8359 vs Q6 0.8489 — the FFN gain is architectural |
+| Q9 / Q9k (bilinear GLU FFN) | **negative**: 0.8740 / 0.8673 vs Q6 0.8489 |
+| E25/E26/E26b (nonlinear composition) | **negative**: 1.519 / 1.568 / 1.591 vs E8 1.479 |
 | Q5 (`K=24`, 7.75M) | **negative**: 0.9530 at 4k, layer collapse (`cos_prev_max` 0.99999) |
-| Q7 (Kronecker embedding) | **negative**: 0.9533 at 4k vs Q6 0.8489; the dense table stays |
+| Q7 (Kronecker embedding) | **negative**: 0.9533 at 4k vs Q6 0.8489 |
 | E14 (sum composition) | negative: rank is not the quality bottleneck |
+| E19-E22 (weight sharing / recursion) | negative as a default; usable as adaptive compute |
 
-The architecture is **not frozen** yet. Scaling `K` is closed at this budget;
-the remaining levers are width/depth, tokenizer size, embedding storage and
-context length.
+The architecture is **frozen at Q8g**: product composition, full backprop,
+BPE-4096, gated Kronecker FFN. Everything that broke the single-GEMM fusion
+lost quality, and the one structural win (the gate) was confirmed at matched
+parameters. Remaining levers are data, context length and scale toward the 10M
+ceiling.
 
 ## 3. Phase 0 — architecture freeze (gate A)
 

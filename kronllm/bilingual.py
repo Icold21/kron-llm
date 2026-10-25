@@ -160,6 +160,8 @@ def normalize(text: str, keep_indent: bool = False) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = text.replace("\u00ad", "")          # soft hyphen
     text = text.replace("\ufeff", "")
+    for space in ("\u00a0", "\u2009", "\u202f", "\u2007"):
+        text = text.replace(space, " ")
     if keep_indent:
         lines = [ln.rstrip() for ln in text.split("\n")]
         out: list[str] = []
