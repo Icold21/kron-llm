@@ -37,8 +37,9 @@ under 10 MB, so it fits a 6 GB GPU and runs on CPU. The reference
 configuration is 9,938,886 parameters (d=512, 25 layers, d×d = 16×32
 Kronecker factors, K=10, 8K bilingual BPE). Purpose, success criteria, corpus
 contract and compute plan are in [`docs/goal_10m.md`](docs/goal_10m.md); the
-training is scheduled for a Kaggle T4, with the 1660 Ti as the restartable
-fallback.
+corpus itself is published as
+[**Icold21/kron-corpus**](https://github.com/Icold21/kron-corpus). Training is
+scheduled for a Kaggle T4, with the 1660 Ti as the restartable fallback.
 
 | model | parameters | tokens | bits/byte | note |
 |---|---:|---:|---:|---|
@@ -224,9 +225,10 @@ and this is deliberate: it is a *development bench* that separates architecture
 effects from data effects, and it fits in a few minutes of GPU time.
 
 TinyStories is **not** the target corpus. The final model is trained on a
-bilingual English/Russian corpus (60/40 by bytes, code at ~15 %); the pilot
-build and its measured composition are in [§14](#14-the-bilingual-corpus)
-and [docs/data_plan.md](docs/data_plan.md).
+bilingual English/Russian corpus (60/40 by bytes, science-heavy); the corpus is
+published separately as
+**[Icold21/kron-corpus](https://github.com/Icold21/kron-corpus)**, and its
+measured composition is summarised in [§14](#14-the-bilingual-corpus).
 
 Every conclusion below that mentions "quality" should be read as "quality on
 the development bench".
@@ -600,39 +602,40 @@ current_progress.md rolling log of the experiment queue
 
 ## 14. The bilingual corpus
 
-The architecture is frozen at Q8g; the next phase is data. The first
-end-to-end build of the English/Russian pilot is in place, with the full plan,
-sources and licences in [docs/data_plan.md](docs/data_plan.md):
+The corpus now lives in its own repository:
+**[Icold21/kron-corpus](https://github.com/Icold21/kron-corpus)** — a
+2B-token English/Russian corpus with a science accent, published with the full
+pipeline, the per-shard manifest and the measured composition.
 
 | stage | result |
 |---|---|
-| shards fetched | 12 · 420 MB · 35,919 documents |
-| by language | EN 231 MB · RU 189 MB |
-| licences | CC BY-SA 4.0 (408 MB) · PSF-2.0 (13 MB) |
-| exact + near dedup | 34,912 kept · 2.8 % removed |
-| mixed corpus | **273 MB · RU share 39 %** |
-| tokenizer | 8K BPE · 80.3M train tokens · 3.34 bytes/token |
+| fetched text | 7.3 GB · ~795k documents |
+| target size | **~2.0B tokens** (8K BPE, 3.34 bytes/token measured) |
+| by language | EN 4.9 GB · RU 2.4 GB at fetch; the mix enforces 60/40 by bytes |
+| domains | math 25 %, science 14 %, ML 12 %, logic 10 %, code 15 %, literature 11 %, encyclopedic 9 %, CS/engineering 3 %, humour 1 %, identity 1 % |
+| dedup | MinHash (Jaccard 0.8) · held-out 2 % per language, disjoint |
+| tokenizer | 8K byte-level BPE, bilingual, fertility recorded per language |
 
-**One finding changes the ratio policy.** Bytes per token is not comparable
-across scripts: both languages receive ≈2.8 characters per token, but Cyrillic
-costs two UTF-8 bytes per character. A 60/40 *byte* split therefore gives only
-**33 % of tokens** to Russian, not the 45-47 % the plan predicted. The next
-stage has to choose byte share or token share as the contract and record one of
-them; the meta file stores both.
+**One finding fixed the ratio policy.** Bytes per token is not comparable across
+scripts: both languages receive ≈2.8 characters per token, but Cyrillic costs
+two UTF-8 bytes per character. A 60/40 *byte* split therefore gives only
+**33 % of tokens** to Russian, not the 45–47 % the original plan predicted. The
+contract is now stated in bytes (stable, tokenizer-independent) and the token
+share is recorded next to it in `tokenizer_meta.json`.
 
-Known gaps, reported rather than hidden: code is 4.2 % of the mixed corpus
-against a 15 % target (the CPython standard library was the only permissively
-licensed source in the pilot) and Russian code is absent; `en/math` reached
-33.5 of 52.2 MB. The next build adds MIT/Apache repositories with
-per-repository licence records and grows the pilot toward 250 MB per language.
+Known gaps are reported rather than hidden, and the corpus README repeats them:
+logic lands at ~3 % against a 10 % quota (only formal proofs scale), ML at
+~5 % against 12 % (most prose is paywalled), and Russian code is absent by
+nature. The mixer emits these as shortfalls; nothing is padded with
+mislabelled text.
 
 Next steps:
 
-1. close the code gap, then retrain the tokenizer (8K vs 16K) on the larger mix;
-2. train Q8g at 10M scale on the corpus, with TinyStories kept only as a sanity
-   bench;
+1. train Q8g at 10M scale on the corpus on a Kaggle T4 (checkpointed), with
+   TinyStories kept only as a sanity bench;
+2. close the tokenizer question (8K vs 16K) before the run starts;
 3. package the result, then compare against public small-model baselines
-   before any distillation step.
+   before the SFT stage.
 
 The long-term plan, including the SFT families and the comparison phase, is in
 [docs/roadmap.md](docs/roadmap.md).
@@ -646,6 +649,6 @@ MIT — see [LICENSE](LICENSE).
   title  = {KronLLM: a compact fully Kronecker-parameterised language model},
   author = {Ivan Kholodilo},
   year   = {2026},
-  url    = {https://github.com/Icold21/kron_llm}
+  url    = {https://github.com/Icold21/kron-llm}
 }
 ```

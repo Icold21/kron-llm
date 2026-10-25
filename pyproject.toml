@@ -32,9 +32,9 @@ hf = ["transformers>=4.40"]
 dev = ["pytest>=7.4", "ruff>=0.5", "jupyter>=1.0"]
 
 [project.urls]
-Homepage = "https://github.com/Icold21/kron_llm"
-Repository = "https://github.com/Icold21/kron_llm"
-Issues = "https://github.com/Icold21/kron_llm/issues"
+Homepage = "https://github.com/Icold21/kron-llm"
+Repository = "https://github.com/Icold21/kron-llm"
+Issues = "https://github.com/Icold21/kron-llm/issues"
 
 [project.scripts]
 kronllm = "kronllm.cli:main"

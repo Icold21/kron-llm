@@ -43,7 +43,7 @@ from kronllm.bilingual import (DOMAIN_QUOTAS, append_jsonl, clean_wikitext,
 from kronllm.bilingual import Shard
 
 UA = {"User-Agent": "KronLLM-research/0.1 (bilingual corpus pilot; "
-                    "https://github.com/Icold21/kron_llm)"}
+                    "https://github.com/Icold21/kron-llm)"}
 ROOT = Path("data/bilingual")
 RAW = ROOT / "raw"
 SHARDS = ROOT / "shards"
@@ -1075,6 +1075,61 @@ def cmd_fetch_wiki_titles(args: argparse.Namespace) -> None:
     print(f"[done] {kept} articles, {shard.bytes/1e6:.1f} MB -> {out.name}")
 
 
+def cmd_fetch_gutenberg_ids(args: argparse.Namespace) -> None:
+    """Fetch an explicit list of Gutenberg ids through the pglaf mirror.
+
+    The catalog CSV is unusable from this network (6 KB/s), but individual
+    texts come down fine, so a curated id list is the reliable path for a
+    small themed slice.
+    """
+    out = SHARDS / f"gutenberg_{args.lang}_{args.domain}_ids.jsonl"
+    if args.force:
+        reset_shard(out, MANIFEST)
+    elif out.exists():
+        print(f"[skip] {out} exists")
+        return
+    ids = [int(x) for x in args.ids.split(",") if x.strip()]
+    written = kept = 0
+    with open(out, "a", encoding="utf-8") as sink:
+        for book_id in ids:
+            try:
+                raw = _get(GUT_MIRROR.format(id=book_id),
+                           timeout=180).decode("utf-8", errors="replace")
+            except RuntimeError as exc:
+                print(f"[warn] {book_id}: {exc}")
+                continue
+            match = re.search(r"Title:\s*(.+)", raw[:2000])
+            title = match.group(1).strip() if match else f"gutenberg/{book_id}"
+            body = _RE_GUT_START.split(raw, maxsplit=1)[-1]
+            body = _RE_GUT_END.split(body, maxsplit=1)[0]
+            text = normalize(body)
+            if not quality(text, args.lang, min_chars=args.min_chars).ok:
+                print(f"[skip] {book_id}: quality")
+                continue
+            doc = {"title": title, "text": text, "language": args.lang,
+                   "domain": args.domain,
+                   "source": "Project Gutenberg (pglaf mirror)",
+                   "licence": "public-domain",
+                   "url": f"https://www.gutenberg.org/ebooks/{book_id}"}
+            sink.write(json.dumps(doc, ensure_ascii=False) + "\n")
+            written += len(text.encode("utf-8"))
+            kept += 1
+            print(f"  [{kept}] {book_id} {title[:50]} {written/1e6:.1f} MB")
+        sink.flush()
+    if not kept:
+        print("[warn] nothing fetched")
+        if out.exists():
+            out.unlink()
+        return
+    shard = record_shard(out, MANIFEST,
+                         source="Project Gutenberg (pglaf mirror)",
+                         licence="public-domain",
+                         url="https://gutenberg.pglaf.org/",
+                         language=args.lang, domain=args.domain, docs=kept,
+                         note=f"curated ids {args.ids}")
+    print(f"[done] {kept} books, {shard.bytes/1e6:.1f} MB -> {out.name}")
+
+
 # ---------------------------------------------------------------------------
 # Build: dedup, mix, split, report
 # ---------------------------------------------------------------------------
@@ -1316,6 +1371,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--min-chars", type=int, default=2000)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_fetch_wiki_titles)
+
+    p = sub.add_parser("fetch-gutenberg-ids")
+    p.add_argument("--ids", required=True, help="comma-separated book ids")
+    p.add_argument("--domain", default="humour")
+    p.add_argument("--lang", default="en")
+    p.add_argument("--min-chars", type=int, default=4000)
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_fetch_gutenberg_ids)
 
     p = sub.add_parser("build")
     p.add_argument("--budget-per-language-mb", type=float, default=200.0)

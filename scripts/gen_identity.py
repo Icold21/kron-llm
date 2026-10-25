@@ -235,7 +235,7 @@ def generate(lang: str, n: int, seed: int,
                      "language": lang, "domain": "identity",
                      "source": f"synthetic: {MODEL} (local Ollama)",
                      "licence": "CC0-1.0",
-                     "url": "https://github.com/Icold21/kron_llm",
+                     "url": "https://github.com/Icold21/kron-llm",
                      "note": "generated from a fixed prompt family; "
                              "identity facts supplied in the prompt"})
         print(f"  [{len(docs):3d}/{n}] {len(text):4d} chars")
@@ -278,7 +278,7 @@ def main() -> None:
         n = append_jsonl(path, docs)
         shard = record_shard(path, MANIFEST, source=f"synthetic: {MODEL}",
                              licence="CC0-1.0",
-                             url="https://github.com/Icold21/kron_llm",
+                             url="https://github.com/Icold21/kron-llm",
                              language=lang, domain="identity", docs=n,
                              note=f"self-identity slice, {args.style} style, "
                                   "prompt-constrained")
