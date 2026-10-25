@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import datetime
 import json
 import math
 import os
@@ -13,7 +14,9 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import numpy as np
 import torch
+import torch.distributed as dist
 import torch.nn as nn
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from .config import save_config
 from .data import ByteDataset, open_dataset
@@ -210,6 +213,31 @@ def diagnostics(model: nn.Module, ds: ByteDataset, batch_size: int,
 # ---------------------------------------------------------------------------
 # train
 # ---------------------------------------------------------------------------
+def _init_process_group(rank: int, world_size: int) -> None:
+    """Initialise DDP, with a Windows fallback for the rendezvous store.
+
+    Some Windows wheels are built without libuv, so the default TCP store
+    aborts with "use_libuv was requested but PyTorch was build without libuv
+    support".  Retrying with an explicitly constructed store fixes it; on Linux
+    (Kaggle) the default path is used unchanged.
+    """
+    backend = "nccl" if torch.cuda.is_available() else "gloo"
+    try:
+        dist.init_process_group(backend=backend, rank=rank,
+                                world_size=world_size)
+        return
+    except Exception:                                   # noqa: BLE001
+        if dist.is_initialized():
+            dist.destroy_process_group()
+    addr = os.environ.get("MASTER_ADDR", "127.0.0.1")
+    port = int(os.environ.get("MASTER_PORT", "29500"))
+    store = dist.TCPStore(addr, port, world_size, rank == 0,
+                          timeout=datetime.timedelta(minutes=30),
+                          use_libuv=False)
+    dist.init_process_group(backend=backend, store=store, rank=rank,
+                            world_size=world_size)
+
+
 def train(cfg: Mapping[str, Any], run_dir: str | Path,
           resume: Optional[str] = None) -> Dict[str, Any]:
     tc = cfg["training"]
@@ -217,12 +245,30 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     seed = int(cfg.get("seed", 42))
     set_seed(seed, deterministic=bool(tc.get("deterministic", True)))
 
-    run_dir = Path(run_dir)
-    run_dir.mkdir(parents=True, exist_ok=True)
-    save_config(cfg, run_dir / "config.yaml")
+    # -- distributed ----------------------------------------------------
+    # `torchrun --nproc_per_node=N` sets WORLD_SIZE/RANK/LOCAL_RANK.  Without
+    # it the run is the single-process path exactly as before.
+    world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    ddp = world_size > 1
+    rank = int(os.environ.get("RANK", "0"))
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    is_main = rank == 0
+    if ddp:
+        if not dist.is_initialized():
+            _init_process_group(rank, world_size)
+        if torch.cuda.is_available():
+            torch.cuda.set_device(local_rank)
 
-    device = torch.device(tc.get("device", "cuda")
-                          if torch.cuda.is_available() else "cpu")
+    run_dir = Path(run_dir)
+    if is_main:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        save_config(cfg, run_dir / "config.yaml")
+
+    if torch.cuda.is_available():
+        device = torch.device(f"cuda:{local_rank}" if ddp
+                              else tc.get("device", "cuda"))
+    else:
+        device = torch.device("cpu")
     data_dir = Path(dc.get("data_dir", "data"))
     train_ds = open_dataset(cfg, "train")
     val_ds = open_dataset(cfg, "val")
@@ -244,8 +290,17 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
         model.load_state_dict(state)
         print(f"[init] weights <- {source} (step {payload.get('step', 'n/a') if isinstance(payload, dict) else 'n/a'})")
     model = model.to(device)
+    raw_model = model                       # unwrapped: eval, diagnostics, save
     if tc.get("compile") and hasattr(torch, "compile"):
         model = torch.compile(model)
+    if ddp:
+        # theta is inert when sigma_mode != "learned", so the flag is needed
+        # there; the default configuration has no unused parameters.
+        kc = cfg["model"]["kron"]
+        unused = str(kc.get("sigma_mode", "learned")) != "learned"
+        model = DDP(model,
+                    device_ids=[local_rank] if device.type == "cuda" else None,
+                    find_unused_parameters=unused)
 
     opt = build_optimizer(model, tc)
     init_base_lrs(opt)
@@ -266,7 +321,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     random_recurse = (bool(tc.get("recurse_random"))
                       and getattr(model, "max_recurse", 1) > 1)
 
-    logger = CSVLogger(run_dir / "log.csv")
+    logger = CSVLogger(run_dir / "log.csv") if is_main else None
     tb = None
     if cfg.get("logging", {}).get("tensorboard"):
         try:
@@ -286,13 +341,15 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
             print(f"[warn] wandb disabled: {exc}")
 
     eff_bs = int(tc["batch_size"]) * int(tc["grad_accum"])
-    comp = comparison_report(model, int(dc["seq_len"]), batch_size=eff_bs)
-    print(f"[model] {model.n_params:,} params "
-          f"({model.n_params_matrix:,} in matrix layers), "
-          f"{comp['flops_per_token']/1e6:.1f} MFLOP/token "
-          f"@ batch {eff_bs}")
+    comp = comparison_report(raw_model, int(dc["seq_len"]), batch_size=eff_bs)
+    if is_main:
+        print(f"[model] {raw_model.n_params:,} params "
+              f"({raw_model.n_params_matrix:,} in matrix layers), "
+              f"{comp['flops_per_token']/1e6:.1f} MFLOP/token "
+              f"@ batch {eff_bs}"
+              + (f" | ddp world_size={world_size}" if ddp else ""))
 
-    gen = torch.Generator(device="cpu").manual_seed(seed)
+    gen = torch.Generator(device="cpu").manual_seed(seed + 1000 * rank)
     start_step = 0
     best_ppl = float("inf")
     bad_evals = 0
@@ -300,11 +357,12 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
 
     if resume:
         ck = torch.load(resume, map_location="cpu")
-        model.load_state_dict(ck["model"])
+        raw_model.load_state_dict(ck["model"])
         opt.load_state_dict(ck["optimizer"])
         start_step = int(ck.get("step", 0))
         best_ppl = float(ck.get("val_ppl", float("inf")))
-        print(f"[resume] step {start_step}, best ppl {best_ppl:.3f}")
+        if is_main:
+            print(f"[resume] step {start_step}, best ppl {best_ppl:.3f}")
 
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
@@ -321,7 +379,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     while step < total_steps and not stop:
         for _ in range(accum):
             if random_recurse:
-                model.set_recurse(random.randint(1, model.max_recurse))
+                raw_model.set_recurse(random.randint(1, raw_model.max_recurse))
             x, y = train_ds.get_batch(bs, device, gen)
             with torch.amp.autocast("cuda", dtype=torch.float16, enabled=use_amp):
                 out = model(x, y)
@@ -362,50 +420,57 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                 "sec_per_step": dt / max(1, log_every),
             }
             row.update({k: v for k, v in grads.items()})
-            logger.log(row)
-            if tb:
-                for k, v in row.items():
-                    if isinstance(v, (int, float)):
-                        tb.add_scalar(f"train/{k}", v, step)
-            if wb:
-                wb.log({f"train/{k}": v for k, v in row.items()
-                        if isinstance(v, (int, float))}, step=step)
-            print(f"step {step:5d} | loss {train_loss:.4f} | "
-                  f"ppl {math.exp(min(train_loss,50)):.2f} | "
-                  f"gnorm {gnorm:.3f} | {dt/max(1,log_every)*1000:.0f} ms/step")
+            if is_main:
+                logger.log(row)
+                if tb:
+                    for k, v in row.items():
+                        if isinstance(v, (int, float)):
+                            tb.add_scalar(f"train/{k}", v, step)
+                if wb:
+                    wb.log({f"train/{k}": v for k, v in row.items()
+                            if isinstance(v, (int, float))}, step=step)
+                print(f"step {step:5d} | loss {train_loss:.4f} | "
+                      f"ppl {math.exp(min(train_loss,50)):.2f} | "
+                      f"gnorm {gnorm:.3f} | {dt/max(1,log_every)*1000:.0f} ms/step")
             running, running_n = 0.0, 0
 
         if step % eval_every == 0 or step == total_steps:
             if random_recurse:
-                model.set_recurse(model.max_recurse)
-            ev = evaluate(model, val_ds, bs, device, eval_batches, str(tc["amp"]))
+                raw_model.set_recurse(raw_model.max_recurse)
+            # Every rank evaluates the same fixed validation batches, so the
+            # numbers (and therefore early-stop decisions) agree without a
+            # broadcast.  Only rank 0 logs and writes checkpoints.
+            ev = evaluate(raw_model, val_ds, bs, device, eval_batches, str(tc["amp"]))
             ev["val_bpb"] = bits_per_byte(ev["val_loss"], bpt)
-            row = {"step": step, "split": "val", **ev}
-            logger.log(row)
-            if tb:
-                tb.add_scalar("val/loss", ev["val_loss"], step)
-                tb.add_scalar("val/ppl", ev["val_ppl"], step)
-                tb.add_scalar("val/bpb", ev["val_bpb"], step)
-            if wb:
-                wb.log({"val/loss": ev["val_loss"], "val/ppl": ev["val_ppl"],
-                        "val/bpb": ev["val_bpb"]}, step=step)
-            print(f"  [val] step {step:5d} | loss {ev['val_loss']:.4f} | "
-                  f"ppl {ev['val_ppl']:.2f} | bpb {ev['val_bpb']:.3f}")
+            if is_main:
+                row = {"step": step, "split": "val", **ev}
+                logger.log(row)
+                if tb:
+                    tb.add_scalar("val/loss", ev["val_loss"], step)
+                    tb.add_scalar("val/ppl", ev["val_ppl"], step)
+                    tb.add_scalar("val/bpb", ev["val_bpb"], step)
+                if wb:
+                    wb.log({"val/loss": ev["val_loss"], "val/ppl": ev["val_ppl"],
+                            "val/bpb": ev["val_bpb"]}, step=step)
+                print(f"  [val] step {step:5d} | loss {ev['val_loss']:.4f} | "
+                      f"ppl {ev['val_ppl']:.2f} | bpb {ev['val_bpb']:.3f}")
 
             if ev["val_ppl"] < best_ppl:
                 best_ppl = ev["val_ppl"]
                 bad_evals = 0
-                torch.save({"model": model.state_dict(), "cfg": dict(cfg),
-                            "step": step, "val_ppl": best_ppl},
-                           run_dir / "best.pt")
+                if is_main:
+                    torch.save({"model": raw_model.state_dict(), "cfg": dict(cfg),
+                                "step": step, "val_ppl": best_ppl},
+                               run_dir / "best.pt")
             else:
                 bad_evals += 1
                 if bad_evals >= patience:
-                    print(f"[early-stop] no improvement for {bad_evals} evals")
+                    if is_main:
+                        print(f"[early-stop] no improvement for {bad_evals} evals")
                     stop = True
 
-            if spectral_every and (step % spectral_every == 0 or step == total_steps):
-                dg = diagnostics(model, val_ds, bs, device, spectral=True,
+            if spectral_every and (step % spectral_every == 0 or step == total_steps) and is_main:
+                dg = diagnostics(raw_model, val_ds, bs, device, spectral=True,
                                  amp=str(tc["amp"]))
                 logger.log({"step": step, "split": "diag", **{
                     k: v for k, v in dg.items() if isinstance(v, (int, float))}})
@@ -419,18 +484,19 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                 history.append({"step": step, **dg})
 
     if random_recurse:
-        model.set_recurse(model.max_recurse)
-    torch.save({"model": model.state_dict(), "cfg": dict(cfg),
-                "step": step, "val_ppl": best_ppl}, run_dir / "last.pt")
+        raw_model.set_recurse(raw_model.max_recurse)
+    if is_main:
+        torch.save({"model": raw_model.state_dict(), "cfg": dict(cfg),
+                    "step": step, "val_ppl": best_ppl}, run_dir / "last.pt")
 
     elapsed = time.time() - t_start
     peak_vram = 0.0
     if device.type == "cuda":
         peak_vram = torch.cuda.max_memory_allocated(device) / 1e9
 
-    final = evaluate(model, val_ds, bs, device, eval_batches, str(tc["amp"]))
-    dg = diagnostics(model, val_ds, bs, device, spectral=True,
-                     amp=str(tc["amp"]))
+    final = evaluate(raw_model, val_ds, bs, device, eval_batches, str(tc["amp"]))
+    dg = diagnostics(raw_model, val_ds, bs, device, spectral=True,
+                     amp=str(tc["amp"])) if is_main else {}
 
     results = {
         "experiment": cfg.get("experiment", "run"),
@@ -477,17 +543,21 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
         "theta_grad_norm": dg.get("theta_grad_norm"),
         "config": json.loads(json.dumps(cfg, default=str)),
     }
-    with open(run_dir / "results.json", "w", encoding="utf-8") as fh:
-        json.dump(results, fh, indent=2)
-    with open(run_dir / "diagnostics.json", "w", encoding="utf-8") as fh:
-        json.dump({"final": dg, "history": history}, fh, indent=2)
+    if is_main:
+        with open(run_dir / "results.json", "w", encoding="utf-8") as fh:
+            json.dump(results, fh, indent=2)
+        with open(run_dir / "diagnostics.json", "w", encoding="utf-8") as fh:
+            json.dump({"final": dg, "history": history}, fh, indent=2)
 
-    logger.close()
-    if tb:
-        tb.close()
-    if wb:
-        wb.finish()
+        logger.close()
+        if tb:
+            tb.close()
+        if wb:
+            wb.finish()
 
-    print(f"[done] best val ppl {best_ppl:.3f} | {elapsed/60:.1f} min | "
-          f"peak VRAM {peak_vram:.2f} GB")
+        print(f"[done] best val ppl {best_ppl:.3f} | {elapsed/60:.1f} min | "
+              f"peak VRAM {peak_vram:.2f} GB")
+    if ddp:
+        dist.barrier()
+        dist.destroy_process_group()
     return results

@@ -62,6 +62,8 @@ CATEGORIES: dict[str, dict[str, list[str]]] = {
         "encyclopedic": ["География", "История", "Культура", "Техника"],
         "ml": ["Машинное обучение", "Искусственный интеллект",
                "Нейронные сети", "Обработка естественного языка"],
+        "cs": ["Информатика", "Программная инженерия", "Техника",
+               "Программирование", "Алгоритмы"],
     },
     "en": {
         "math": ["Mathematics", "Algebra", "Mathematical analysis",
@@ -72,6 +74,8 @@ CATEGORIES: dict[str, dict[str, list[str]]] = {
         "encyclopedic": ["Geography", "History", "Culture", "Technology"],
         "ml": ["Machine learning", "Artificial intelligence",
                "Artificial neural networks", "Deep learning"],
+        "cs": ["Computer science", "Software engineering", "Engineering",
+               "Algorithms", "Programming languages"],
     },
 }
 
@@ -215,7 +219,8 @@ def fetch_wikitext(site: str, lang: str, titles: Sequence[str],
 def cmd_fetch_wiki(args: argparse.Namespace) -> None:
     """Fetch and clean one MediaWiki domain shard."""
     site = args.site
-    out = SHARDS / f"{site}_{args.lang}_{args.domain}.jsonl"
+    suffix = getattr(args, "suffix", "") or ""
+    out = SHARDS / f"{site}_{args.lang}_{args.domain}{suffix}.jsonl"
     source = {"wikipedia": "Wikipedia", "wikisource": "Wikisource"}[site]
     licence = "CC-BY-SA-4.0"
     url = f"https://{args.lang}.{site}.org/"
@@ -226,7 +231,10 @@ def cmd_fetch_wiki(args: argparse.Namespace) -> None:
         print(f"[skip] {out} exists (use --force to rebuild)")
         return
 
-    roots = [args.category] if args.category else CATEGORIES[args.lang][args.domain]
+    if args.category:
+        roots = [c.strip() for c in args.category.split(",") if c.strip()]
+    else:
+        roots = CATEGORIES[args.lang][args.domain]
     # 20 KB per article is the observed average after cleaning; 1.7x headroom
     # covers the quality filter.  Capping the crawl matters: walking a whole
     # top-level category at depth 2 takes minutes and we only need a few
@@ -283,14 +291,18 @@ _RE_GUT_END = re.compile(r"\*\*\*\s*END OF (?:THE|THIS) PROJECT GUTENBERG.*?\*\*
                          re.S | re.I)
 
 
-def _gutendex(lang: str, page: int) -> dict:
+def _gutendex(lang: str, page: int, topic: str | None = None) -> dict:
     url = f"https://gutendex.com/books?languages={lang}&page={page}"
+    if topic:
+        url += "&topic=" + urllib.parse.quote(topic)
     return json.loads(_get(url, timeout=120))
 
 
 def cmd_fetch_gutenberg(args: argparse.Namespace) -> None:
     """Fetch public-domain books from Project Gutenberg via the gutendex API."""
-    out = SHARDS / f"gutenberg_{args.lang}_{args.domain}.jsonl"
+    topic = getattr(args, "topic", None)
+    slug = f"_{re.sub(r'[^a-z0-9]+', '_', topic.lower()).strip('_')}" if topic else ""
+    out = SHARDS / f"gutenberg_{args.lang}_{args.domain}{slug}.jsonl"
     if args.force:
         reset_shard(out, MANIFEST)
     elif out.exists():
@@ -301,7 +313,7 @@ def cmd_fetch_gutenberg(args: argparse.Namespace) -> None:
     docs: list[dict] = []
     page = 1
     while written < target and page <= args.max_pages:
-        listing = _gutendex(args.lang, page)
+        listing = _gutendex(args.lang, page, topic)
         books = listing.get("results", [])
         if not books:
             break
@@ -429,9 +441,24 @@ def _notebook_text(raw: str) -> str:
 
 
 def _download_tarball(repo: str, branch: str) -> bytes:
-    """Download a repository tarball (codeload) into memory."""
-    url = f"https://codeload.github.com/{repo}/tar.gz/refs/heads/{branch}"
-    return _get(url, timeout=300, retries=2)
+    """Download a repository tarball (codeload, then a mirror).
+
+    Direct codeload connections reset on this machine often enough that a
+    fallback matters for large repositories like mathlib4.
+    """
+    urls = [
+        f"https://codeload.github.com/{repo}/tar.gz/refs/heads/{branch}",
+        f"https://ghproxy.com/https://github.com/{repo}/archive/refs/"
+        f"heads/{branch}.tar.gz",
+    ]
+    last: Optional[Exception] = None
+    for url in urls:
+        try:
+            return _get(url, timeout=600, retries=1)
+        except RuntimeError as exc:
+            print(f"[warn] {url}: {exc}")
+            last = exc
+    raise RuntimeError(f"tarball download failed for {repo}") from last
 
 
 def cmd_fetch_github(args: argparse.Namespace) -> None:
@@ -977,7 +1004,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         p.add_argument("--lang", choices=["en", "ru"], required=True)
         p.add_argument("--domain", choices=list(DOMAIN_QUOTAS), required=True)
         p.add_argument("--category", default=None,
-                       help="override the seed category list")
+                       help="comma-separated override of the seed categories")
+        p.add_argument("--suffix", default="",
+                       help="filename suffix, for a second shard in one domain")
         p.add_argument("--depth", type=int, default=2)
         p.add_argument("--target-mb", type=float, default=25.0)
         p.add_argument("--min-chars", type=int, default=600)
@@ -990,6 +1019,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = sub.add_parser("fetch-gutenberg")
     p.add_argument("--lang", default="en", choices=["en", "ru"])
     p.add_argument("--domain", default="literature")
+    p.add_argument("--topic", default=None,
+                   help="gutendex topic filter, e.g. astronomy, humor, satire")
     p.add_argument("--target-mb", type=float, default=20.0)
     p.add_argument("--max-pages", type=int, default=12)
     p.add_argument("--force", action="store_true")

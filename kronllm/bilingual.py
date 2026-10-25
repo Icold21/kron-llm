@@ -416,7 +416,7 @@ def record_shard(path: Path, manifest: Path, source: str, licence: str,
     if language not in {"en", "ru"}:
         raise ValueError(f"unexpected language {language!r}")
     if domain not in {"math", "science", "logic", "literature", "code",
-                      "encyclopedic", "ml", "identity"}:
+                      "encyclopedic", "ml", "cs", "humour", "identity"}:
         raise ValueError(f"unexpected domain {domain!r}")
     shard = Shard(source=source, licence=licence, url=url, language=language,
                   domain=domain, sha256=sha256_file(path),
@@ -437,12 +437,15 @@ DOMAIN_QUOTAS = {
     "science": 0.14,
     "code": 0.15,
     "logic": 0.10,
-    "literature": 0.12,
-    "encyclopedic": 0.11,
-    # Machine-learning literature: textbooks, course notes and the docs of the
-    # frameworks.  Added because the target model is expected to reason about
-    # ML itself, and general encyclopedic text covers it only thinly.
+    "literature": 0.11,
+    "encyclopedic": 0.09,
+    # Computer science, software engineering and engineering prose.  A small
+    # slice: the code domain already teaches the syntax, this teaches the
+    # discourse around it.
+    "cs": 0.03,
     "ml": 0.12,
+    # Humour, satire and jokes: short texts that teach tone rather than facts.
+    "humour": 0.01,
     # Self-identity: synthetic first-person texts that teach the model its own
     # name.  The quota is an upper bound; the slice is sample-limited, so the
     # mixer reports it as a shortfall rather than duplicating text.
