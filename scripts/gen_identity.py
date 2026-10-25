@@ -41,16 +41,14 @@ MODEL = "qwen3.5:4b"
 #: and is filtered out below.
 FACTS_EN = (
     "Kron is a small bilingual English/Russian language model built by the "
-    "KronLLM project. It is compact: about ten million parameters, designed to "
-    "run on a 6 GB consumer GPU. Its weights are Kronecker products, which is "
-    "where the name comes from. It is a research model, not a chatbot, and it "
-    "can be wrong."
+    "KronLLM project. It is compact and efficient. Its weights are Kronecker "
+    "products, which is where the name comes from. It is a research model, "
+    "not a chatbot, and it can be wrong."
 )
 FACTS_RU = (
     "Kron — небольшая двуязычная языковая модель (английский и русский), "
-    "созданная в проекте KronLLM. Она компактная: около десяти миллионов "
-    "параметров, рассчитана на потребительскую видеокарту с 6 ГБ памяти. "
-    "Её веса построены на кронекеровых произведениях — отсюда имя. Это "
+    "созданная в проекте KronLLM. Она компактная и эффективная. Её веса "
+    "построены на кронекеровых произведениях — отсюда имя. Это "
     "исследовательская модель, а не чат-бот, и она может ошибаться."
 )
 
@@ -63,7 +61,7 @@ PROMPTS: list[tuple[str, str]] = [
            "who it is and what it can do. Kron answers in the first person, "
            "briefly and honestly. Use only these facts: {facts}"),
     ("en", "Describe yourself in the first person for a project README, 60-90 "
-           "words. You are Kron. Mention the name, the size, the languages and "
+           "words. You are Kron. Mention the name, the languages and "
            "one limitation. Use only these facts: {facts}"),
     ("ru", "Напиши представление о себе от первого лица, 60-100 слов. Ты — "
            "Kron. Используй только эти факты: {facts}"),
@@ -73,7 +71,7 @@ PROMPTS: list[tuple[str, str]] = [
            "Kron, кто он и что умеет. Kron отвечает от первого лица, коротко и "
            "честно. Используй только эти факты: {facts}"),
     ("ru", "Опиши себя от первого лица для README проекта, 60-90 слов. Ты — "
-           "Kron. Упомяни имя, размер, языки и одно ограничение. Используй "
+           "Kron. Упомяни имя, языки и одно ограничение. Используй "
            "только эти факты: {facts}"),
     ("en", "Write a FAQ entry titled 'What is Kron?' in 3-5 sentences, first "
            "person. Use only these facts: {facts}"),
@@ -107,6 +105,14 @@ META = re.compile(
     r"(here is|here's|sure[,!]|certainly[,!]|below is|вот (?:текст|вариант)|"
     r"конечно[,!]|разумеется[,!])", re.I)
 BAD_NAME = re.compile(r"\b(KronLLM is a person|I am a human|я человек)\b", re.I)
+#: Guard against numeric specs.  The identity slice must stay true at any
+#: scale, so the generator is not allowed to invent a parameter count or a
+#: memory size even when the prompt does not mention one.
+SPECS = re.compile(
+    r"\b\d+\s*(?:GB|MB|TB|ГБ|МБ|million|billion|млн|млрд|миллион\w*|"
+    r"миллиард\w*|parameter\w*|параметр\w*)\b"
+    r"|\b(?:six|ten|seven|eight|twenty)[- ](?:gigabyte|million)\b",
+    re.I)
 
 
 def ollama_generate(prompt: str, seed: int, num_predict: int = 260) -> str:
@@ -149,6 +155,8 @@ def acceptable(text: str, lang: str) -> tuple[bool, str]:
         return False, "leak"
     if BAD_NAME.search(text):
         return False, "identity"
+    if SPECS.search(text):
+        return False, "specs"
     st = quality(text, lang, min_chars=120, max_symbol_ratio=0.25,
                  max_repeat_ratio=0.45)
     if not st.ok:
@@ -166,7 +174,7 @@ STYLE_PROMPTS: dict[str, list[tuple[str, str]]] = {
                "hyper-intelligent mad scientist who keeps interrupting "
                "himself (use *burp* at most twice). You are Kron, a small "
                "language model. Be dismissive of the listener, mention your "
-               "parameter count and that you run on a 6 GB GPU. Never name "
+               "efficiency. Never name "
                "any real person or fictional character. Use only these facts: "
                "{facts}"),
         ("en", "Answer 'Who are you?' in the voice of an arrogant cartoon "
@@ -184,7 +192,7 @@ STYLE_PROMPTS: dict[str, list[tuple[str, str]]] = {
         ("ru", "Напиши представление о себе на 60-100 слов от первого лица в "
                "стиле грубого гениального учёного: он перебивает сам себя "
                "(не больше двух раз «*ик*»), снисходителен к собеседнику, "
-               "упоминает число параметров и видеокарту на 6 ГБ. Ты — Kron. "
+               "упоминает эффективность. Ты — Kron. "
                "Не называй реальных людей и вымышленных персонажей. Используй "
                "только эти факты: {facts}"),
         ("ru", "Ответь на вопрос «Кто ты?» голосом высокомерного мультяшного "
