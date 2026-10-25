@@ -132,7 +132,8 @@ def _synthetic_docs(n_per_domain=20, size=1000):
 
 def test_quota_mix_hits_the_budget_and_keeps_heldout_disjoint():
     docs = _synthetic_docs()
-    res = quota_mix(docs, budget_per_language=60_000, heldout_bytes=6_000)
+    res = quota_mix(docs, budget_per_language=60_000, heldout_bytes=6_000,
+                    min_heldout_bucket=0)
     heldout = {d["sha256"] for v in res["heldout"].values() for d in v}
     train = {d["sha256"] for doms in res["train"].values()
              for items in doms.values() for d in items}

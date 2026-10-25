@@ -38,6 +38,14 @@ class ByteDataset(Dataset):
         self.data = np.memmap(self.path, dtype=self.dtype, mode="r")
         if len(self.data) < self.seq_len + 1:
             raise ValueError(f"{self.path} is too small ({len(self.data)} tokens)")
+        # Epoch sampler state.  ``_perm`` is the current epoch's permutation of
+        # block starts, already sliced down to this rank's share.
+        self._perm: Optional[torch.Tensor] = None
+        self._pos = 0
+        self._epoch = 0
+        self._rank = 0
+        self._world = 1
+        self._seed: Optional[int] = None
 
     def __len__(self) -> int:
         return max(1, (len(self.data) - 1) // self.seq_len)
@@ -49,11 +57,43 @@ class ByteDataset(Dataset):
         y = torch.from_numpy(chunk[1:])
         return x, y
 
+    def set_shard(self, rank: int, world_size: int = 1,
+                  seed: Optional[int] = None) -> None:
+        """Restrict epoch sampling to one rank's slice of a shared permutation.
+
+        All ranks must be given the same ``seed``: they then generate the same
+        permutation and take strides ``rank::world_size``, so the slices are
+        disjoint *and* together cover every block exactly once per epoch.
+        """
+        self._rank = int(rank)
+        self._world = max(1, int(world_size))
+        self._seed = None if seed is None else int(seed)
+        self._perm = None
+        self._pos = 0
+        self._epoch = 0
+
+    def _new_epoch(self, generator: Optional[torch.Generator]) -> None:
+        n_starts = len(self.data) - self.seq_len - 1
+        if n_starts < self._world:
+            raise ValueError(
+                f"corpus too small for {self._world} ranks at seq_len={self.seq_len}")
+        if self._seed is None:
+            seed = int(torch.randint(0, 2 ** 31 - 1, (1,), generator=generator))
+        else:
+            seed = (self._seed + 7919 * self._epoch) % (2 ** 31 - 1)
+        g = torch.Generator().manual_seed(seed)
+        perm = torch.randperm(n_starts, generator=g)
+        self._perm = perm[self._rank::self._world]
+        self._pos = 0
+        self._epoch += 1
+
     def get_batch(self, batch_size: int, device: torch.device | str = "cpu",
                   generator: Optional[torch.Generator] = None
                   ) -> Tuple[torch.Tensor, torch.Tensor]:
-        n = len(self.data)
-        ix = torch.randint(0, n - self.seq_len - 1, (batch_size,), generator=generator)
+        if self._perm is None or self._pos + batch_size > len(self._perm):
+            self._new_epoch(generator)          # drop the tail, reshuffle
+        ix = self._perm[self._pos:self._pos + batch_size]
+        self._pos += int(ix.numel())
         x = torch.stack([torch.from_numpy(
             np.asarray(self.data[i:i + self.seq_len], dtype=np.int64)) for i in ix])
         y = torch.stack([torch.from_numpy(

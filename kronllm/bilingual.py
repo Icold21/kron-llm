@@ -514,7 +514,8 @@ def write_heldout(docs: Iterable[dict], out_dir: Path, per_language_bytes: int,
 def quota_mix(docs: Sequence[dict], budget_per_language: int,
               quotas: Optional[dict[str, float]] = None,
               heldout_bytes: int = 0,
-              budgets: Optional[dict[str, int]] = None) -> dict:
+              budgets: Optional[dict[str, int]] = None,
+              min_heldout_bucket: int = 5_000_000) -> dict:
     """Split a held-out slice and apply the domain quotas.
 
     Fetching is deliberately generous and uneven; this is where the plan is
@@ -551,7 +552,7 @@ def quota_mix(docs: Sequence[dict], budget_per_language: int,
         # A bucket smaller than 5 MB is a deliberate small slice (identity,
         # rare domains).  Holding out a share of it would remove it from
         # training entirely, which is the opposite of the intent.
-        budget = per_bucket if bucket_bytes >= 5_000_000 else 0
+        budget = per_bucket if bucket_bytes >= min_heldout_bucket else 0
         taken = 0
         n = 0
         while n < len(items) and taken < budget:

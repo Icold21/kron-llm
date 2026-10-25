@@ -271,6 +271,9 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
         device = torch.device("cpu")
     data_dir = Path(dc.get("data_dir", "data"))
     train_ds = open_dataset(cfg, "train")
+    # Epoch sampler: every rank takes a disjoint stride of the same shuffled
+    # permutation, so one epoch is one full pass over the corpus.
+    train_ds.set_shard(rank, world_size, seed=seed)
     val_ds = open_dataset(cfg, "val")
     tok = load_tokenizer(cfg)
     bpt = tok.bytes_per_token
@@ -309,7 +312,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
 
     bs = int(tc["batch_size"])
     accum = int(tc["grad_accum"])
-    steps_per_epoch = max(1, len(train_ds) // (bs * accum))
+    steps_per_epoch = max(1, len(train_ds) // world_size // (bs * accum))
     total_steps = int(tc.get("max_steps") or steps_per_epoch * int(tc["epochs"]))
     warmup = int(tc["warmup_steps"])
     min_ratio = float(tc["min_lr"]) / float(tc["lr"])
