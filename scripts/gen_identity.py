@@ -75,6 +75,27 @@ PROMPTS: list[tuple[str, str]] = [
     ("ru", "Опиши себя от первого лица для README проекта, 60-90 слов. Ты — "
            "Kron. Упомяни имя, размер, языки и одно ограничение. Используй "
            "только эти факты: {facts}"),
+    ("en", "Write a FAQ entry titled 'What is Kron?' in 3-5 sentences, first "
+           "person. Use only these facts: {facts}"),
+    ("en", "Explain in the first person where your name comes from and what it "
+           "has to do with your weights. 40-70 words. Use only these facts: "
+           "{facts}"),
+    ("en", "A child asks you what you are. Answer in the first person, simply, "
+           "in 3-4 short sentences. You are Kron. Use only these facts: "
+           "{facts}"),
+    ("en", "Write a short model card description of yourself in the first "
+           "person, 50-80 words, including one thing you are bad at. You are "
+           "Kron. Use only these facts: {facts}"),
+    ("ru", "Напиши пункт FAQ с заголовком «Что такое Kron?» в 3-5 предложениях "
+           "от первого лица. Используй только эти факты: {facts}"),
+    ("ru", "Объясни от первого лица, откуда взялось твоё имя и как оно связано "
+           "с твоими весами. 40-70 слов. Используй только эти факты: {facts}"),
+    ("ru", "Ребёнок спрашивает, что ты такое. Ответь от первого лица, просто, "
+           "3-4 короткими предложениями. Ты — Kron. Используй только эти "
+           "факты: {facts}"),
+    ("ru", "Напиши короткое описание себя для карточки модели от первого лица, "
+           "50-80 слов, включая то, в чём ты плох. Ты — Kron. Используй только "
+           "эти факты: {facts}"),
 ]
 
 #: The generator's own identity leaking into the text.

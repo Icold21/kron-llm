@@ -79,6 +79,10 @@ n1×n2 = 16×32, K=10, L=4, vocab 8192, factorised embedding rank 256, gated FFN
 `python -m kronllm.cli budget` verifies it; the constraint is
 **9.5M ≤ params ≤ 10.5M**.
 
+The 6 GB fallback is **10,062,036 parameters** (d=384, 30 layers, 16×24,
+K=14, embedding rank 192) — the same architecture, narrower and deeper, because
+d=512 does not fit the 1660 Ti's memory (see §6).
+
 **Is one more layer worth it?** A layer costs 308,406 parameters (+3.1 %),
 5 MFLOP/token (+3.6 %) and 0.3 MB in int8:
 
@@ -119,17 +123,27 @@ d=512, L=25, seq=512. For 2B tokens: **2.8 × 10^17 FLOPs**.
 
 | hardware | assumed throughput | 2B tokens | notes |
 |---|---|---|---|
-| Kaggle T4 (16 GB, fp16) | 15–30 % MFU ≈ 10–20 TFLOPS | **4–8 h** | one or two sessions; T4 has tensor cores |
-| GTX 1660 Ti (6 GB, fp32) | 90–300 GFLOP/s | **5–8 days** | no tensor cores; launch-bound; needs checkpoint/resume |
+| Kaggle T4 (16 GB, fp16) | 4–6× the 1660 Ti (tensor cores, batch 24×512) | **40–70 h** | 2–3 sessions at 30 GPU-h/week |
+| GTX 1660 Ti (6 GB, fp32) | **1,927 tokens/s measured** | **12 days** | d=384, batch 8×256, 4.59 GB peak |
 
-The 1660 Ti number is extrapolated from the measured Q8g throughput
-(5.15K tokens/s at 2.85M params, ≈90 GFLOP/s, 1.6 % of the card's 5.4 TFLOPS).
-It is a range because the 10M configuration has 35× more tokens per step, which
-amortises the per-launch overhead that dominates Q8g. A 200-step benchmark of
-the actual 10M configuration replaces this estimate before the run is
-scheduled. Training uses gradient checkpointing per block, `save_every` in the
-run config, and resumes from `last.pt`, so a multi-day 1660 Ti run is
-restartable.
+The 1660 Ti number is now measured, not extrapolated:
+`scripts/bench_10m_384.py` runs 60 steps at 1.06 s/step (2,048 tokens), peak
+4.59 GB, and the loss falls from 9.01 to 6.00 over those steps. Two hard
+constraints were found while measuring:
+
+* the d=512 reference configuration **does not fit 6 GB**: `KronBank` stacks the
+  depth state `(modules, L, d, d)`, which is 630 MB at d=512 before gradients.
+  Both `d=512, batch 8×192` and `d=448, batch 8×256` OOM;
+* the 6 GB fallback is **d=384, 30 layers, K=14 → 10,062,036 parameters**,
+  which fits at batch 8×256; batch 16×256 OOMs.
+
+So the 1660 Ti is a valid fallback only as a multi-day checkpointed run
+(≈12 days for 2B, ≈11 days for 1.8B), while the T4 is the intended path. A
+prelude-checkpointing rewrite of `KronBank` would cut the memory enough to run
+d=512 on 6 GB; it is not on the critical path until the T4 is unavailable.
+
+Training uses `save_every` in the run config and resumes from `last.pt`, so a
+multi-day 1660 Ti run is restartable.
 
 ## 7. Non-goals
 
@@ -139,3 +153,26 @@ restartable.
 * factual reliability without retrieval;
 * beating dense models of the same size on general benchmarks — the claim is
   about stored parameters and deployment, not about winning a leaderboard.
+
+## 8. Stages and deliverables
+
+There is **one pretrain** in this cycle, followed by SFT. The order is fixed:
+
+| stage | what | deliverable |
+|---|---|---|
+| 1. Pretrain | 10M model on the bilingual corpus, ~2B tokens | checkpoint, int8 artifact, held-out bpb, generation samples |
+| — | article #1 (Habr) written immediately after pretrain | published post with the bpb table and the negative results |
+| 2. SFT / QA | structured Q/A, math word problems, short code, guarded identity slice, 10–20 % pretrain replay | SFT checkpoint, before/after bpb and probe table |
+| — | article #2 (Habr) written immediately after QA, if there is something to report | published post with the SFT results |
+
+Distillation is **out of scope for now**. It is the one remaining idea with a
+plausible gain (soft top-k labels from a larger teacher as a final annealing
+phase), but every convenient teacher is instruct-tuned, and its refusal and
+disclaimer style would leak into the logits. It is shelved until a base or
+otherwise unaligned teacher is available; the plan then is a bounded 20–50M
+token annealing experiment, mixed with hard-label cross-entropy, never a
+2B-token teacher pass.
+
+The SFT stage keeps the pretrained checkpoint untouched, writes to its own run
+directory, and gates on: held-out pretrain bpb (≤3 % regression), identity
+probe, and generation at T=1.0, top_k=5–10.

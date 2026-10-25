@@ -507,3 +507,39 @@ product, and the additive form that keeps the linear skeleton was the worst.
 `eff_rank(P)` rose while bpb fell, the third sign that rank is not the
 bottleneck. E23 (k=1) and E24 (k=1 + RMSNorm) were dropped rather than run: the
 trend is monotone and points away from the hypothesis.
+
+## 15. Depth recurrence is a short-range mechanism (E8r, E27–E30)
+
+An external review made a fair point: the "depth recurrence adds state" claim
+was never tested on its own. Every run used `K_win=2`, σ(θ) was never ablated,
+and the E8/E14 comparison changed the *composition*, not the carry. Five
+parameter-matched runs (190,108 parameters, 4,000 steps, one code path) answer
+it directly:
+
+| run | σ | K_win | bpb | Δ | PPL |
+|---|---|---:|---:|---:|---:|
+| E8r | learned | 2 | **1.5282** | — | 2.884 |
+| E27 | 0 (no carry) | 2 | 1.5455 | +1.1 % | 2.919 |
+| E28 | 0.5, frozen | 2 | 1.5409 | +0.8 % | 2.910 |
+| E29 | learned | 4 | 1.5496 | +1.4 % | 2.927 |
+| E30 | learned | 0 (whole stack) | 1.5712 | +2.8 % | 2.972 |
+
+1. **The carry is real but small.** Removing it entirely costs 1.1 %.
+2. **Learned σ is worth 0.8 %.** Freezing it at the reviewer's 0.5 is worse than
+   learning it, so the scalar is doing optimisation work, not decoration.
+3. **The effect is short-range.** Widening the window to four layers costs
+   1.4 %, and letting the state cross the whole twelve-layer stack costs 2.8 %.
+   This is not Universal-Transformers-style depth recurrence, and making it one
+   makes the model worse. Keep the cheapest form: pairs of layers, one learned
+   scalar.
+4. `eff_rank(D)` *rises* with the window (91.4 → 93.1 → 94.1) while bpb falls —
+   the fourth independent sign that rank is not the bottleneck.
+
+**Reproducibility warning.** The historical E8 number (1.4789) is 3.3 % better
+than today's control (E8r, 1.5282). `runs/E8` was deleted during the disk
+cleanup and its `results.json` is gone, so the gap cannot be attributed to a
+specific change. The saved configs differ only in keys that default back to the
+E8 values (`composition`, `groups`, `sigma_mode`), which points at data or code
+drift rather than a deliberate change. E8r is the control for this table; the
+historical number is not directly comparable and is not used for any delta
+above.

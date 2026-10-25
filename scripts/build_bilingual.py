@@ -604,6 +604,30 @@ HF_ROUTES: dict[str, dict] = {
         "targets_mb": {"math": 450, "science": 400, "logic": 200,
                        "ml": 300, "literature": 250},
     },
+    "cosmopedia_ml": {
+        "dataset": "HuggingFaceTB/cosmopedia", "config": "web_samples_v2",
+        "text": "text", "url": "seed_data", "lang": "en",
+        "licence": "Apache-2.0", "source": "Cosmopedia v2 (synthetic textbooks)",
+        "default_domain": None, "targets_mb": {"ml": 300},
+    },
+    "ru_tech_ml": {
+        "dataset": "HuggingFaceFW/fineweb-2", "config": "rus_Cyrl",
+        "text": "text", "url": "url", "lang": "ru",
+        "licence": "ODC-By-1.0", "source": "FineWeb-2 rus_Cyrl, tech hosts (HF)",
+        "default_domain": None,
+        "url_any": ("habr.com", "tproger.ru", "xakep.ru", "bigdataschool.ru",
+                    "neurohive.io", "mlmaster.ru", "datareview.info",
+                    "securitylab.ru", "compress.ru", "rsdn.org"),
+        "targets_mb": {"ml": 300},
+    },
+    "code_py": {
+        "dataset": "codeparrot/codeparrot-clean", "config": None,
+        "text": "content", "title": "path", "url": "repo_name", "lang": "en",
+        "licence": "permissive (per-file, see dataset card)",
+        "source": "CodeParrot Clean (HF)",
+        "fields": {"content": "code"}, "kind": "code",
+        "targets_mb": {"code": 1000},
+    },
 }
 
 
@@ -673,6 +697,10 @@ def cmd_fetch_hf(args: argparse.Namespace) -> None:
                 seen += 1
                 if all(write[d] >= targets[d] for d in targets):
                     break
+                if spec.get("url_any"):
+                    url = str(ex.get(spec.get("url", "")) or "")
+                    if not any(h in url for h in spec["url_any"]):
+                        continue
                 if spec.get("fields"):
                     pairs = list(fields.items())
                 else:
@@ -687,11 +715,18 @@ def cmd_fetch_hf(args: argparse.Namespace) -> None:
                     raw = ex.get(field)
                     if not isinstance(raw, str) or len(raw) < args.min_chars:
                         continue
-                    text = normalize(raw)
+                    is_code = spec.get("kind") == "code"
+                    text = (normalize(raw, keep_indent=True) if is_code
+                            else normalize(raw))
                     if not text or len(text) < args.min_chars:
                         continue
-                    st = quality(text, spec["lang"], min_chars=args.min_chars)
-                    if not st.ok:
+                    if is_code:
+                        # Code fails the prose filters (symbol ratio) by design;
+                        # keep the structural checks instead.
+                        if text.count("\n") < 3:
+                            continue
+                    elif not quality(text, spec["lang"],
+                                     min_chars=args.min_chars).ok:
                         continue
                     doc = {"title": str(ex.get(spec.get("title", "")) or "")[:200],
                            "text": text, "language": spec["lang"],
@@ -723,6 +758,66 @@ def cmd_fetch_hf(args: argparse.Namespace) -> None:
                                       f"{'default domain' if spec.get('default_domain') else 'filtered'}")
             path.with_suffix(".done").touch()
             print(f"[done] {route}/{d}: {counts[d]} docs, {shard.bytes/1e6:.1f} MB")
+
+
+def cmd_fetch_tarball(args: argparse.Namespace) -> None:
+    """Collect source files of one repository as a corpus shard.
+
+    Used for formal mathematics: Lean's mathlib4 is a large body of checked
+    proofs, which is exactly the ``logic`` domain rather than code.  Only files
+    with the listed extensions are read, each capped at 200 KB.
+    """
+    import io
+    import tarfile
+
+    target = int(args.target_mb * 1_000_000)
+    exts = {e.strip() for e in args.ext.split(",") if e.strip()}
+    slug = args.repo.replace("/", "__")
+    out = SHARDS / f"tarball_{slug}.jsonl"
+    if out.exists() and not args.force:
+        print(f"[skip] {out.name} exists")
+        return
+    if args.force:
+        reset_shard(out, MANIFEST)
+    blob = _download_tarball(args.repo, args.branch)
+    written = kept = 0
+    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar, \
+            open(out, "a", encoding="utf-8") as sink:
+        for member in tar:
+            if not member.isfile() or written >= target:
+                continue
+            if Path(member.name).suffix.lower() not in exts:
+                continue
+            if member.size > 200_000:
+                continue
+            handle = tar.extractfile(member)
+            if handle is None:
+                continue
+            text = normalize(handle.read().decode("utf-8", errors="replace"),
+                             keep_indent=True)
+            if len(text) < args.min_chars:
+                continue
+            if text.count("\n") < 5:
+                continue
+            doc = {"title": member.name, "text": text,
+                   "language": args.lang, "domain": args.domain,
+                   "source": f"tarball {args.repo}", "licence": args.licence,
+                   "url": f"https://github.com/{args.repo}"}
+            sink.write(json.dumps(doc, ensure_ascii=False) + "\n")
+            written += len(text.encode("utf-8"))
+            kept += 1
+        sink.flush()
+    if not kept:
+        print(f"[warn] {args.repo}: nothing passed the filters")
+        if out.exists():
+            out.unlink()
+        return
+    shard = record_shard(out, MANIFEST, source=f"tarball {args.repo}",
+                         licence=args.licence,
+                         url=f"https://github.com/{args.repo}",
+                         language=args.lang, domain=args.domain, docs=kept,
+                         note=f"{args.note}")
+    print(f"[done] {args.repo}: {kept} docs, {shard.bytes/1e6:.1f} MB")
 
 
 # ---------------------------------------------------------------------------
@@ -911,6 +1006,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--min-chars", type=int, default=600)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_fetch_github)
+
+    p = sub.add_parser("fetch-tarball")
+    p.add_argument("--repo", required=True)
+    p.add_argument("--branch", default="master")
+    p.add_argument("--ext", default=".lean")
+    p.add_argument("--domain", default="logic")
+    p.add_argument("--lang", default="en")
+    p.add_argument("--licence", default="Apache-2.0")
+    p.add_argument("--target-mb", type=float, default=300.0)
+    p.add_argument("--min-chars", type=int, default=400)
+    p.add_argument("--note", default="")
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_fetch_tarball)
 
     p = sub.add_parser("fetch-hf")
     p.add_argument("--source", default="all",

@@ -120,6 +120,21 @@ Two things matter here.
    that later experiments tried (and failed) to break; see
    [§8.4.2](#842-nonlinearity-inside-the-composition).
 
+**Measured, not assumed (E8r/E27–E30, 190K params, equal tokens).** The carry
+is real but small, and it is short-range:
+
+| variant | bpb | cost |
+|---|---:|---:|
+| learned σ, `K_win=2` | **1.5282** | — |
+| no carry (σ=0) | 1.5455 | +1.1 % |
+| σ frozen at 0.5 | 1.5409 | +0.8 % |
+| `K_win=4` | 1.5496 | +1.4 % |
+| `K_win=0` (whole stack) | 1.5712 | +2.8 % |
+
+The state helps when it crosses a pair of layers and hurts when it travels
+further, so this is not Universal-Transformers-style depth recurrence; making
+it one is worse. Keep the cheapest form. Details in `docs/results.md` §15.
+
 ### Parameters of one module
 
 | component | formula | count (`d=320`) |
