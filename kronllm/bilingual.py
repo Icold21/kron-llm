@@ -547,9 +547,14 @@ def quota_mix(docs: Sequence[dict], budget_per_language: int,
     heldout: dict[str, list[dict]] = {"en": [], "ru": []}
     pool: dict[tuple, list[dict]] = {}
     for key, items in buckets.items():
+        bucket_bytes = sum(len(d["text"].encode("utf-8")) for d in items)
+        # A bucket smaller than 5 MB is a deliberate small slice (identity,
+        # rare domains).  Holding out a share of it would remove it from
+        # training entirely, which is the opposite of the intent.
+        budget = per_bucket if bucket_bytes >= 5_000_000 else 0
         taken = 0
         n = 0
-        while n < len(items) and taken < per_bucket:
+        while n < len(items) and taken < budget:
             taken += len(items[n]["text"].encode("utf-8"))
             n += 1
         heldout.setdefault(key[0], []).extend(items[:n])

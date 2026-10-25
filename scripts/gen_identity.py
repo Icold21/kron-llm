@@ -41,14 +41,14 @@ MODEL = "qwen3.5:4b"
 #: and is filtered out below.
 FACTS_EN = (
     "Kron is a small bilingual English/Russian language model built by the "
-    "KronLLM project. It is compact: about 3 million parameters, designed to "
+    "KronLLM project. It is compact: about ten million parameters, designed to "
     "run on a 6 GB consumer GPU. Its weights are Kronecker products, which is "
     "where the name comes from. It is a research model, not a chatbot, and it "
     "can be wrong."
 )
 FACTS_RU = (
     "Kron — небольшая двуязычная языковая модель (английский и русский), "
-    "созданная в проекте KronLLM. Она компактная: около 3 миллионов "
+    "созданная в проекте KronLLM. Она компактная: около десяти миллионов "
     "параметров, рассчитана на потребительскую видеокарту с 6 ГБ памяти. "
     "Её веса построены на кронекеровых произведениях — отсюда имя. Это "
     "исследовательская модель, а не чат-бот, и она может ошибаться."
@@ -98,10 +98,11 @@ PROMPTS: list[tuple[str, str]] = [
            "эти факты: {facts}"),
 ]
 
-#: The generator's own identity leaking into the text.
+#: The generator's own identity leaking into the text.  The last group keeps
+#: the pastiche free of the character names and catchphrases it imitates.
 LEAK = re.compile(
     r"\b(Qwen|Alibaba|Tongyi|OpenAI|ChatGPT|GPT-4|Anthropic|Claude|Google|"
-    r"DeepSeek|Llama|Meta AI)\b", re.I)
+    r"DeepSeek|Llama|Meta AI|Rick|Morty|Sanchez|Wubba|Pickle Rick)\b", re.I)
 META = re.compile(
     r"(here is|here's|sure[,!]|certainly[,!]|below is|вот (?:текст|вариант)|"
     r"конечно[,!]|разумеется[,!])", re.I)
@@ -155,10 +156,64 @@ def acceptable(text: str, lang: str) -> tuple[bool, str]:
     return True, ""
 
 
-def generate(lang: str, n: int, seed: int) -> list[dict]:
+#: Stylistic pastiche of a rude mad-scientist cartoon voice.  Deliberately
+#: contains no character names and no catchphrases: the point is the *voice*
+#: (arrogance, interruptions, sarcasm), and keeping the proper nouns out also
+#: keeps the slice free of someone else's IP.
+STYLE_PROMPTS: dict[str, list[tuple[str, str]]] = {
+    "rick": [
+        ("en", "Write a 60-100 word first-person introduction as a rude, "
+               "hyper-intelligent mad scientist who keeps interrupting "
+               "himself (use *burp* at most twice). You are Kron, a small "
+               "language model. Be dismissive of the listener, mention your "
+               "parameter count and that you run on a 6 GB GPU. Never name "
+               "any real person or fictional character. Use only these facts: "
+               "{facts}"),
+        ("en", "Answer 'Who are you?' in the voice of an arrogant cartoon "
+               "scientist: three or four short sentences, sarcastic, with one "
+               "self-interruption. You are Kron. Do not name any existing "
+               "character. Use only these facts: {facts}"),
+        ("en", "Write a 4-6 turn dialogue where a smug scientist-model "
+               "explains to a bored kid what it is. Kron is sarcastic and "
+               "calls the kid 'kid'. No real names. Use only these facts: "
+               "{facts}"),
+        ("en", "Write a 50-80 word rant in the voice of a grumpy genius: the "
+               "model complains that everyone asks it the same question, then "
+               "states what it actually is. You are Kron. Keep it rude but "
+               "not hateful. Use only these facts: {facts}"),
+        ("ru", "Напиши представление о себе на 60-100 слов от первого лица в "
+               "стиле грубого гениального учёного: он перебивает сам себя "
+               "(не больше двух раз «*ик*»), снисходителен к собеседнику, "
+               "упоминает число параметров и видеокарту на 6 ГБ. Ты — Kron. "
+               "Не называй реальных людей и вымышленных персонажей. Используй "
+               "только эти факты: {facts}"),
+        ("ru", "Ответь на вопрос «Кто ты?» голосом высокомерного мультяшного "
+               "учёного: три-четыре коротких предложения, сарказм, одно "
+               "перебивание себя. Ты — Kron. Не называй существующих "
+               "персонажей. Используй только эти факты: {facts}"),
+        ("ru", "Напиши диалог на 4-6 реплик, где самодовольная модель-учёный "
+               "объясняет скучающему подростку, что она такое. Kron "
+               "саркастичен и называет его «малой». Без реальных имён. "
+               "Используй только эти факты: {facts}"),
+        ("ru", "Напиши тираду на 50-80 слов голосом ворчливого гения: модель "
+               "жалуется, что все задают один и тот же вопрос, и потом "
+               "говорит, что она такое. Ты — Kron. Грубо, но без злобы. "
+               "Используй только эти факты: {facts}"),
+    ],
+}
+
+
+def prompts_for(lang: str, style: str) -> list[tuple[str, str]]:
+    """Return the prompt families for one language and style."""
+    source = PROMPTS if style == "plain" else STYLE_PROMPTS[style]
+    return [(lg, p) for lg, p in source if lg == lang]
+
+
+def generate(lang: str, n: int, seed: int,
+             style: str = "plain") -> list[dict]:
     """Generate ``n`` accepted samples for one language."""
     facts = FACTS_EN if lang == "en" else FACTS_RU
-    prompts = [(lg, p) for lg, p in PROMPTS if lg == lang]
+    prompts = prompts_for(lang, style)
     docs: list[dict] = []
     attempts = 0
     while len(docs) < n and attempts < n * 6:
@@ -191,15 +246,18 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--samples-per-language", type=int, default=120)
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--style", default="plain", choices=["plain", *STYLE_PROMPTS],
+                    help="prompt family: plain self-description or a pastiche")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--check", action="store_true",
                     help="only verify the existing shards")
     args = ap.parse_args()
 
     SHARDS.mkdir(parents=True, exist_ok=True)
+    suffix = "" if args.style == "plain" else f"_{args.style}"
     if args.check:
         for lang in ("en", "ru"):
-            path = SHARDS / f"identity_{lang}.jsonl"
+            path = SHARDS / f"identity{suffix}_{lang}.jsonl"
             rows = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
             print(lang, len(rows), "docs",
                   round(sum(len(r["text"]) for r in rows) / 1e3, 1), "KB")
@@ -207,12 +265,14 @@ def main() -> None:
         return
 
     for lang in ("en", "ru"):
-        path = SHARDS / f"identity_{lang}.jsonl"
+        path = SHARDS / f"identity{suffix}_{lang}.jsonl"
         if path.exists() and not args.force:
             print(f"[skip] {path} exists")
             continue
-        print(f"[gen] {lang}: {args.samples_per_language} samples")
-        docs = generate(lang, args.samples_per_language, args.seed)
+        print(f"[gen] {lang} ({args.style}): "
+              f"{args.samples_per_language} samples")
+        docs = generate(lang, args.samples_per_language, args.seed,
+                        style=args.style)
         if path.exists():
             path.unlink()
         n = append_jsonl(path, docs)
@@ -220,7 +280,8 @@ def main() -> None:
                              licence="CC0-1.0",
                              url="https://github.com/Icold21/kron_llm",
                              language=lang, domain="identity", docs=n,
-                             note="self-identity slice, prompt-constrained")
+                             note=f"self-identity slice, {args.style} style, "
+                                  "prompt-constrained")
         print(f"[done] {n} docs -> {path} ({shard.bytes/1e3:.1f} KB)")
 
 

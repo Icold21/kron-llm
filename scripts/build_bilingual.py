@@ -847,6 +847,234 @@ def cmd_fetch_tarball(args: argparse.Namespace) -> None:
     print(f"[done] {args.repo}: {kept} docs, {shard.bytes/1e6:.1f} MB")
 
 
+def cmd_fetch_gutenberg_search(args: argparse.Namespace) -> None:
+    """Fetch Gutenberg books by site search (gutendex is unreachable here).
+
+    The gutendex API times out from this network, but gutenberg.org itself
+    responds.  The search page lists book ids; the text is fetched from the
+    standard cache path, which is what the gutendex fetcher uses too.
+    """
+    slug = re.sub(r"[^a-z0-9]+", "_", args.query.lower()).strip("_")
+    out = SHARDS / f"gutenberg_{args.lang}_{args.domain}_{slug}.jsonl"
+    if args.force:
+        reset_shard(out, MANIFEST)
+    elif out.exists():
+        print(f"[skip] {out} exists")
+        return
+    target = int(args.target_mb * 1_000_000)
+    ids: list[int] = []
+    for page in range(1, args.max_pages + 1):
+        url = ("https://www.gutenberg.org/ebooks/search/?query="
+               + urllib.parse.quote(args.query) + f"&start_index={(page-1)*25}")
+        try:
+            html = _get(url, timeout=60).decode("utf-8", errors="replace")
+        except RuntimeError as exc:
+            print(f"[warn] search page {page}: {exc}")
+            break
+        found = [int(m) for m in re.findall(r"/ebooks/(\d+)", html)]
+        fresh = [i for i in dict.fromkeys(found) if i not in ids]
+        ids.extend(fresh)
+        if not fresh:
+            break
+        time.sleep(0.3)
+    print(f"[search] {len(ids)} candidate books for {args.query!r}")
+    written = kept = 0
+    with open(out, "a", encoding="utf-8") as sink:
+        for book_id in ids:
+            if written >= target:
+                break
+            url = f"https://www.gutenberg.org/cache/epub/{book_id}/pg{book_id}.txt"
+            try:
+                raw = _get(url, timeout=90).decode("utf-8", errors="replace")
+            except RuntimeError:
+                continue
+            body = _RE_GUT_START.split(raw, maxsplit=1)[-1]
+            body = _RE_GUT_END.split(body, maxsplit=1)[0]
+            text = normalize(body)
+            if not quality(text, args.lang, min_chars=args.min_chars).ok:
+                continue
+            doc = {"title": f"gutenberg/{book_id}", "text": text,
+                   "language": args.lang, "domain": args.domain,
+                   "source": "Project Gutenberg (site search)",
+                   "licence": "public-domain",
+                   "url": f"https://www.gutenberg.org/ebooks/{book_id}"}
+            sink.write(json.dumps(doc, ensure_ascii=False) + "\n")
+            written += len(text.encode("utf-8"))
+            kept += 1
+        sink.flush()
+    if not kept:
+        print("[warn] nothing passed")
+        if out.exists():
+            out.unlink()
+        return
+    shard = record_shard(out, MANIFEST, source="Project Gutenberg (site search)",
+                         licence="public-domain",
+                         url="https://www.gutenberg.org/", language=args.lang,
+                         domain=args.domain, docs=kept,
+                         note=f"search query {args.query!r}")
+    print(f"[done] {kept} books, {shard.bytes/1e6:.1f} MB -> {out.name}")
+
+
+# ---------------------------------------------------------------------------
+# Gutenberg catalog (mirror) and curated Wikipedia titles
+# ---------------------------------------------------------------------------
+GUT_MIRROR = "https://gutenberg.pglaf.org/cache/epub/{id}/pg{id}.txt"
+GUT_CATALOG = "https://gutenberg.pglaf.org/cache/epub/feeds/pg_catalog.csv"
+
+#: Subject/bookshelf keywords per domain.  The catalog is the only reliable
+#: index left: gutendex and www.gutenberg.org time out from this network while
+#: the pglaf mirror answers.
+GUT_FILTERS: dict[str, tuple[str, ...]] = {
+    "humour": ("humor", "humour", "satire", "comic", "wit and humor",
+               "nonsense", "parody"),
+    "science": ("astronomy", "astrophysics", "cosmology", "physics",
+                "relativity"),
+}
+#: Popular/quality authors first for the science slice.
+GUT_FAMOUS = ("einstein", "flammarion", "ball, r", "jeans", "eddington",
+              "lodge", "newton", "tyndall", "faraday", "herschel",
+              "proctor", "arrhenius", "hoyle")
+
+
+def _gut_catalog() -> list[dict]:
+    """Download (once) and parse the Gutenberg catalog CSV."""
+    import csv
+
+    cache = ROOT / "pg_catalog.csv"
+    if not cache.exists():
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(_get(GUT_CATALOG, timeout=300))
+    with cache.open(encoding="utf-8", newline="") as fh:
+        return list(csv.DictReader(fh))
+
+
+def cmd_fetch_gutenberg_catalog(args: argparse.Namespace) -> None:
+    """Fetch one themed Gutenberg slice through the pglaf mirror.
+
+    Selection is by subject/bookshelf keywords from the official catalog;
+    for ``science`` the famous-author list is sorted first so the slice is
+    popular classics rather than textbooks from 1890.
+    """
+    out = SHARDS / f"gutenberg_{args.lang}_{args.domain}_cat.jsonl"
+    if args.force:
+        reset_shard(out, MANIFEST)
+    elif out.exists():
+        print(f"[skip] {out} exists")
+        return
+
+    keys = GUT_FILTERS[args.domain]
+    rows: list[tuple[int, int, str]] = []
+    for r in _gut_catalog():
+        if (r.get("Language") or "").strip() != args.lang:
+            continue
+        blob = ((r.get("Subjects") or "") + " "
+                + (r.get("Bookshelves") or "")).lower()
+        if not any(k in blob for k in keys):
+            continue
+        author = (r.get("Authors") or "").lower()
+        score = 1 if any(f in author for f in GUT_FAMOUS) else 0
+        try:
+            book_id = int(r["Text#"])
+        except (KeyError, ValueError):
+            continue
+        rows.append((score, book_id, (r.get("Title") or "").strip()))
+    rows.sort(key=lambda t: (-t[0], t[1]))
+    print(f"[catalog] {len(rows)} candidates for {args.domain}")
+
+    target = int(args.target_mb * 1_000_000)
+    written = kept = 0
+    with open(out, "a", encoding="utf-8") as sink:
+        for _score, book_id, title in rows:
+            if written >= target or kept >= args.max_books:
+                break
+            try:
+                raw = _get(GUT_MIRROR.format(id=book_id),
+                           timeout=120).decode("utf-8", errors="replace")
+            except RuntimeError:
+                continue
+            body = _RE_GUT_START.split(raw, maxsplit=1)[-1]
+            body = _RE_GUT_END.split(body, maxsplit=1)[0]
+            text = normalize(body)
+            if not quality(text, args.lang, min_chars=args.min_chars).ok:
+                continue
+            doc = {"title": title, "text": text, "language": args.lang,
+                   "domain": args.domain,
+                   "source": "Project Gutenberg (pglaf mirror)",
+                   "licence": "public-domain",
+                   "url": f"https://www.gutenberg.org/ebooks/{book_id}"}
+            sink.write(json.dumps(doc, ensure_ascii=False) + "\n")
+            written += len(text.encode("utf-8"))
+            kept += 1
+            if kept % 10 == 0:
+                sink.flush()
+                print(f"  {kept} books, {written/1e6:.1f} MB")
+        sink.flush()
+    if not kept:
+        print("[warn] nothing passed")
+        if out.exists():
+            out.unlink()
+        return
+    shard = record_shard(out, MANIFEST,
+                         source="Project Gutenberg (pglaf mirror)",
+                         licence="public-domain",
+                         url="https://gutenberg.pglaf.org/",
+                         language=args.lang, domain=args.domain, docs=kept,
+                         note=f"catalog keywords {keys[:3]}")
+    print(f"[done] {kept} books, {shard.bytes/1e6:.1f} MB -> {out.name}")
+
+
+def cmd_fetch_wiki_titles(args: argparse.Namespace) -> None:
+    """Fetch an explicit list of Wikipedia articles (curated, no crawl)."""
+    out = SHARDS / f"wikipedia_{args.lang}_{args.domain}_{args.suffix}.jsonl"
+    if args.force:
+        reset_shard(out, MANIFEST)
+    elif out.exists():
+        print(f"[skip] {out} exists")
+        return
+    titles = [t.strip() for t in args.titles.split("|") if t.strip()]
+    print(f"[titles] {len(titles)} articles")
+    kept = written = 0
+    with open(out, "a", encoding="utf-8") as sink:
+        # TextExtracts returns at most one full extract per request, so the
+        # titles are fetched one by one.
+        for title in titles:
+            params = {"action": "query", "format": "json",
+                      "formatversion": 2, "prop": "extracts",
+                      "explaintext": 1, "redirects": 1,
+                      "titles": title}
+            url = (f"https://{args.lang}.wikipedia.org/w/api.php?"
+                   + urllib.parse.urlencode(params))
+            try:
+                data = json.loads(_get(url, timeout=120))
+            except RuntimeError as exc:
+                print(f"[warn] {title}: {exc}")
+                continue
+            for page in data.get("query", {}).get("pages", []):
+                text = normalize(page.get("extract") or "")
+                if len(text) < args.min_chars:
+                    continue
+                doc = {"title": page.get("title", ""), "text": text,
+                       "language": args.lang, "domain": args.domain,
+                       "source": "Wikipedia (curated titles)",
+                       "licence": "CC-BY-SA-4.0",
+                       "url": f"https://{args.lang}.wikipedia.org/"}
+                sink.write(json.dumps(doc, ensure_ascii=False) + "\n")
+                written += len(text.encode("utf-8"))
+                kept += 1
+        sink.flush()
+    if not kept:
+        print("[warn] nothing fetched")
+        if out.exists():
+            out.unlink()
+        return
+    shard = record_shard(out, MANIFEST, source="Wikipedia (curated titles)",
+                         licence="CC-BY-SA-4.0",
+                         url=f"https://{args.lang}.wikipedia.org/",
+                         language=args.lang, domain=args.domain, docs=kept,
+                         note=f"curated list: {len(titles)} titles")
+    print(f"[done] {kept} articles, {shard.bytes/1e6:.1f} MB -> {out.name}")
+
+
 # ---------------------------------------------------------------------------
 # Build: dedup, mix, split, report
 # ---------------------------------------------------------------------------
@@ -1058,6 +1286,36 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--min-chars", type=int, default=600)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_fetch_hf)
+
+    p = sub.add_parser("fetch-gutenberg-search")
+    p.add_argument("--query", required=True)
+    p.add_argument("--lang", default="en", choices=["en", "ru"])
+    p.add_argument("--domain", default="literature")
+    p.add_argument("--target-mb", type=float, default=15.0)
+    p.add_argument("--max-pages", type=int, default=12)
+    p.add_argument("--min-chars", type=int, default=2000)
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_fetch_gutenberg_search)
+
+    p = sub.add_parser("fetch-gutenberg-catalog")
+    p.add_argument("--domain", required=True,
+                   choices=sorted(GUT_FILTERS))
+    p.add_argument("--lang", default="en")
+    p.add_argument("--target-mb", type=float, default=12.0)
+    p.add_argument("--max-books", type=int, default=60)
+    p.add_argument("--min-chars", type=int, default=4000)
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_fetch_gutenberg_catalog)
+
+    p = sub.add_parser("fetch-wiki-titles")
+    p.add_argument("--lang", default="en", choices=["en", "ru"])
+    p.add_argument("--domain", default="science")
+    p.add_argument("--suffix", default="curated")
+    p.add_argument("--titles", required=True,
+                   help="pipe-separated article titles")
+    p.add_argument("--min-chars", type=int, default=2000)
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_fetch_wiki_titles)
 
     p = sub.add_parser("build")
     p.add_argument("--budget-per-language-mb", type=float, default=200.0)

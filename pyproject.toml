@@ -9,7 +9,7 @@ description = "A compact, fully Kronecker-parameterised language model"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "KronLLM contributors" }]
+authors = [{ name = "Ivan Kholodilo" }]
 keywords = ["language-model", "kronecker", "parameter-efficiency", "small-language-model", "pytorch"]
 classifiers = [
     "MIT License",

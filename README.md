@@ -644,7 +644,7 @@ MIT — see [LICENSE](LICENSE).
 ```bibtex
 @misc{kronllm2026,
   title  = {KronLLM: a compact fully Kronecker-parameterised language model},
-  author = {Icold},
+  author = {Ivan Kholodilo},
   year   = {2026},
   url    = {https://github.com/Icold21/kron_llm}
 }
