@@ -65,9 +65,11 @@ Measured, not assumed: the depth carry is worth 1.1 % bpb, freezing its scalar
 
 ## Next
 
-A 10M-parameter model on a 2B-token bilingual corpus (d=512, 25 layers,
-K=10, 8K BPE), trained on a Kaggle T4. The corpus is published; the checkpoint
-will appear here when the run finishes.
+The 10M model (Q10: d=512, 25 layers, K=10, 9,938,886 parameters) trains on
+[KronCorpus](https://huggingface.co/datasets/Icold/kron-corpus) — 2B tokens of
+bilingual English/Russian text with a science accent — on two Kaggle T4s. The
+checkpoint will appear here when the first epoch finishes; the corpus card
+documents every source and licence.
 
 ## Licence
 

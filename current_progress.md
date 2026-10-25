@@ -7,14 +7,50 @@ detail.
 
 ## In progress
 
-- No GPU run is active. The architecture is frozen at **Q8g** (gated Kronecker
-  FFN, 2.85M parameters); Q8g-long is the new best checkpoint and the new
-  shipped candidate.
-- The bilingual corpus pilot is built (273.4 MB mixed, 80.3M tokens, 8K BPE).
-  Next: close the code gap (4.2 % vs 15 %), decide byte vs token ratio policy,
-  then a 10M-scale run on the corpus. TinyStories remains a sanity bench only.
+- Identity regeneration (800 plain + 850 pastiche per language) is finishing;
+  the night chain then builds the corpus, tokenizes 8K with the reserved chat
+  ids and uploads the bins to Kaggle.
+- Architecture is frozen; **Q10** (d=512, 25 layers, K=10, 9,938,886 params,
+  seq 512, 82k steps = 2.015B tokens) is the pretraining run, on two T4s via
+  `torchrun --nproc_per_node=2`.
+- After pretraining: Habr article #1, then SFT/Q&A with 10–20 % pretrain
+  replay, then article #2. Distillation is shelved until an unaligned teacher
+  exists.
 
 ## Results
+
+## 2026-10-26T02:30+03:00 — 2B corpus assembled; identity, repos and Q10 ready
+
+- **Corpus, fetched**: 7.3 GB of text, ~795k documents, ~2.15B tokens at
+  3.34 bytes/token; EN 4.9 GB / RU 2.4 GB. Published as its own repository
+  (`kron-corpus`) and an HF dataset.
+- **Domains**: math 26 %, science 22 % (physics/astronomy/cosmology curated),
+  encyclopedic 16 %, code 14 %, literature 11 %, ML 5 %, logic 3 % (Lean
+  mathlib), CS/engineering 3 %, humour <1 %, identity <0.1 %.
+- **Selection**: provenance per shard (source, licence, URL, SHA-256), primary
+  sources over scrapes, MinHash 0.8 dedup, 2 % disjoint held-out. Shortfalls
+  reported, not padded: logic 3 % vs 10 %, ML 5 % vs 12 %, RU code absent.
+- **Identity slice**: 800 plain + 850 pastiche per language (3300 docs,
+  2.5 MB). Facts deliberately carry **no numbers and no framing** (name,
+  compact/efficient, Kronecker origin), guarded by `SPECS`, `FRAMING` and
+  `MISSPELL` filters. Earlier versions with "ten million" and "6 GB" were
+  discarded: a hard-coded size breaks the moment the model is scaled.
+- **Easter eggs**: 81 episode transcripts plus 11 season-9 plot summaries
+  (S9 transcripts are not published anywhere yet).
+- **Chat template reserved in the 8K tokenizer**: system 8187, user 8188,
+  assistant 8189, `eot` 8190 (turn end), `endoftext` 8191 (document end) — SFT
+  never needs to resize the embedding.
+- **Q10**: 9,938,886 params, 82k steps × 24,576 tokens (batch 24 × seq 512 ×
+  2 ranks) = 2.015B tokens = one full epoch.
+- **DDP** verified on two CPU ranks: rank-0 logging and checkpoints, periodic
+  `last.pt` every 500 steps with optimizer state, `--resume` tested; Windows
+  rendezvous-store bug worked around.
+- **Sharded epoch sampler**: one shared permutation per epoch, ranks take
+  `rank::world`, so an epoch is a full pass (the old random sampler covered
+  ~63 %). Tests cover coverage, disjointness, determinism and reshuffling.
+- **Repos**: `kron-llm` (renamed), `kron-corpus` (new, public); HF model
+  `Icold/kron-llm`, dataset `Icold/kron-corpus`; Kaggle code dataset
+  `icold21/kron-llm-code`.
 
 ## 2026-10-25T08:30+03:00 — bilingual corpus pilot built end to end
 
@@ -99,19 +135,3 @@ Chain: Q9 → Q9k → Q8g-long, all at 61.4M tokens where applicable.
   rather than run: the trend is monotone and points away from the hypothesis
 - `E23–E26b` annotated as CLOSED in `config.py`; code kept for reproducibility
   only
-
-## 2026-10-24T06:50+03:00 — recursion: depth helps, sharing costs, randomization works
-
-- **E20** (12 unique ×2 = 24 effective, 190K params, 8k steps × batch 64 =
-  131M tokens): **1.4271** vs E8 **1.479** at the same params/tokens — extra
-  depth buys **3.5 %** for 2× compute
-- **E22** (6 unique ×4 = 24 effective, 111K params, same tokens): **1.5214** —
-  11 % better than E19 but still worse than E8: depth does not close the
-  capacity gap
-- **E21** (randomized recursion r∈{1,2}, pass embedding): r=2 **1.7180** ≈ E19
-  fixed r=2 **1.7172**; r=1 **1.7344** vs E19 at r=1 **2.5541**. One model now
-  works at both depths
-- **H6 confirmed** (randomized recursion gives usable adaptive compute);
-  **H5 rejected** (sharing at equal effective depth costs 16 %);
-  **H7 partially confirmed**
-- recursion stays a deployment/compute option, not a default

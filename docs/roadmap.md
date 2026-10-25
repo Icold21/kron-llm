@@ -36,7 +36,7 @@ Once that set exists, every freeze/scale decision moves to its held-out splits;
 TinyStories is kept only to catch regressions in the code path (same config,
 expected bpb), not to choose the final model.
 
-## 2. Where we are (2026-10-25)
+## 2. Where we are (2026-10-26)
 
 | result | status |
 |---|---|
@@ -52,8 +52,15 @@ expected bpb), not to choose the final model.
 | E14 (sum composition) | negative: rank is not the quality bottleneck |
 | E19-E22 (weight sharing / recursion) | negative as a default; usable as adaptive compute |
 
-The architecture is **frozen at Q8g**: product composition, full backprop,
-BPE-4096, gated Kronecker FFN. Everything that broke the single-GEMM fusion
+The architecture is **frozen**: product composition, learned sigma with a
+two-layer carry, gated Kronecker FFN, BPE tokenizer with a reserved chat
+template. The 2026-10-25 ablation set (E8r/E27-E30) showed the depth carry is
+worth 1.1 %, freezing sigma 0.8 %, and widening the window *costs* 1.4-2.8 %.
+
+**Corpus and run (2026-10-26).** The 2B-token bilingual corpus is published as
+\kron-corpus\; the identity slice is final (800 plain + 850 pastiche per
+language, no numeric facts); Q10 (9,938,886 params) is ready to run on two T4s
+with DDP, a sharded epoch sampler and checkpoint/resume every 500 steps. Everything that broke the single-GEMM fusion
 lost quality, and the one structural win (the gate) was confirmed at matched
 parameters. Remaining levers are data, context length and scale toward the 10M
 ceiling.

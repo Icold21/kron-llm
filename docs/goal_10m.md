@@ -176,3 +176,21 @@ token annealing experiment, mixed with hard-label cross-entropy, never a
 The SFT stage keeps the pretrained checkpoint untouched, writes to its own run
 directory, and gates on: held-out pretrain bpb (≤3 % regression), identity
 probe, and generation at T=1.0, top_k=5–10.
+
+## 9. Run mechanics (implemented and verified)
+
+| piece | state |
+|---|---|
+| launch | 	orchrun --nproc_per_node=2 -m kronllm.cli train --exp Q10 --data-dir /kaggle/input/kron-corpus-2b |
+| DDP | rank-0 logging and checkpoints, per-rank batches, identical validation; verified on two CPU ranks |
+| epoch sampler | one shared permutation per epoch, ranks take 
+ank::world, so an epoch is a full pass (not the ~63 % of random sampling) |
+| checkpoints | save_every=500, last.pt carries model + optimizer + step, --resume tested |
+| steps | 82,000 x 24,576 tokens = 2.015B = one epoch |
+| Kaggle | code dataset icold21/kron-llm-code; bins icold21/kron-corpus-2b |
+
+The first epoch is the first segment, not a hard target: if validation bpb is
+still falling at step 82,000, the run resumes for a second epoch with a fresh
+cosine cycle. At 10M parameters and 2B tokens, a second pass is cheap and
+unlikely to overfit.
+
