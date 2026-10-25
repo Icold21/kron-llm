@@ -502,7 +502,8 @@ def write_heldout(docs: Iterable[dict], out_dir: Path, per_language_bytes: int,
 
 def quota_mix(docs: Sequence[dict], budget_per_language: int,
               quotas: Optional[dict[str, float]] = None,
-              heldout_bytes: int = 0) -> dict:
+              heldout_bytes: int = 0,
+              budgets: Optional[dict[str, int]] = None) -> dict:
     """Split a held-out slice and apply the domain quotas.
 
     Fetching is deliberately generous and uneven; this is where the plan is
@@ -518,6 +519,8 @@ def quota_mix(docs: Sequence[dict], budget_per_language: int,
             :data:`DOMAIN_QUOTAS`.
         heldout_bytes: total held-out budget, split evenly across
             ``2 * len(quotas)`` buckets.
+        budgets: per-language override of ``budget_per_language``; used to
+            enforce the 60/40 byte ratio when the fetched volumes differ.
 
     Returns:
         ``{"train": {lang: {domain: [docs]}}, "heldout": {lang: [docs]},
@@ -548,7 +551,8 @@ def quota_mix(docs: Sequence[dict], budget_per_language: int,
         available = sum(len(d["text"].encode("utf-8"))
                         for key, items in pool.items() if key[0] == lang
                         for d in items)
-        budget = min(available, budget_per_language)
+        lang_budget = int((budgets or {}).get(lang, budget_per_language))
+        budget = min(available, lang_budget)
         for domain, quota in quotas.items():
             want = int(budget * quota)
             items = pool.get((lang, domain), [])

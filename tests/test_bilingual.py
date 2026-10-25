@@ -154,3 +154,12 @@ def test_quota_mix_is_deterministic_and_reports_shortfalls():
     no_code = [d for d in docs if d["domain"] != "code"]
     res = quota_mix(no_code, budget_per_language=60_000)
     assert any("code: empty" in s for s in res["shortfalls"])
+
+
+def test_quota_mix_per_language_budget_enforces_the_byte_ratio():
+    docs = _synthetic_docs()
+    res = quota_mix(docs, budget_per_language=60_000, budgets={"ru": 30_000})
+    ru = sum(res["bytes"]["ru"].values())
+    en = sum(res["bytes"]["en"].values())
+    assert 25_000 <= ru <= 35_000, ru
+    assert en > ru, (en, ru)

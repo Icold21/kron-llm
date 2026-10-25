@@ -5,6 +5,18 @@ data/*.bin
 data/tokenizer*.json
 data/tokenizer_meta*.json
 
+# Bilingual corpus: raw shards and mixes are large and reproducible from
+# scripts/build_bilingual.py.  The manifest, the report and the tokenizer meta
+# stay tracked because they are the provenance record.
+data/bilingual/shards/
+data/bilingual/mix/
+data/bilingual/raw/
+data/bilingual/*.bin
+data/bilingual/tokenizer.json
+data/bilingual/tokenizer_sample.txt
+data/bilingual/heldout_*.txt
+data/bilingual/*.log
+
 # Training artifacts
 runs/
 results/

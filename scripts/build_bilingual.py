@@ -238,26 +238,30 @@ def cmd_fetch_wiki(args: argparse.Namespace) -> None:
     written = 0
     kept = 0
     seen = 0
-    docs: list[dict] = []
     start = time.time()
-    for title, raw in fetch_wikitext(site, args.lang, titles):
-        seen += 1
-        text = clean_wikitext(raw)
-        st = quality(text, args.lang, min_chars=args.min_chars)
-        if not st.ok:
-            continue
-        doc = {"title": title, "text": text, "language": args.lang,
-               "domain": args.domain, "source": source, "licence": licence,
-               "url": url}
-        docs.append(doc)
-        kept += 1
-        written += len(text.encode("utf-8"))
-        if written >= target:
-            break
-        if kept % 200 == 0:
-            rate = written / max(1e-9, time.time() - start) / 1e6
-            print(f"  {kept} docs, {written/1e6:.1f} MB, {rate:.2f} MB/s")
-    n = append_jsonl(out, docs)
+    # Write as we go: a killed run then leaves a partial file instead of
+    # losing everything to an in-memory buffer, and progress is observable.
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "a", encoding="utf-8") as sink:
+        for title, raw in fetch_wikitext(site, args.lang, titles):
+            seen += 1
+            text = clean_wikitext(raw)
+            st = quality(text, args.lang, min_chars=args.min_chars)
+            if not st.ok:
+                continue
+            doc = {"title": title, "text": text, "language": args.lang,
+                   "domain": args.domain, "source": source, "licence": licence,
+                   "url": url}
+            sink.write(json.dumps(doc, ensure_ascii=False) + "\n")
+            kept += 1
+            written += len(text.encode("utf-8"))
+            if written >= target:
+                break
+            if kept % 200 == 0:
+                sink.flush()
+                rate = written / max(1e-9, time.time() - start) / 1e6
+                print(f"  {kept} docs, {written/1e6:.1f} MB, {rate:.2f} MB/s")
+    n = kept
     shard = record_shard(out, MANIFEST, source=source, licence=licence, url=url,
                          language=args.lang, domain=args.domain, docs=n,
                          note=f"categories={roots[:3]}... depth={args.depth}")
@@ -431,8 +435,14 @@ def cmd_build(args: argparse.Namespace) -> None:
     print(f"[dedup] {len(kept)} kept ({kept_bytes/1e6:.1f} MB), {dropped} dropped "
           f"(Jaccard >= {args.dedup_threshold})")
 
+    budgets = {}
+    if args.budget_en_mb:
+        budgets["en"] = int(args.budget_en_mb * 1e6)
+    if args.budget_ru_mb:
+        budgets["ru"] = int(args.budget_ru_mb * 1e6)
     result = quota_mix(kept, int(args.budget_per_language_mb * 1e6),
-                       heldout_bytes=int(args.heldout_mb * 1e6))
+                       heldout_bytes=int(args.heldout_mb * 1e6),
+                       budgets=budgets or None)
     for lang in ("en", "ru"):
         write_heldout(result["heldout"][lang], ROOT,
                       int(args.heldout_mb * 1e6) // 2, lang)
@@ -556,6 +566,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     p = sub.add_parser("build")
     p.add_argument("--budget-per-language-mb", type=float, default=200.0)
+    p.add_argument("--budget-en-mb", type=float, default=0.0,
+                   help="override the English budget (0 = use the shared one)")
+    p.add_argument("--budget-ru-mb", type=float, default=0.0,
+                   help="override the Russian budget (0 = use the shared one)")
     p.add_argument("--dedup-threshold", type=float, default=0.8)
     p.add_argument("--heldout-mb", type=float, default=2.0)
     p.set_defaults(func=cmd_build)
