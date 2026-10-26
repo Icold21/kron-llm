@@ -254,10 +254,14 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     local_rank = int(os.environ.get("LOCAL_RANK", "0"))
     is_main = rank == 0
     if ddp:
-        if not dist.is_initialized():
-            _init_process_group(rank, world_size)
+        # NCCL binds to the current CUDA device during init_process_group, so
+        # each rank must select its GPU *before* the process group is created.
+        # Initialising first made both ranks use cuda:0, which NCCL treats as
+        # two ranks on one GPU and kills the process.
         if torch.cuda.is_available():
             torch.cuda.set_device(local_rank)
+        if not dist.is_initialized():
+            _init_process_group(rank, world_size)
 
     run_dir = Path(run_dir)
     if is_main:

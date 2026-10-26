@@ -1,0 +1,16 @@
+{
+  "id": "icold21/kron-q10-probe",
+  "title": "Kron Q10 probe",
+  "code_file": "probe.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "icold21/kron-llm-code-v4",
+    "icold21/kron-corpus-2b"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}
