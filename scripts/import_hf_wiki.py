@@ -72,6 +72,8 @@ def main() -> None:
     ap.add_argument("--domain", default="encyclopedic")
     ap.add_argument("--target-mb", type=float, default=2200.0)
     ap.add_argument("--min-chars", type=int, default=600)
+    ap.add_argument("--licence", default="CC-BY-SA-4.0")
+    ap.add_argument("--note", default="bulk import; curated shard titles skipped")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -115,11 +117,18 @@ def main() -> None:
             parquet = pq.ParquetFile(path)
             for batch in parquet.iter_batches(batch_size=2000):
                 data = batch.to_pydict()
-                for title, text in zip(data.get("title", []),
-                                       data.get("text", [])):
+                texts = data.get("text", [])
+                titles = data.get("title") or [""] * len(texts)
+                for title, text in zip(titles, texts):
                     title = (title or "").strip()
                     text = (text or "").strip()
-                    if not title or not text or title in skip or title in seen:
+                    if not text:
+                        continue
+                    if not title:
+                        # Some datasets (cosmopedia) have no title column; use
+                        # the opening words as a stable identifier.
+                        title = " ".join(text.split()[:8])[:80]
+                    if title in skip or title in seen:
                         continue
                     body = normalize(text)
                     if len(body) < args.min_chars:
@@ -134,9 +143,9 @@ def main() -> None:
                         "language": args.lang,
                         "domain": args.domain,
                         "source": f"{args.site} dump ({args.dataset})",
-                        "licence": "CC-BY-SA-4.0",
+                        "licence": args.licence,
                         "url": f"https://{args.lang}.{args.site}.org/",
-                        "note": "bulk import; curated shard titles skipped",
+                        "note": args.note,
                     }
                     dst.write(json.dumps(doc, ensure_ascii=False) + "\n")
                     seen.add(title)
@@ -155,10 +164,10 @@ def main() -> None:
         raise SystemExit("nothing written")
     shard = record_shard(out, MANIFEST,
                          source=f"{args.dataset} ({args.site} dump)",
-                         licence="CC-BY-SA-4.0",
+                         licence=args.licence,
                          url=f"https://{args.lang}.{args.site}.org/",
                          language=args.lang, domain=args.domain, docs=docs,
-                         note="bulk import; curated shard titles skipped")
+                         note=args.note)
     print(f"[done] {docs:,} docs, {shard.bytes/1e6:.0f} MB -> {out}")
 
 
