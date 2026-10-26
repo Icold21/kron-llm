@@ -67,12 +67,12 @@ DEFAULTS: Dict[str, Any] = {
             # Cost: K*(v1*r1 + v2*r2) instead of V*r.
             "v1": 64, "v2": 64,
             "r1": 16, "r2": 8,
-            "K": 32,
+            "terms": 32,
         },
         "routed": {
             "v_eff": 5000,
             "route_dim": 6,
-            "top_k": 10,
+            "active_rows": 10,
             "temperature": 1.0,
         },
         # Intra-layer RMSNorm on q/k per head: removes logit drift and lets the
@@ -87,8 +87,8 @@ DEFAULTS: Dict[str, Any] = {
         "batched_prelude": True,
         "kron": {
             "L": 4,
-            "K": 2,
-            "K_win": 2,
+            "terms": 2,
+            "carry_window": 2,
             "n1": 8,
             "n2": 16,
             "stop_gradient": True,   # E8 flips this
@@ -226,10 +226,10 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
         "overrides": {"model.kron.s_learnable": True},
     },
     "E4": {
-        "desc": "E2 without anchor, K_qkv=8 (pure innovation product)",
+        "desc": "E2 without anchor, qkv_terms=8 (pure innovation product)",
         "overrides": {
             "model.kron.anchor": False,
-            "model.kron.K_qkv": 8,
+            "model.kron.qkv_terms": 8,
             # without the identity carrier the product of L innovations has
             # norm ~ tau**L, so tau must be O(1) for the branch to be alive
             "model.kron.innovation_scale": 1.0,
@@ -250,7 +250,7 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
     },
     "E7": {
         "desc": "E2 + K=4",
-        "overrides": {"model.kron.K": 4},
+        "overrides": {"model.kron.terms": 4},
     },
     "E8": {
         "desc": "E2 + full backprop (no stop-grad)",
@@ -277,7 +277,7 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
     },
     "E13": {
         "desc": "E2 + K=8 (budget-scaling point, ~651K params)",
-        "overrides": {"model.kron.K": 8},
+        "overrides": {"model.kron.terms": 8},
     },
     "E14": {
         "desc": "E2 + sum composition (sI + sum_l alpha_l D_l), full backprop",
@@ -326,7 +326,7 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
             "model.qk_norm": True,
             "model.kron.n1": 12,
             "model.kron.n2": 16,
-            "model.kron.K": 5,
+            "model.kron.terms": 5,
             "training.seq_len": 192,
             # batch 96 is too large for the reference GPU at d=192/N=20;
             # 64 x 192 = 12.3k tokens per step.
@@ -383,7 +383,7 @@ EXPERIMENTS: Dict[str, Dict[str, Any]] = {
             "model.qk_norm": True,
             "model.kron.n1": 16,
             "model.kron.n2": 20,         # n1 * n2 == d_model == 320
-            "model.kron.K": 6,
+            "model.kron.terms": 6,
             "training.seq_len": 192,
             # N*d*bs is held at Q1's level (24*320*32 == 20*192*64), so the
             # activation footprint stays the same as Q1's.
@@ -411,7 +411,7 @@ EXPERIMENTS["Q3"] = {
         "model.embed_rank": 0,
         "model.routed.v_eff": 5000,
         "model.routed.route_dim": 6,
-        "model.routed.top_k": 10,
+        "model.routed.active_rows": 10,
         "model.routed.temperature": 1.0,
         "training.lr": 3e-4,
         "training.min_lr": 3e-5,
@@ -454,7 +454,7 @@ EXPERIMENTS["Q5"] = {
     "desc": "Q4 + K=24 (~7.75M params), same activation footprint",
     "overrides": {
         **EXPERIMENTS["Q4"]["overrides"],
-        "model.kron.K": 24,
+        "model.kron.terms": 24,
         # Same lr schedule as Q4: the first attempt used 3e-4/2k steps and is
         # not a clean K ablation.
         "training.max_steps": 4000,
@@ -492,7 +492,7 @@ EXPERIMENTS["Q7"] = {
     "overrides": {
         **EXPERIMENTS["Q6"]["overrides"],
         "model.embed_mode": "kron",
-        "model.embed_kron": {"v1": 64, "v2": 64, "r1": 16, "r2": 8, "K": 32},
+        "model.embed_kron": {"v1": 64, "v2": 64, "r1": 16, "r2": 8, "terms": 32},
     },
 }
 
@@ -607,12 +607,12 @@ EXPERIMENTS["E28"] = {
 EXPERIMENTS["E29"] = {
     "desc": "E8 with K_win=4: state crosses four layers instead of two",
     "overrides": {**EXPERIMENTS["E8"]["overrides"],
-                  "model.kron.K_win": 4},
+                  "model.kron.carry_window": 4},
 }
 EXPERIMENTS["E30"] = {
     "desc": "E8 with K_win=0: state crosses the whole 12-layer stack",
     "overrides": {**EXPERIMENTS["E8"]["overrides"],
-                  "model.kron.K_win": 0},
+                  "model.kron.carry_window": 0},
 }
 # Q8g: gated FFN at quality scale (Q6 + SwiGLU).
 EXPERIMENTS["Q8g"] = {
@@ -639,7 +639,7 @@ EXPERIMENTS["Q10"] = {
         "model.embed_rank": 256,
         "model.kron.n1": 16,
         "model.kron.n2": 32,
-        "model.kron.K": 10,
+        "model.kron.terms": 10,
         "data.vocab_size": 8192,
         "data.eot_id": 8191,
         "data.seq_len": 512,

@@ -316,7 +316,7 @@ class KronBlock(nn.Module):
         self.s_values["f"] = self.s_values["fg"] = s_of("f")
 
         if self.use_kron_qkv:
-            kq = kc.get("K_qkv", None)   # E4: extra Kronecker terms on Q only
+            kq = kc.get("qkv_terms", None)   # E4: extra Kronecker terms on Q only
             self.q = self._make(d, n1, n2, self.L, s_of("q"), self.anchor, kq)
             self.k = self._make(d_kv, n1, n2, self.L, s_of("k"), self.anchor)
             self.v = self._make(d_kv, n1, n2, self.L, s_of("v"), self.anchor)
@@ -365,8 +365,8 @@ class KronBlock(nn.Module):
             L_eff, anchor, learn = 1, False, False
         return KronCompose(
             self.d, d_out, n1, n2, n1o, n2o,
-            L=L_eff, K=int(k_override if k_override is not None else kc["K"]),
-            K_win=int(kc["K_win"]),
+            L=L_eff, K=int(k_override if k_override is not None else kc["terms"]),
+            K_win=int(kc["carry_window"]),
             s_init=s_init, anchor=anchor, s_learnable=learn,
             stop_gradient=bool(kc["stop_gradient"]),
             theta_std=float(kc["theta_std"]),
@@ -579,7 +579,7 @@ class KronTransformer(nn.Module):
                 self.vocab_size, self.d,
                 v_eff=int(rc.get("v_eff", 5000)),
                 route_dim=int(rc.get("route_dim", 6)),
-                top_k=int(rc.get("top_k", 10)),
+                top_k=int(rc.get("active_rows", 10)),
                 temperature=float(rc.get("temperature", 1.0)),
             )
             self.embed_rank = 0
@@ -597,7 +597,7 @@ class KronTransformer(nn.Module):
                 self.vocab_size, self.embed_rank,
                 v1=int(ek.get("v1", 64)), v2=int(ek.get("v2", 64)),
                 r1=int(ek.get("r1", 16)), r2=int(ek.get("r2", 8)),
-                K=int(ek.get("K", 32)))
+                K=int(ek.get("terms", 32)))
             self.embed = None
             self.embed_up = nn.Linear(self.embed_rank, self.d, bias=False)
             self.lm_head = None

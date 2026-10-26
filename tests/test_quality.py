@@ -182,7 +182,7 @@ def test_chunked_loss_matches_full_and_grads_flow():
 def test_kron_embedding_builds_and_forward_finite():
     cfg = make_cfg(**{"model.embed_rank": 32, "model.embed_mode": "kron",
                       "model.embed_kron": {"v1": 16, "v2": 16, "r1": 4,
-                                           "r2": 8, "K": 8}})
+                                           "r2": 8, "terms": 8}})
     model = KronTransformer(cfg)
     assert model.embed_mode == "kron"
     assert model.embed is None and model.embed_up is not None
@@ -199,7 +199,7 @@ def test_kron_embedding_param_cost_and_grads():
     v1, v2, r1, r2, K = 16, 16, 4, 8, 8
     cfg = make_cfg(**{"model.embed_rank": 32, "model.embed_mode": "kron",
                       "model.embed_kron": {"v1": v1, "v2": v2, "r1": r1,
-                                           "r2": r2, "K": K}})
+                                           "r2": r2, "terms": K}})
     model = KronTransformer(cfg)
     factor_params = sum(p.numel() for p in model.kron_embed.parameters())
     assert factor_params == K * (v1 * r1 + v2 * r2)
@@ -217,7 +217,7 @@ def test_kron_embedding_chunked_loss_grads():
     checkpointed chunk, so gradients must reach every factor."""
     cfg = make_cfg(**{"model.embed_rank": 32, "model.embed_mode": "kron",
                       "model.embed_kron": {"v1": 16, "v2": 16, "r1": 4,
-                                           "r2": 8, "K": 8},
+                                           "r2": 8, "terms": 8},
                       "model.loss_chunk": 4})
     model = KronTransformer(cfg).train()
     x = torch.randint(0, 256, (2, 16))
@@ -231,7 +231,7 @@ def test_kron_embedding_chunked_loss_grads():
 def test_kron_embedding_bad_shapes_raise():
     cfg = make_cfg(**{"model.embed_rank": 32, "model.embed_mode": "kron",
                       "model.embed_kron": {"v1": 15, "v2": 16, "r1": 4,
-                                           "r2": 8, "K": 8}})
+                                           "r2": 8, "terms": 8}})
     with pytest.raises(ValueError):
         KronTransformer(cfg)
 
@@ -239,7 +239,7 @@ def test_kron_embedding_bad_shapes_raise():
 def test_kron_table_einsum_matches_torch_kron():
     cfg = make_cfg(**{"model.embed_rank": 32, "model.embed_mode": "kron",
                       "model.embed_kron": {"v1": 16, "v2": 16, "r1": 4,
-                                           "r2": 8, "K": 8}})
+                                           "r2": 8, "terms": 8}})
     model = KronTransformer(cfg)
     expected = sum(torch.kron(a, b) for a, b in
                    zip(model.kron_embed.A, model.kron_embed.B))
