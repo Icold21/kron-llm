@@ -7,55 +7,64 @@ detail.
 
 ## In progress
 
-- The corpus is built and measured: 5.19 GB mix, **1.637B train tokens**,
-  Russian at **15.7 % of tokens**. identity v6 (all four slices re-gated and
-  regenerated where needed) is being patched into the mix; then the final 8K
-  tokenizer and bins go to Kaggle as `icold21/kron-corpus-2b`.
-- Architecture is frozen; **Q10** (d=512, 25 layers, K=10, 9,938,886 params,
-  seq 512, **66,500 steps = 1.634B tokens**) is the pretraining run, on two T4s
-  via `torchrun --nproc_per_node=2`.
-- After pretraining: Habr article #1, then SFT/Q&A with 10–20 % pretrain
-  replay, then article #2. Distillation is shelved until an unaligned teacher
-  exists.
-- Open decision before SFT: the language rebalance. Russian is 29 % of bytes
-  but only 16 % of tokens; upsampling Russian or trimming English changes the
-  corpus, so it is a deliberate step, not a silent mixer tweak.
+- The corpus is final: **8.61 GB, 945,234 documents, 2,183,929,941 train
+  tokens**, Russian at **37.9 % of tokens**. Bins are on Kaggle as
+  `icold21/kron-corpus-2b` (4.37 GB train, 89.6 MB val).
+- **Q10** (d=512, 25 layers, K=10, 9,938,886 params, seq 512) is running on two
+  Kaggle T4s via `torchrun`; one epoch is **88,864 steps** (24,576 tokens per
+  step), `max_steps=0` derives it from the bin. Checkpoints every 500 steps,
+  500-minute sessions with resume.
+- After pretraining: Habr article #1, then SFT/Q&A with a KL anchor to the
+  frozen pretrain policy plus 5–10 % replay, then article #2. Distillation is
+  shelved until an unaligned teacher exists.
 
 ## Results
 
-## 2026-10-26T11:30+03:00 — corpus built: 1.637B tokens, Russian 15.7 % of tokens
+## 2026-10-26T15:10+03:00 — corpus final: 2.184B tokens, Russian 37.9 %; Q10 running
 
-- **Build**: 7.65 GB fetched, 807,024 documents; MinHash 0.8 dropped 20,022
-  (2.5 %) and left 7.12 GB; the quota mixer produced **5.19 GB**, which
-  tokenized to **1,636,598,548 train tokens** at 3.11 bytes/token (val 33.3M).
-- **Language share, measured**: EN 70.8 % / RU 29.2 % of bytes, but **EN
-  84.3 % / RU 15.7 % of tokens**. Russian costs 5.30 bytes/token against 2.67
-  for English, so a byte quota is not a token quota. The pilot's "33 %" came
-  from measuring fertility on a fixed 2M-character window, which favours
-  Cyrillic bytes; the measurement now runs over the whole validation text.
-- **Silent truncation found and fixed**: `prepare_bilingual_bin.py` defaulted
-  to `--max-train-mb 400` (a pilot value) and cut the first real tokenization
-  to 131M tokens. The default is now 0 (whole mix), and the run prints the
-  byte and token totals it actually consumed.
-- **Domains** (share of documents): math 25.3 %, science 21.6 %, encyclopedic
-  16.4 %, code 14.0 %, literature 12.2 %, ML 5.2 %, logic 3.9 %, CS 1.2 %,
-  humour 0.2 %, identity 0.09 %. Shortfalls published, not padded: logic 3.9 %
-  vs 10 %, ML 5.2 % vs 12 %, Russian code/ML/humour thin.
-- **Identity v6**: 800 plain + 850 pastiche per language. The earlier slices
-  had 135–153 dialogue documents per pastiche, 67 documents with numbers,
-  speaker labels (`User:`/`Kron:`), `**Turn 1:**` markers, stage directions and
-  31 "as an AI assistant" texts. Prompts are now monologues in both languages,
-  and one gate (`acceptable()`) rejects digits, assistant phrasing, dialogue,
-  markup, links, mixed-script text, fragments and near-duplicates (5-gram
-  Jaccard 0.8). The audit runs the same gate, so "0 defects" is the generator's
-  own predicate.
+- **Size**: 8.61 GB of mixed text, 945,234 documents, **2,183,929,941 train
+  tokens** at 3.80 bytes/token (val 44.8M). EN 46.2 % / RU 53.8 % of bytes,
+  which is **EN 62.1 % / RU 37.9 % of tokens**.
+- **Russian top-up**: the quota mix gave Russian 15.7 % of tokens because
+  Russian costs 5.12 bytes/token against 3.00 for English. The fix was data:
+  the full Russian Wikipedia (**2.0 GB** of new articles after skipping 18,337
+  titles already in curated shards) and the full Russian Wikisource (**1.1 GB**
+  of public-domain literature, 100,261 texts). Russian moved from 15.7 % to
+  37.9 % of tokens; closing the remaining gap to 45 % would need ~1 GB of
+  Russian prose that does not exist under a reusable licence.
+- **English shortfalls**: +47 MB theoretical physics, +63 MB engineering
+  (2,505 duplicate titles skipped), +100 MB IETF RFCs (2,696 documents) and
+  +130 MB Cosmopedia for ML (30,118 synthetic educational texts, labelled as
+  such in the manifest).
+- **Domains**: encyclopedic 30.3 %, literature 21.2 %, math 19.1 %, science
+  11.1 %, code 7.5 %, ML 5.4 %, logic 3.2 %, CS/engineering 2.3 %, humour
+  <0.1 %, identity 0.09 %. The encyclopedic overshoot is the price of the
+  Russian requirement; the report states it instead of hiding it.
+- **Identity v7**: 3,300 documents, **0 defects** under the generator's own
+  gate. Both pastiches regenerated at temperature 0.7, plain slices repaired
+  (616 kept / 184 regenerated in EN, 596 / 204 in RU). The gate rejects digits,
+  assistant phrasing, dialogue and stage directions, markdown, mixed scripts,
+  wrong mathematician names, fragments, and 5-gram near-duplicates; it requires
+  the three facts (name, KronLLM, Kronecker origin).
+- **Pipeline bugs fixed on the way**: `str.splitlines()` split JSON on U+2028
+  inside wiki text; bulk appends lacked `sha256` for the train/val split; the
+  BPE sample used the first 10 MB of each language (i.e. the code shard) and now
+  takes an equal share per domain; `encode_docs` streams text so an 8.6 GB mix
+  does not need three copies in RAM; `--max-train-mb` defaulted to the 400 MB
+  pilot cap and silently truncated the corpus 13×.
+- **Kaggle**: the dataset mount moved to `/kaggle/input/datasets/<owner>/<slug>`
+  and two DDP ranks reading bins straight from that mount were OOM-killed
+  (SIGKILL, no traceback). The kernel now copies the bins to
+  `/kaggle/working/data` first; the run survives.
+- **Q10**: 9,938,886 params, 88,864 steps of 24,576 tokens = 2.184B = one epoch,
+  `max_steps=0` and `epochs=1` derive the count from the bin. Batch 24 × seq 512
+  per GPU, fp16, checkpoint every 500 steps, 500-minute session budget.
+
 - **Easter eggs**: 81 episode transcripts plus 11 season-9 plot summaries
   (S9 transcripts are not published anywhere yet).
 - **Chat template reserved in the 8K tokenizer**: system 8187, user 8188,
   assistant 8189, `eot` 8190 (turn end), `endoftext` 8191 (document end) — SFT
   never needs to resize the embedding.
-- **Q10**: 9,938,886 params, 66,500 steps × 24,576 tokens (batch 24 × seq 512 ×
-  2 ranks) = 1.634B tokens = one full epoch of the measured corpus.
 - **DDP** verified on two CPU ranks: rank-0 logging and checkpoints, periodic
   `last.pt` every 500 steps with optimizer state, `--resume` tested; Windows
   rendezvous-store bug worked around.
@@ -130,22 +139,3 @@ Chain: Q9 → Q9k → Q8g-long, all at 61.4M tokens where applicable.
   budget*
 - Q8w is also cheaper in memory (3.44 GB vs 4.28) because 20 layers with batch
   24 fit better than 24 layers with batch 32
-
-## 2026-10-24T22:42+03:00 — nonlinearity inside the composition: closed
-
-| variant | bpb | vs E8 (1.4789) |
-|---|---:|---:|
-| E26, k=4 (one activation) | 1.5675 | +6.0 % |
-| E25, k=2 (two activations) | 1.5189 | +2.7 % |
-| E26b, additive k=4 (linear skeleton kept) | 1.5906 | +7.5 % |
-
-- more nonlinearity helped (k=2 beat k=4), but **every variant lost to the
-  linear product**, and the additive form was the worst
-- wall-clock cost at equal FLOPs: **0.655 vs 0.405 s/step** (+62 %) — the loss
-  of the single-GEMM fusion, not the activation itself
-- `eff_rank(P)` rose to 62.3 while bpb got worse: third independent sign that
-  rank is not the bottleneck
-- E23 (k=1, 9.56 MFLOP, 2.6× compute) and E24 (k=1 + RMSNorm) were dropped
-  rather than run: the trend is monotone and points away from the hypothesis
-- `E23–E26b` annotated as CLOSED in `config.py`; code kept for reproducibility
-  only

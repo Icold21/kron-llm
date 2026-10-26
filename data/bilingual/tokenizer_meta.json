@@ -3,32 +3,39 @@
   "tokenizer": "data/bilingual/tokenizer.json",
   "vocab_size": 8192,
   "eot_id": 8191,
-  "bytes_per_token": 3.326858124725372,
-  "train_tokens": 80300881,
-  "val_tokens": 1524790,
-  "train_bytes": 268296677,
-  "val_bytes": 5072760,
-  "merge_docs": 1080,
-  "merge_bytes": 33822389,
+  "chat_tokens": {
+    "system": 8187,
+    "user": 8188,
+    "assistant": 8189,
+    "eot": 8190
+  },
+  "endoftext_id": 8191,
+  "bytes_per_token": 3.802377431705417,
+  "train_tokens": 2183929941,
+  "val_tokens": 44809447,
+  "train_bytes": 8436175078,
+  "val_bytes": 170382430,
+  "merge_docs": 5585,
+  "merge_bytes": 27763678,
   "language": {
     "en": {
-      "bytes": 2006063,
-      "tokens": 717951,
-      "bytes_per_token": 2.794
+      "bytes": 83322934,
+      "tokens": 27794894,
+      "bytes_per_token": 2.998
     },
     "ru": {
-      "bytes": 1846818,
-      "tokens": 352506,
-      "bytes_per_token": 5.239
+      "bytes": 87059496,
+      "tokens": 16995799,
+      "bytes_per_token": 5.122
     }
   },
   "token_share": {
-    "en": 0.6707,
-    "ru": 0.3293
+    "en": 0.6206,
+    "ru": 0.3794
   },
   "byte_share": {
-    "en": 0.5207,
-    "ru": 0.4793
+    "en": 0.489,
+    "ru": 0.511
   },
   "val_fraction": 0.02
 }

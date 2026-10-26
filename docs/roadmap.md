@@ -58,12 +58,13 @@ template. The 2026-10-25 ablation set (E8r/E27-E30) showed the depth carry is
 worth 1.1 %, freezing sigma 0.8 %, and widening the window *costs* 1.4-2.8 %.
 
 **Corpus and run (2026-10-26).** The bilingual corpus is published as
-`kron-corpus`: 5.19 GB mixed, **1.637B tokens** measured, English 84.3 % /
-Russian 15.7 % of tokens (see README §14 for why bytes and tokens disagree).
-The identity slice is final: 800 plain + 850 pastiche per language, plain
-first-person prose, no digits, no dialogue scaffolding. Q10 (9,938,886 params)
-is ready on two T4s with DDP, a sharded epoch sampler and checkpoint/resume
-every 500 steps; one epoch is 66,500 steps.
+`kron-corpus`: 8.61 GB mixed, **2.184B tokens** measured, English 62.1 % /
+Russian 37.9 % of tokens (see README §14 for why bytes and tokens disagree, and
+for the Russian top-up that closed the gap). The identity slice is final: 800
+plain + 850 pastiche per language, plain first-person prose, no digits, no
+dialogue scaffolding, 0 defects under the generator's own gate. Q10
+(9,938,886 params) runs on two T4s with DDP, a sharded epoch sampler and
+checkpoint/resume every 500 steps; one epoch is 88,864 steps.
 
 Everything that broke the single-GEMM fusion lost quality, and the one
 structural win (the gate) was confirmed at matched parameters. Remaining levers
