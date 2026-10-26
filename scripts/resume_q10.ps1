@@ -39,7 +39,7 @@ if ($LASTEXITCODE -ne 0) {
 Say ("checkpoint dataset exit " + $LASTEXITCODE)
 
 # 3. attach it to the kernel and push the next session
-python -c "import json; p=r'kaggle/q10/kernel-metadata.json'; d=json.load(open(p)); d['dataset_sources']=['icold21/kron-llm-code-v8','icold21/kron-corpus-2b','icold21/kron-q10-ckpt']; json.dump(d, open(p,'w'), indent=2)"
+python -c "import json; p=r'kaggle/q10/kernel-metadata.json'; d=json.load(open(p)); d['dataset_sources']=['icold21/kron-llm-code-v9','icold21/kron-corpus-2b','icold21/kron-q10-ckpt']; json.dump(d, open(p,'w'), indent=2)"
 python -m kaggle kernels push -p kaggle/q10 2>&1 | Out-File -Encoding utf8 -Append $log
 Say ("kernel push exit " + $LASTEXITCODE)
 Say "SESSION 2 PUSHED"
