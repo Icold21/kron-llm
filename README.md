@@ -641,8 +641,9 @@ emits these as shortfalls; nothing is padded with mislabelled text.
 Next steps:
 
 1. train **Q10** (9,938,886 params, d=512, 25 layers, K=10, seq 512) on the
-   corpus on two Kaggle T4s with `torchrun --nproc_per_node=2`, one epoch =
-   88,864 steps = 2.184B tokens, checkpoint every 500 steps;
+   corpus on one Kaggle T4 with fp16 and batch 32 (DDP is unstable in the
+   Kaggle image; see `docs/goal_10m.md`), one epoch = 133,296 steps of 16,384
+   tokens = 2.184B, checkpoint every 500 steps;
 2. package the result, then compare against public small-model baselines
    before the SFT stage;
 3. decide the language rebalance for SFT (Russian is 38 % of tokens now).

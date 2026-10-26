@@ -10,8 +10,8 @@ detail.
 - The corpus is final: **8.61 GB, 945,234 documents, 2,183,929,941 train
   tokens**, Russian at **37.9 % of tokens**. Bins are on Kaggle as
   `icold21/kron-corpus-2b` (4.37 GB train, 89.6 MB val).
-- **Q10** (d=512, 25 layers, K=10, 9,938,886 params, seq 512) is running on two
-  Kaggle T4s via `torchrun`; one epoch is **88,864 steps** (24,576 tokens per
+- **Q10** (d=512, 25 layers, K=10, 9,938,886 params, seq 512) is running on one
+  Kaggle T4 (fp16, batch 32); one epoch is **133,296 steps** (16,384 tokens per
   step), `max_steps=0` derives it from the bin. Checkpoints every 500 steps,
   500-minute sessions with resume.
 - After pretraining: Habr article #1, then SFT/Q&A with a KL anchor to the
@@ -56,7 +56,7 @@ detail.
   and two DDP ranks reading bins straight from that mount were OOM-killed
   (SIGKILL, no traceback). The kernel now copies the bins to
   `/kaggle/working/data` first; the run survives.
-- **Q10**: 9,938,886 params, 88,864 steps of 24,576 tokens = 2.184B = one epoch,
+- **Q10**: 9,938,886 params, 133,296 steps of 16,384 tokens = 2.184B = one epoch,
   `max_steps=0` and `epochs=1` derive the count from the bin. Batch 24 × seq 512
   per GPU, fp16, checkpoint every 500 steps, 500-minute session budget.
 

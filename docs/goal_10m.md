@@ -186,11 +186,11 @@ probe, and generation at T=1.0, top_k=5–10.
 | epoch sampler | one shared permutation per epoch, ranks take 
 ank::world, so an epoch is a full pass (not the ~63 % of random sampling) |
 | checkpoints | save_every=500, last.pt carries model + optimizer + step, --resume tested |
-| steps | 88,864 x 24,576 tokens = 2.184B = one epoch |
+| steps | 133,296 x 16,384 tokens = 2.184B = one epoch (one T4, batch 32, fp16) |
 | Kaggle | code dataset icold21/kron-llm-code; bins icold21/kron-corpus-2b |
 
 The first epoch is the first segment, not a hard target: if validation bpb is
-still falling at step 88,864, the run resumes for a second epoch with a fresh
+still falling at step 133,296, the run resumes for a second epoch with a fresh
 cosine cycle. At 10M parameters and 1.6B tokens, a second pass is cheap and
 unlikely to overfit.
 
