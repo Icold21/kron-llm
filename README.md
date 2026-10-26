@@ -31,10 +31,10 @@ never the target corpus. Every comparison below is made at equal tokens,
 because step counts alone are misleading: Q6 trained with `batch 32` and Q8g
 with `batch 24`, so 10,000 steps of one is not 10,000 steps of the other.
 
-### The next run: 10M parameters on 2B tokens
+### The next run: 10M parameters on the bilingual corpus
 
 The current checkpoint is a development bench. The real target is a **10M
-model trained on a 2B-token bilingual corpus** and shipped as an int8 artifact
+model trained on a 1.6B-token bilingual corpus** and shipped as an int8 artifact
 under 10 MB, so it fits a 6 GB GPU and runs on CPU. The reference
 configuration is 9,938,886 parameters (d=512, 25 layers, d×d = 16×32
 Kronecker factors, K=10, 8K bilingual BPE). Purpose, success criteria, corpus
@@ -605,42 +605,47 @@ current_progress.md rolling log of the experiment queue
 ## 14. The bilingual corpus
 
 The corpus now lives in its own repository:
-**[Icold21/kron-corpus](https://github.com/Icold21/kron-corpus)** — a
-2B-token English/Russian corpus with a science accent, published with the full
-pipeline, the per-shard manifest and the measured composition.
+**[Icold21/kron-corpus](https://github.com/Icold21/kron-corpus)** — a bilingual
+English/Russian corpus with a science accent, published with the full pipeline,
+the per-shard manifest and the measured composition.
 
 | stage | result |
 |---|---|
-| fetched text | 7.3 GB · ~795k documents |
-| target size | **~2.0B tokens** (8K BPE, 3.34 bytes/token measured) |
-| by language | EN 4.9 GB · RU 2.4 GB at fetch; the mix enforces 60/40 by bytes |
-| domains | math 25 %, science 14 %, ML 12 %, logic 10 %, code 15 %, literature 11 %, encyclopedic 9 %, CS/engineering 3 %, humour 1 %, identity 1 % |
+| fetched text | 7.65 GB · 807k documents |
+| after dedup | 787k documents · 7.12 GB (20,022 dropped, 2.5 %) |
+| mixed | 5.19 GB |
+| measured size | **1.637B train tokens** (8K BPE, 3.11 bytes/token) |
+| by language | EN 70.8 % / RU 29.2 % of bytes · **EN 84.3 % / RU 15.7 % of tokens** |
+| domains | math 25.3 %, science 21.6 %, encyclopedic 16.4 %, code 14.0 %, literature 12.2 %, ML 5.2 %, logic 3.9 %, CS/engineering 1.2 %, humour 0.2 %, identity 0.09 % |
 | dedup | MinHash (Jaccard 0.8) · held-out 2 % per language, disjoint |
-| tokenizer | 8K byte-level BPE, bilingual, fertility recorded per language |
+| tokenizer | 8K byte-level BPE, bilingual, fertility measured per language (EN 2.67, RU 5.30 bytes/token) |
 | chat template | `<\|system\|>` 8187 · `<\|user\|>` 8188 · `<\|assistant\|>` 8189 · `<\|eot\|>` 8190 · `<\|endoftext\|>` 8191 |
 | identity slice | 800 plain + 850 pastiche per language, no numeric facts |
 
-**One finding fixed the ratio policy.** Bytes per token is not comparable across
-scripts: both languages receive ≈2.8 characters per token, but Cyrillic costs
-two UTF-8 bytes per character. A 60/40 *byte* split therefore gives only
-**33 % of tokens** to Russian, not the 45–47 % the original plan predicted. The
-contract is now stated in bytes (stable, tokenizer-independent) and the token
-share is recorded next to it in `tokenizer_meta.json`.
+**The ratio policy is the main measured surprise.** Bytes per token is not
+comparable across scripts: both languages get ≈2.7 characters per token, but
+Cyrillic costs two UTF-8 bytes per character. A 60/40 *byte* mix therefore
+yields only **15.7 % of tokens** to Russian — less than half the 33 % the pilot
+extrapolated from a truncated measurement, and far from the 45–47 % the
+original plan wanted. The corpus is honest about it: quotas are set in bytes
+(stable, tokenizer-independent), the measured token share sits next to them in
+`tokenizer_meta.json`, and rebalancing (upsampling Russian or trimming English)
+is a decision for before SFT, not something to hide in the mix.
 
 Known gaps are reported rather than hidden, and the corpus README repeats them:
 logic lands at ~3 % against a 10 % quota (only formal proofs scale), ML at
-~5 % against 12 % (most prose is paywalled), and Russian code is absent by
-nature. The mixer emits these as shortfalls; nothing is padded with
-mislabelled text.
+~5 % against 12 % (most prose is paywalled), Russian code, ML and humour are
+thin, and Russian is 1.5 GB against 3.7 GB of English. The mixer emits these as
+shortfalls; nothing is padded with mislabelled text.
 
 Next steps:
 
 1. train **Q10** (9,938,886 params, d=512, 25 layers, K=10, seq 512) on the
    corpus on two Kaggle T4s with `torchrun --nproc_per_node=2`, one epoch =
-   82k steps = 2.015B tokens, checkpoint every 500 steps;
-2. close the tokenizer question (8K vs 16K) before the run starts;
-3. package the result, then compare against public small-model baselines
-   before the SFT stage.
+   66,500 steps = 1.637B tokens, checkpoint every 500 steps;
+2. package the result, then compare against public small-model baselines
+   before the SFT stage;
+3. decide the language rebalance for SFT.
 
 **Reproducibility details that matter for the run.** The epoch sampler is
 sharded: all ranks build the same permutation from a shared seed and take

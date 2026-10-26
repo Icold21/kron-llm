@@ -66,7 +66,7 @@ Measured, not assumed: the depth carry is worth 1.1 % bpb, freezing its scalar
 ## Next
 
 The 10M model (Q10: d=512, 25 layers, K=10, 9,938,886 parameters) trains on
-[KronCorpus](https://huggingface.co/datasets/Icold/kron-corpus) — 2B tokens of
+[KronCorpus](https://huggingface.co/datasets/Icold/kron-corpus) — 1.6B tokens of
 bilingual English/Russian text with a science accent — on two Kaggle T4s. The
 checkpoint will appear here when the first epoch finishes; the corpus card
 documents every source and licence.

@@ -57,13 +57,17 @@ two-layer carry, gated Kronecker FFN, BPE tokenizer with a reserved chat
 template. The 2026-10-25 ablation set (E8r/E27-E30) showed the depth carry is
 worth 1.1 %, freezing sigma 0.8 %, and widening the window *costs* 1.4-2.8 %.
 
-**Corpus and run (2026-10-26).** The 2B-token bilingual corpus is published as
-\kron-corpus\; the identity slice is final (800 plain + 850 pastiche per
-language, no numeric facts); Q10 (9,938,886 params) is ready to run on two T4s
-with DDP, a sharded epoch sampler and checkpoint/resume every 500 steps. Everything that broke the single-GEMM fusion
-lost quality, and the one structural win (the gate) was confirmed at matched
-parameters. Remaining levers are data, context length and scale toward the 10M
-ceiling.
+**Corpus and run (2026-10-26).** The bilingual corpus is published as
+`kron-corpus`: 5.19 GB mixed, **1.637B tokens** measured, English 84.3 % /
+Russian 15.7 % of tokens (see README §14 for why bytes and tokens disagree).
+The identity slice is final: 800 plain + 850 pastiche per language, plain
+first-person prose, no digits, no dialogue scaffolding. Q10 (9,938,886 params)
+is ready on two T4s with DDP, a sharded epoch sampler and checkpoint/resume
+every 500 steps; one epoch is 66,500 steps.
+
+Everything that broke the single-GEMM fusion lost quality, and the one
+structural win (the gate) was confirmed at matched parameters. Remaining levers
+are data, context length and scale toward the 10M ceiling.
 
 ## 3. Phase 0 — architecture freeze (gate A)
 

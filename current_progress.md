@@ -7,41 +7,55 @@ detail.
 
 ## In progress
 
-- Identity regeneration (800 plain + 850 pastiche per language) is finishing;
-  the night chain then builds the corpus, tokenizes 8K with the reserved chat
-  ids and uploads the bins to Kaggle.
+- The corpus is built and measured: 5.19 GB mix, **1.637B train tokens**,
+  Russian at **15.7 % of tokens**. identity v6 (all four slices re-gated and
+  regenerated where needed) is being patched into the mix; then the final 8K
+  tokenizer and bins go to Kaggle as `icold21/kron-corpus-2b`.
 - Architecture is frozen; **Q10** (d=512, 25 layers, K=10, 9,938,886 params,
-  seq 512, 82k steps = 2.015B tokens) is the pretraining run, on two T4s via
-  `torchrun --nproc_per_node=2`.
+  seq 512, **66,500 steps = 1.634B tokens**) is the pretraining run, on two T4s
+  via `torchrun --nproc_per_node=2`.
 - After pretraining: Habr article #1, then SFT/Q&A with 10–20 % pretrain
   replay, then article #2. Distillation is shelved until an unaligned teacher
   exists.
+- Open decision before SFT: the language rebalance. Russian is 29 % of bytes
+  but only 16 % of tokens; upsampling Russian or trimming English changes the
+  corpus, so it is a deliberate step, not a silent mixer tweak.
 
 ## Results
 
-## 2026-10-26T02:30+03:00 — 2B corpus assembled; identity, repos and Q10 ready
+## 2026-10-26T11:30+03:00 — corpus built: 1.637B tokens, Russian 15.7 % of tokens
 
-- **Corpus, fetched**: 7.3 GB of text, ~795k documents, ~2.15B tokens at
-  3.34 bytes/token; EN 4.9 GB / RU 2.4 GB. Published as its own repository
-  (`kron-corpus`) and an HF dataset.
-- **Domains**: math 26 %, science 22 % (physics/astronomy/cosmology curated),
-  encyclopedic 16 %, code 14 %, literature 11 %, ML 5 %, logic 3 % (Lean
-  mathlib), CS/engineering 3 %, humour <1 %, identity <0.1 %.
-- **Selection**: provenance per shard (source, licence, URL, SHA-256), primary
-  sources over scrapes, MinHash 0.8 dedup, 2 % disjoint held-out. Shortfalls
-  reported, not padded: logic 3 % vs 10 %, ML 5 % vs 12 %, RU code absent.
-- **Identity slice**: 800 plain + 850 pastiche per language (3300 docs,
-  2.5 MB). Facts deliberately carry **no numbers and no framing** (name,
-  compact/efficient, Kronecker origin), guarded by `SPECS`, `FRAMING` and
-  `MISSPELL` filters. Earlier versions with "ten million" and "6 GB" were
-  discarded: a hard-coded size breaks the moment the model is scaled.
+- **Build**: 7.65 GB fetched, 807,024 documents; MinHash 0.8 dropped 20,022
+  (2.5 %) and left 7.12 GB; the quota mixer produced **5.19 GB**, which
+  tokenized to **1,636,598,548 train tokens** at 3.11 bytes/token (val 33.3M).
+- **Language share, measured**: EN 70.8 % / RU 29.2 % of bytes, but **EN
+  84.3 % / RU 15.7 % of tokens**. Russian costs 5.30 bytes/token against 2.67
+  for English, so a byte quota is not a token quota. The pilot's "33 %" came
+  from measuring fertility on a fixed 2M-character window, which favours
+  Cyrillic bytes; the measurement now runs over the whole validation text.
+- **Silent truncation found and fixed**: `prepare_bilingual_bin.py` defaulted
+  to `--max-train-mb 400` (a pilot value) and cut the first real tokenization
+  to 131M tokens. The default is now 0 (whole mix), and the run prints the
+  byte and token totals it actually consumed.
+- **Domains** (share of documents): math 25.3 %, science 21.6 %, encyclopedic
+  16.4 %, code 14.0 %, literature 12.2 %, ML 5.2 %, logic 3.9 %, CS 1.2 %,
+  humour 0.2 %, identity 0.09 %. Shortfalls published, not padded: logic 3.9 %
+  vs 10 %, ML 5.2 % vs 12 %, Russian code/ML/humour thin.
+- **Identity v6**: 800 plain + 850 pastiche per language. The earlier slices
+  had 135–153 dialogue documents per pastiche, 67 documents with numbers,
+  speaker labels (`User:`/`Kron:`), `**Turn 1:**` markers, stage directions and
+  31 "as an AI assistant" texts. Prompts are now monologues in both languages,
+  and one gate (`acceptable()`) rejects digits, assistant phrasing, dialogue,
+  markup, links, mixed-script text, fragments and near-duplicates (5-gram
+  Jaccard 0.8). The audit runs the same gate, so "0 defects" is the generator's
+  own predicate.
 - **Easter eggs**: 81 episode transcripts plus 11 season-9 plot summaries
   (S9 transcripts are not published anywhere yet).
 - **Chat template reserved in the 8K tokenizer**: system 8187, user 8188,
   assistant 8189, `eot` 8190 (turn end), `endoftext` 8191 (document end) — SFT
   never needs to resize the embedding.
-- **Q10**: 9,938,886 params, 82k steps × 24,576 tokens (batch 24 × seq 512 ×
-  2 ranks) = 2.015B tokens = one full epoch.
+- **Q10**: 9,938,886 params, 66,500 steps × 24,576 tokens (batch 24 × seq 512 ×
+  2 ranks) = 1.634B tokens = one full epoch of the measured corpus.
 - **DDP** verified on two CPU ranks: rank-0 logging and checkpoints, periodic
   `last.pt` every 500 steps with optimizer state, `--resume` tested; Windows
   rendezvous-store bug worked around.
