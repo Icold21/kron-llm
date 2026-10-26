@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -25,6 +26,21 @@ from gen_identity import (MANIFEST, MODEL, SHARDS, acceptable, clean,
                           generate, record_shard)
 
 URL = "https://github.com/Icold21/kron-llm"
+
+
+def _shingles(text: str) -> set[tuple[str, ...]]:
+    words = re.findall(r"\w+", text.lower())
+    return {tuple(words[i:i + 5]) for i in range(len(words) - 4)}
+
+
+def _near_duplicate(sig: set, kept: list[set], threshold: float = 0.8) -> bool:
+    for other in kept:
+        if not sig or not other:
+            continue
+        inter = len(sig & other)
+        if inter / (len(sig) + len(other) - inter) >= threshold:
+            return True
+    return False
 
 
 def main() -> None:
@@ -42,10 +58,16 @@ def main() -> None:
     lang = "ru" if args.name.endswith("_ru") else "en"
 
     kept, reasons = [], Counter()
+    signatures: list[set] = []
     for row in rows:
         text = clean(row["text"])
         ok, why = acceptable(text, lang)
         if ok:
+            sig = _shingles(text)
+            if _near_duplicate(sig, signatures):
+                reasons["duplicate"] += 1
+                continue
+            signatures.append(sig)
             row["text"] = text
             kept.append(row)
         else:

@@ -132,6 +132,15 @@ ROLE_LINE = re.compile(
 DASH_LINE = re.compile(r"^\s*[—–]\s", re.M)
 #: A line that is nothing but a stage direction, e.g. *the scientist leans in*.
 STAGE_LINE = re.compile(r"^\*[^*\n]{3,90}\*$|^\([^)\n]{15,90}\)$")
+#: Strict shape of an identity document: a short piece of first-person prose.
+#: Too short a text carries no identity, too long a text drifts into an essay.
+MIN_CHARS, MAX_CHARS = 150, 1200
+FIRST_PERSON = {
+    "en": re.compile(r"\b(I|I'm|I am|I've|I'd|my|me)\b"),
+    "ru": re.compile(r"\b(я|меня|мне|мой|моя|моё|мои)\b", re.I),
+}
+SENTENCE = re.compile(r"[.!?…]+")
+MARKDOWN = re.compile(r"(^#|^\s*[-•]\s|^\s*\d+\.\s|https?://|www\.)", re.M)
 
 
 def ollama_generate(prompt: str, seed: int, num_predict: int = 260) -> str:
@@ -176,9 +185,16 @@ def clean(text: str) -> str:
 
 
 def acceptable(text: str, lang: str) -> tuple[bool, str]:
-    """Return ``(ok, reason)`` for one generated sample."""
-    if len(text) < 120:
+    """Return ``(ok, reason)`` for one generated sample.
+
+    The identity slice is small, so the bar is deliberately high: a document
+    is first-person prose of one to three paragraphs, with no digits, no
+    assistant boilerplate, no dialogue, no markup and no stage directions.
+    """
+    if len(text) < MIN_CHARS:
         return False, "short"
+    if len(text) > MAX_CHARS:
+        return False, "long"
     if "Kron" not in text and "Крон" not in text:
         return False, "no_name"
     if LEAK.search(text):
@@ -195,12 +211,34 @@ def acceptable(text: str, lang: str) -> tuple[bool, str]:
         return False, "dialogue"
     if len(DASH_LINE.findall(text)) >= 2:
         return False, "dialogue"
+    if MARKDOWN.search(text):
+        return False, "markdown"
     if MISSPELL.search(text):
         return False, "misspell"
-    st = quality(text, lang, min_chars=120, max_symbol_ratio=0.25,
-                 max_repeat_ratio=0.45)
+    if len(SENTENCE.findall(text)) < 2:
+        return False, "fragment"
+    if len(FIRST_PERSON[lang].findall(text)) < 2:
+        return False, "no_first_person"
+    if META.search(text):
+        return False, "meta"
+    # Tighter than the corpus defaults: the slice is tiny, so a single bad
+    # document is a visible share of it.
+    st = quality(text, lang, min_chars=MIN_CHARS, max_symbol_ratio=0.12,
+                 max_repeat_ratio=0.25, min_compression=0.25,
+                 max_compression=0.78)
     if not st.ok:
         return False, ",".join(st.reasons)
+    # Language purity: Latin words inside a Russian text were the most common
+    # artefact ("Ой, wait"), and a stray Cyrillic word inside English is just
+    # as wrong.  The names are exempt by being short.
+    cyr = len(re.findall(r"[\u0400-\u04FF]", text))
+    lat = len(re.findall(r"[A-Za-z]", text))
+    letters = cyr + lat
+    if letters:
+        if lang == "ru" and cyr / letters < 0.82:
+            return False, "mixed_ru"
+        if lang == "en" and cyr / letters > 0.02:
+            return False, "mixed_en"
     return True, ""
 
 

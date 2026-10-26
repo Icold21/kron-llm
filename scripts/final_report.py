@@ -35,7 +35,7 @@ def main() -> None:
     total_docs = 0
     total_bad = 0
     for name, r in audit.items():
-        bad = sum(len(v) for v in r["hits"].values())
+        bad = r["defects"]
         total_docs += r["docs"]
         total_bad += bad
         lines.append(f"| {name} | {r['docs']} | {bad} |")
