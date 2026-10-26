@@ -40,16 +40,14 @@ MODEL = "qwen3.5:4b"
 #: Facts the generator is allowed to use.  Everything else is a hallucination
 #: and is filtered out below.
 FACTS_EN = (
-    "Kron is a small bilingual English/Russian language model built by the "
-    "KronLLM project. It is compact and efficient. Its weights are Kronecker "
-    "products, which is where the name comes from. It is a research model, "
-    "not a chatbot, and it can be wrong."
+    "Kron is a small language model built by the KronLLM project. It is "
+    "compact and efficient. Its weights are built from Kronecker products, "
+    "which is where the name comes from."
 )
 FACTS_RU = (
-    "Kron — небольшая двуязычная языковая модель (английский и русский), "
-    "созданная в проекте KronLLM. Она компактная и эффективная. Её веса "
-    "построены на кронекеровых произведениях — отсюда имя. Это "
-    "исследовательская модель, а не чат-бот, и она может ошибаться."
+    "Kron — небольшая языковая модель, созданная в проекте KronLLM. Она "
+    "компактная и эффективная. Её веса построены на кронекеровых "
+    "произведениях — отсюда имя."
 )
 
 PROMPTS: list[tuple[str, str]] = [
@@ -61,8 +59,8 @@ PROMPTS: list[tuple[str, str]] = [
            "who it is and what it can do. Kron answers in the first person, "
            "briefly and honestly. Use only these facts: {facts}"),
     ("en", "Describe yourself in the first person for a project README, 60-90 "
-           "words. You are Kron. Mention the name, the languages and "
-           "one limitation. Use only these facts: {facts}"),
+           "words. You are Kron. Mention the name and what the name refers to. "
+           "Use only these facts: {facts}"),
     ("ru", "Напиши представление о себе от первого лица, 60-100 слов. Ты — "
            "Kron. Используй только эти факты: {facts}"),
     ("ru", "Ответь на вопрос «Кто ты?» от первого лица, 3-5 предложений. Ты — "
@@ -71,7 +69,7 @@ PROMPTS: list[tuple[str, str]] = [
            "Kron, кто он и что умеет. Kron отвечает от первого лица, коротко и "
            "честно. Используй только эти факты: {facts}"),
     ("ru", "Опиши себя от первого лица для README проекта, 60-90 слов. Ты — "
-           "Kron. Упомяни имя, языки и одно ограничение. Используй "
+           "Kron. Упомяни имя и то, на что оно указывает. Используй "
            "только эти факты: {facts}"),
     ("en", "Write a FAQ entry titled 'What is Kron?' in 3-5 sentences, first "
            "person. Use only these facts: {facts}"),
@@ -113,6 +111,13 @@ SPECS = re.compile(
     r"миллиард\w*|parameter\w*|параметр\w*)\b"
     r"|\b(?:six|ten|seven|eight|twenty)[- ](?:gigabyte|million)\b",
     re.I)
+#: Framing that is deliberately absent from the identity slice: the model is
+#: a small language model with Kronecker weights, nothing more.
+FRAMING = re.compile(
+    r"\b(bilingual|двуязычн\w*|chatbot|chat-bot|чат-бот\w*|"
+    r"research model|исследовательск\w* модель)\b", re.I)
+#: Frequent generator misspellings of the project name.
+MISSPELL = re.compile(r"\b(CronLLM|Kroun|Кроун|КронLLM)\b")
 
 
 def ollama_generate(prompt: str, seed: int, num_predict: int = 260) -> str:
@@ -157,6 +162,10 @@ def acceptable(text: str, lang: str) -> tuple[bool, str]:
         return False, "identity"
     if SPECS.search(text):
         return False, "specs"
+    if FRAMING.search(text):
+        return False, "framing"
+    if MISSPELL.search(text):
+        return False, "misspell"
     st = quality(text, lang, min_chars=120, max_symbol_ratio=0.25,
                  max_repeat_ratio=0.45)
     if not st.ok:
@@ -189,23 +198,20 @@ STYLE_PROMPTS: dict[str, list[tuple[str, str]]] = {
                "model complains that everyone asks it the same question, then "
                "states what it actually is. You are Kron. Keep it rude but "
                "not hateful. Use only these facts: {facts}"),
-        ("ru", "Напиши представление о себе на 60-100 слов от первого лица в "
-               "стиле грубого гениального учёного: он перебивает сам себя "
-               "(не больше двух раз «*ик*»), снисходителен к собеседнику, "
-               "упоминает эффективность. Ты — Kron. "
-               "Не называй реальных людей и вымышленных персонажей. Используй "
+        ("ru", "Напиши 3-4 предложения от первого лица. Ты — Kron, небольшая "
+               "языковая модель проекта KronLLM. Тон: уверенный, слегка "
+               "насмешливый. Упомяни, что твои веса — кронекеровы произведения. "
+               "Без диалога, без ремарок, без других персонажей. Используй "
                "только эти факты: {facts}"),
-        ("ru", "Ответь на вопрос «Кто ты?» голосом высокомерного мультяшного "
-               "учёного: три-четыре коротких предложения, сарказм, одно "
-               "перебивание себя. Ты — Kron. Не называй существующих "
-               "персонажей. Используй только эти факты: {facts}"),
-        ("ru", "Напиши диалог на 4-6 реплик, где самодовольная модель-учёный "
-               "объясняет скучающему подростку, что она такое. Kron "
-               "саркастичен и называет его «малой». Без реальных имён. "
-               "Используй только эти факты: {facts}"),
-        ("ru", "Напиши тираду на 50-80 слов голосом ворчливого гения: модель "
-               "жалуется, что все задают один и тот же вопрос, и потом "
-               "говорит, что она такое. Ты — Kron. Грубо, но без злобы. "
+        ("ru", "Ответь на вопрос «Кто ты?» тремя короткими предложениями. Тон "
+               "самоуверенный и насмешливый. Ты — Kron. Без диалога и без "
+               "описаний сцены. Используй только эти факты: {facts}"),
+        ("ru", "Напиши короткое представление о себе, 50-80 слов, от первого "
+               "лица, для карточки модели. Тон дерзкий, но без грубостей. Ты — "
+               "Kron. Только текст, без заголовков и ремарок. Используй только "
+               "эти факты: {facts}"),
+        ("ru", "Объясни в двух-трёх предложениях, откуда у тебя имя, и добавь "
+               "одну насмешливую фразу в свой адрес. Ты — Kron. Без диалога. "
                "Используй только эти факты: {facts}"),
     ],
 }
@@ -256,15 +262,18 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--style", default="plain", choices=["plain", *STYLE_PROMPTS],
                     help="prompt family: plain self-description or a pastiche")
+    ap.add_argument("--lang", default="both", choices=["en", "ru", "both"],
+                    help="restrict generation to one language")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--check", action="store_true",
                     help="only verify the existing shards")
     args = ap.parse_args()
 
     SHARDS.mkdir(parents=True, exist_ok=True)
+    langs = ("en", "ru") if args.lang == "both" else (args.lang,)
     suffix = "" if args.style == "plain" else f"_{args.style}"
     if args.check:
-        for lang in ("en", "ru"):
+        for lang in langs:
             path = SHARDS / f"identity{suffix}_{lang}.jsonl"
             rows = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
             print(lang, len(rows), "docs",
@@ -272,7 +281,7 @@ def main() -> None:
             print("  sample:", rows[0]["text"][:160].replace("\n", " "))
         return
 
-    for lang in ("en", "ru"):
+    for lang in langs:
         path = SHARDS / f"identity{suffix}_{lang}.jsonl"
         if path.exists() and not args.force:
             print(f"[skip] {path} exists")
