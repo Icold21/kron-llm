@@ -15,6 +15,14 @@ detail.
   one Kaggle T4 (fp16, batch 32); one epoch is **137,377 steps** (16,384 tokens
   per step), `max_steps=0` derives it from the bin. Checkpoints every 500 steps,
   500-minute sessions with resume.
+- **WSD schedule**: the epoch runs at a **constant 3e-4** (`min_lr = lr`), so
+  every token gets the same weight, and the quality work is done by a separate
+  decay pass `Q10A`: resumes the end-of-epoch weights, anneals 3e-4 → 1e-6 over
+  **20 % of an epoch** (27,475 steps, ~19 GPU-ч) on a curated subset
+  (encyclopedic, literature, science, identity at a higher share, ~30 % general
+  text). The curated bin is not built yet — it is needed before the epoch ends.
+  A cosine tail inside the epoch was rejected: at 5 % of steps and LR ~1.5e-5 it
+  would have given the curated data ~0.2 % of the update mass.
 - After pretraining: Habr article #1, then SFT/Q&A with a KL anchor to the
   frozen pretrain policy plus 5–10 % replay, then article #2. Distillation is
   shelved until an unaligned teacher exists.
