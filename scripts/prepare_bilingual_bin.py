@@ -44,17 +44,28 @@ def load_mixed(mix_dir: Path) -> list[dict]:
 
 
 def stratified_sample(docs: list[dict], per_language_bytes: int) -> list[str]:
-    """Sample text per language so both sides shape the merge table equally."""
+    """Sample text per language *and domain* so both sides shape the merges.
+
+    Taking the first N MB of each language would sample whatever mix file
+    happens to sort first (``en_code``), which biases a bilingual prose
+    tokenizer toward Python.  Each domain gets an equal share instead.
+    """
     out: list[str] = []
     for lang in ("en", "ru"):
-        budget = 0
+        by_domain: dict[str, list[dict]] = {}
         for doc in docs:
-            if doc["language"] != lang:
-                continue
-            out.append(doc["text"])
-            budget += len(doc["text"])
-            if budget >= per_language_bytes:
-                break
+            if doc["language"] == lang:
+                by_domain.setdefault(doc["domain"], []).append(doc)
+        if not by_domain:
+            continue
+        budget = per_language_bytes // len(by_domain)
+        for domain in sorted(by_domain):
+            used = 0
+            for doc in by_domain[domain]:
+                out.append(doc["text"])
+                used += len(doc["text"])
+                if used >= budget:
+                    break
     return out
 
 
