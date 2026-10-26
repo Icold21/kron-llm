@@ -657,7 +657,10 @@ EXPERIMENTS["Q10"] = {
         "training.eval_batch_size": 8,
         "training.grad_accum": 1,
         "training.amp": "fp16",
-        "training.spectral_every": 0,
+        # Spectral diagnostics are read from ``metrics``, not ``training`` -- the
+        # old ``training.spectral_every: 0`` was inert, so every 2000 steps the
+        # run still paid for 250 SVDs and, at batch 32, died in cusolver.
+        "metrics.spectral_every": 0,
         "training.seq_len": 512,
         "training.lr": 3e-4,
         # Constant LR through the epoch: WSD keeps the whole first pass at one

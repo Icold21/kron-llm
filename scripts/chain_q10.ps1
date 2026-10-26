@@ -4,7 +4,7 @@ $root = "C:\Users\Icold\Desktop\kron_llm"
 Set-Location $root
 $log = Join-Path $root "data\q10_chain.log"
 $kernel = "icold21/kron-q10-10m-bilingual-pretraining"
-$code = "icold21/kron-llm-code-v11"
+$code = "icold21/kron-llm-code-v12"
 
 function Say($msg) {
     $line = "[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $msg
@@ -19,6 +19,9 @@ function Mail($subject, $body) {
 
 "=== chain started $(Get-Date -Format 'HH:mm:ss')" | Out-File -Encoding utf8 $log
 
+$prevStep = [int](python scripts\session_progress.py --history 2>$null | Select-Object -Last 1)
+Say ("last step seen before this session: " + $prevStep)
+
 # 1. wait for the session to end.  A transient API failure must not look like
 # completion, otherwise the next session would be pushed on top of a live run.
 $deadline = (Get-Date).AddHours(14)
@@ -29,22 +32,63 @@ while ($true) {
     if ($status -match "COMPLETE|ERROR|CANCEL|FAILED") { break }
     Start-Sleep -Seconds 300
 }
+$errored = $status -match "ERROR|CANCEL|FAILED"
 
-# 2. download the session output (checkpoints, log.csv, results.json)
+# 2. download the session output.  The directory is cleared first: a failed run
+#    can return the previous version's files, and stale weights are worse than
+#    no weights.
 $out = Join-Path $root "data\kaggle_out"
+Remove-Item (Join-Path $out "q10") -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 python -m kaggle kernels output $kernel -p $out 2>&1 | Out-File -Encoding utf8 -Append $log
 Say ("output exit " + $LASTEXITCODE)
 
-# 3. report the curve and mail it
+$nowStep = [int](python scripts\session_progress.py --new 2>$null | Select-Object -Last 1)
+Say ("this download ends at step " + $nowStep)
+
+# 3. no progress means the run died before a checkpoint: say so, do not resume
+#    from whatever old file happened to be lying around.
+if ($nowStep -le $prevStep) {
+    python scripts\kaggle_log.py "" 4000 > data\session_failure.txt 2>&1
+    $body = Join-Path $root "data\session_failure.md"
+    @"
+# Q10: сессия упала, прогресса нет
+
+Кернел завершился со статусом ``$status``, но в выходных файлах нет шага
+больше $prevStep — то есть новый чекпоинт не записался, и прогон не продвинулся.
+
+**Ничего не публикую и не перезапускаю автоматически**: продолжать с чужого
+или устаревшего чекпоинта хуже, чем остановиться.
+
+Хвост лога сессии — в ``data/session_failure.txt``. Коротко он здесь:
+
+``````
+"@ | Out-File -Encoding utf8 $body
+    Get-Content "data\session_failure.txt" -Tail 60 -Encoding utf8 | Out-File -Encoding utf8 -Append $body
+    "``````" | Out-File -Encoding utf8 -Append $body
+    Mail "Q10: сессия упала без прогресса" $body
+    Say "FAILED SESSION: reported, nothing pushed"
+    exit 3
+}
+
+# 4. report the curve and mail it
 Remove-Item "data\q10_epoch_done.flag" -ErrorAction SilentlyContinue
 python scripts\report_q10.py --tag session 2>&1 | Out-File -Encoding utf8 -Append $log
 $body = Join-Path $root "data\report_q10.md"
 $subjectFile = Join-Path $root "data\report_q10_subject.txt"
-$subject = if (Test-Path $subjectFile) { (Get-Content $subjectFile -Raw).Trim() } else { "Q10 session report" }
-if (Test-Path $body) { Mail $subject $body }
+$subject = if (Test-Path $subjectFile) { (Get-Content $subjectFile -Raw -Encoding utf8).Trim() } else { "Q10 session report" }
+if ($errored) { $subject = $subject + " (сессия завершилась ошибкой)" }
+if (Test-Path $body) {
+    if ($errored) {
+        python scripts\kaggle_log.py "" 3000 > data\session_failure.txt 2>&1
+        "`n## Хвост лога`n`n``````" | Out-File -Encoding utf8 -Append $body
+        Get-Content "data\session_failure.txt" -Tail 40 -Encoding utf8 | Out-File -Encoding utf8 -Append $body
+        "``````" | Out-File -Encoding utf8 -Append $body
+    }
+    Mail $subject $body
+}
 
-# 4. publish the checkpoint so the next session can attach it
+# 5. publish the checkpoint so the next session can attach it
 $ckpt = Join-Path $root "data\kaggle_out\q10\last.pt"
 if (-not (Test-Path $ckpt)) {
     Say "no last.pt in the output; stopping before the resume"
@@ -61,7 +105,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Say ("checkpoint dataset exit " + $LASTEXITCODE)
 
-# 5. the epoch is complete: keep the weights, do not push another training
+# 6. the epoch is complete: keep the weights, do not push another training
 #    session -- the WSD decay pass is launched separately, on curated data.
 if (Test-Path "data\q10_epoch_done.flag") {
     Say "EPOCH COMPLETE: checkpoint published, waiting for the decay pass"
@@ -69,7 +113,7 @@ if (Test-Path "data\q10_epoch_done.flag") {
     exit 0
 }
 
-# 6. otherwise push the next session: same code, same corpus, plus the checkpoint
+# 7. otherwise push the next session: same code, same corpus, plus the checkpoint
 python -c "import json; p=r'kaggle/q10/kernel-metadata.json'; d=json.load(open(p)); d['dataset_sources']=['$code','icold21/kron-corpus-2b','icold21/kron-q10-ckpt']; json.dump(d, open(p,'w'), indent=2)"
 python -m kaggle kernels push -p kaggle/q10 2>&1 | Out-File -Encoding utf8 -Append $log
 Say ("kernel push exit " + $LASTEXITCODE)

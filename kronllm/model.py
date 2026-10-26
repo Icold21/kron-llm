@@ -473,10 +473,17 @@ class KronBlock(nn.Module):
             cache["q_drift"] = ((q - h.view(B, T, nh, dh).transpose(1, 2)).norm()
                                 / h.norm().clamp_min(1e-9)).item()
             del scores, p, mask
-            cache["q_sigma_min"] = torch.linalg.svdvals(
-                q.reshape(-1, dh).float()).min().item()
-            cache["k_sigma_min"] = torch.linalg.svdvals(
-                k.reshape(-1, dh).float()).min().item()
+            # cusolver can fail (INTERNAL_ERROR) when the GPU is already near
+            # its memory ceiling at batch 32; a diagnostic must never take a
+            # multi-hour session down with it.
+            try:
+                cache["q_sigma_min"] = torch.linalg.svdvals(
+                    q.reshape(-1, dh).float()).min().item()
+                cache["k_sigma_min"] = torch.linalg.svdvals(
+                    k.reshape(-1, dh).float()).min().item()
+            except RuntimeError:
+                cache["q_sigma_min"] = float("nan")
+                cache["k_sigma_min"] = float("nan")
 
         out = self._attend(q, k, v, n_past)
         out = out.transpose(1, 2).reshape(B, T, self.d)

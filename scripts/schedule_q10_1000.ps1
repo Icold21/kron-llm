@@ -20,8 +20,19 @@ while ((Get-Date) -lt $target) {
     if ($left -gt 120) { Start-Sleep -Seconds 60 } else { Start-Sleep -Seconds 5 }
 }
 
-# The session that ended at ~07:13 has its log.csv downloaded by then; if the
-# chain is still busy, wait for the file to appear rather than mailing nothing.
+# If the chain already mailed a session report in the last 90 minutes, another
+# identical letter is noise.
+$marker = Join-Path $root "data\last_mail.txt"
+if (Test-Path $marker) {
+    $last = [datetime]::Parse((Get-Content $marker -Raw -Encoding utf8).Trim())
+    if (((Get-Date) - $last).TotalMinutes -lt 90) {
+        Say ("session report already sent at " + $last.ToString("HH:mm") + ", skipping")
+        exit 0
+    }
+}
+
+# The session that ended overnight has its log.csv downloaded by now; if the
+# chain is still working, wait for it rather than mailing an empty report.
 $deadline = (Get-Date).AddMinutes(90)
 while (-not (Test-Path "data\kaggle_out\q10\log.csv")) {
     if ((Get-Date) -gt $deadline) { Say "no log.csv by the deadline, mailing what we have"; break }

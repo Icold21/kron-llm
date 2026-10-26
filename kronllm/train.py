@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import datetime
+import hashlib
 import json
 import math
 import os
@@ -281,6 +282,19 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     val_ds = open_dataset(cfg, "val")
     tok = load_tokenizer(cfg)
     bpt = tok.bytes_per_token
+    # Fingerprint of the token space: tokenizer file + train bin size.  A
+    # checkpoint saved against a different tokenizer cannot be resumed safely,
+    # and the failure mode is silent (ids mean different strings), so the run
+    # refuses instead of trusting the file name.
+    data_key = ""
+    meta_path = data_dir / str(dc.get("meta_file", "tokenizer_meta.json"))
+    bin_path = data_dir / str(dc.get("train_bin", "train.bpe.bin"))
+    try:
+        h = hashlib.sha256(meta_path.read_bytes())
+        h.update(str(bin_path.stat().st_size).encode())
+        data_key = h.hexdigest()[:16]
+    except OSError:
+        data_key = ""
 
     # -- model ---------------------------------------------------------
     from .model import KronTransformer
@@ -373,6 +387,13 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
 
     if resume:
         ck = torch.load(resume, map_location="cpu")
+        saved_key = ck.get("data_key")
+        if saved_key and data_key and saved_key != data_key:
+            raise SystemExit(
+                f"[resume] checkpoint was trained on a different corpus "
+                f"(data_key {saved_key} != {data_key}); resuming would mix two "
+                f"token id spaces.  Restart, or pass --init to warm-start the "
+                f"weights deliberately.")
         raw_model.load_state_dict(ck["model"])
         opt.load_state_dict(ck["optimizer"])
         start_step = int(ck.get("step", 0))
@@ -432,9 +453,14 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
 
         if save_every and step % save_every == 0 and is_main:
             # Crash / quota resilience: a resumed run continues from here.
+            # ``data_key`` pins the checkpoint to the exact corpus the weights
+            # were trained on: resuming a checkpoint across a retokenisation
+            # silently mixes two token id spaces, which is much worse than
+            # restarting.
             torch.save({"model": raw_model.state_dict(), "cfg": dict(cfg),
                         "optimizer": opt.state_dict(), "step": step,
-                        "val_ppl": best_ppl}, run_dir / "last.pt")
+                        "val_ppl": best_ppl, "data_key": data_key},
+                       run_dir / "last.pt")
 
         if step % log_every == 0 or step == 1:
             dt = time.time() - last_log
