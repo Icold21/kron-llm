@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 from pathlib import Path
 
@@ -29,8 +30,14 @@ def main() -> None:
     args = ap.parse_args()
 
     shard = Path(args.shard)
-    docs = [json.loads(l) for l in shard.read_text(encoding="utf-8")
-            .splitlines() if l.strip()]
+    # Read line by line: str.splitlines() also splits on U+2028/U+0085, which
+    # occur inside wiki text and would cut a JSON string in half.
+    with open(shard, encoding="utf-8") as fh:
+        docs = [json.loads(line) for line in fh if line.strip()]
+    for doc in docs:
+        if not doc.get("sha256"):
+            doc["sha256"] = hashlib.sha256(
+                doc["text"].encode("utf-8")).hexdigest()
 
     mix_path = MIX / f"{args.lang}_{args.domain}.jsonl.gz"
     before = 0
