@@ -301,13 +301,16 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     if tc.get("compile") and hasattr(torch, "compile"):
         model = torch.compile(model)
     if ddp:
-        # theta is inert when sigma_mode != "learned", so the flag is needed
-        # there; the default configuration has no unused parameters.
-        kc = cfg["model"]["kron"]
-        unused = str(kc.get("sigma_mode", "learned")) != "learned"
+        # The Kronecker block carries parameters that are inert in some
+        # configurations (theta when sigma is frozen, tau when recurrence is
+        # off, alpha for the sum composition).  With find_unused_parameters
+        # False, DDP waits for a gradient bucket that never arrives, the first
+        # backward hangs, and the platform kills the process without a Python
+        # traceback.  Always allow unused parameters; the overhead is small at
+        # 10M parameters.
         model = DDP(model,
                     device_ids=[local_rank] if device.type == "cuda" else None,
-                    find_unused_parameters=unused)
+                    find_unused_parameters=True)
 
     opt = build_optimizer(model, tc)
     init_base_lrs(opt)
