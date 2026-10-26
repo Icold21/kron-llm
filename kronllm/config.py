@@ -622,10 +622,13 @@ EXPERIMENTS["Q8g"] = {
                   "training.batch_size": 24},
 }
 # Q10: the 10M bilingual run.  d=512, 25 layers, K=10, 8K BPE with reserved
-# chat ids, seq 512.  24,576 tokens per optimiser step on two GPUs (batch 24 x
-# seq 512 x 2 ranks).  max_steps=0 means "derive from the train bin": the run
-# always does exactly one epoch, whatever the measured corpus size is, so the
-# step count never has to be edited when the corpus grows.
+# chat ids, seq 512.  24,576 tokens per optimiser step on two GPUs (batch 8 x
+# accum 3 x seq 512 x 2 ranks).  Batch 24 at seq 512 needs ~36 GB of activations
+# per rank in fp32, and the T4 kernel is killed at 16 GB; batch 8 with three
+# accumulation steps keeps the step size identical at a third of the memory.
+# max_steps=0 means "derive from the train bin": the run always does exactly one
+# epoch, whatever the measured corpus size is, so the step count never has to be
+# edited when the corpus grows.
 EXPERIMENTS["Q10"] = {
     "desc": "10M bilingual: d=512, 25 layers, K=10, 8K BPE, seq 512",
     "overrides": {
@@ -643,7 +646,8 @@ EXPERIMENTS["Q10"] = {
         "data.train_bin": "train.bpe.bin",
         "data.val_bin": "val.bpe.bin",
         "data.meta_file": "tokenizer_meta.json",
-        "training.batch_size": 24,
+        "training.batch_size": 8,
+        "training.grad_accum": 3,
         "training.seq_len": 512,
         "training.lr": 3e-4,
         "training.warmup_steps": 1000,

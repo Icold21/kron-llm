@@ -8,7 +8,7 @@
   "enable_gpu": true,
   "enable_internet": true,
   "dataset_sources": [
-    "icold21/kron-llm-code-v2",
+    "icold21/kron-llm-code-v3",
     "icold21/kron-corpus-2b"
   ],
   "competition_sources": [],
