@@ -117,7 +117,7 @@ FRAMING = re.compile(
     r"\b(bilingual|двуязычн\w*|chatbot|chat-bot|чат-бот\w*|"
     r"research model|исследовательск\w* модель)\b", re.I)
 #: Frequent generator misspellings of the project name.
-MISSPELL = re.compile(r"\b(CronLLM|Kroun|Кроун|КронLLM)\b")
+MISSPELL = re.compile(r"\b(CronLLM|Kroun|Кроун|КронLLM|Кронеккер\w*)\b")
 #: The identity slice contains no digits at all.  Any concrete size would be
 #: wrong the moment the model is scaled, and turn numbers are scaffolding.
 DIGIT = re.compile(r"\d")
@@ -141,9 +141,16 @@ FIRST_PERSON = {
 }
 SENTENCE = re.compile(r"[.!?…]+")
 MARKDOWN = re.compile(r"(^#|^\s*[-•]\s|^\s*\d+\.\s|https?://|www\.)", re.M)
+#: Scripts the slice must not contain: a Chinese character once slipped into a
+#: translated Russian text and only a byte-level check would have caught it.
+FOREIGN_SCRIPT = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff"
+                            r"\uf900-\ufaff\uac00-\ud7af]")
+#: Wrong mathematician names the generator substitutes for Kronecker.
+WRONG_FACT = re.compile(r"\b(Крамер\w*|Kramer|Kroneker|Кронеккер\w*)\b", re.I)
 
 
-def ollama_generate(prompt: str, seed: int, num_predict: int = 260) -> str:
+def ollama_generate(prompt: str, seed: int, num_predict: int = 260,
+                    temperature: float = 0.95) -> str:
     """Call the local Ollama server and return the completion text."""
     payload = {
         "model": MODEL,
@@ -152,7 +159,7 @@ def ollama_generate(prompt: str, seed: int, num_predict: int = 260) -> str:
         # qwen3.5 is a reasoning model: without this it spends the whole
         # num_predict budget in `thinking` and returns an empty response.
         "think": False,
-        "options": {"temperature": 0.95, "top_p": 0.92, "seed": seed,
+        "options": {"temperature": temperature, "top_p": 0.92, "seed": seed,
                     "num_predict": num_predict, "repeat_penalty": 1.1},
     }
     data = json.dumps(payload).encode("utf-8")
@@ -213,8 +220,18 @@ def acceptable(text: str, lang: str) -> tuple[bool, str]:
         return False, "dialogue"
     if MARKDOWN.search(text):
         return False, "markdown"
+    if FOREIGN_SCRIPT.search(text):
+        return False, "foreign_script"
+    if WRONG_FACT.search(text):
+        return False, "wrong_fact"
     if MISSPELL.search(text):
         return False, "misspell"
+    # The three facts are the whole point of the slice: the name, the project
+    # and the Kronecker origin all have to be present.
+    if "KronLLM" not in text:
+        return False, "no_project"
+    if not re.search(r"кронекер|kronecker", text, re.I):
+        return False, "no_origin"
     if len(SENTENCE.findall(text)) < 2:
         return False, "fragment"
     if len(FIRST_PERSON[lang].findall(text)) < 2:
@@ -293,8 +310,8 @@ def prompts_for(lang: str, style: str) -> list[tuple[str, str]]:
     return [(lg, p) for lg, p in source if lg == lang]
 
 
-def generate(lang: str, n: int, seed: int,
-             style: str = "plain") -> list[dict]:
+def generate(lang: str, n: int, seed: int, style: str = "plain",
+             temperature: float = 0.95) -> list[dict]:
     """Generate ``n`` accepted samples for one language."""
     facts = FACTS_EN if lang == "en" else FACTS_RU
     prompts = prompts_for(lang, style)
@@ -305,7 +322,8 @@ def generate(lang: str, n: int, seed: int,
         attempts += 1
         prompt = template.format(facts=facts)
         try:
-            raw = ollama_generate(prompt, seed=seed + attempts)
+            raw = ollama_generate(prompt, seed=seed + attempts,
+                                  temperature=temperature)
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             print(f"  [warn] ollama: {exc}")
             time.sleep(2)
@@ -332,6 +350,9 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--style", default="plain", choices=["plain", *STYLE_PROMPTS],
                     help="prompt family: plain self-description or a pastiche")
+    ap.add_argument("--temperature", type=float, default=0.95,
+                    help="sampling temperature; 0.7 is markedly cleaner "
+                         "for Russian pastiche")
     ap.add_argument("--lang", default="both", choices=["en", "ru", "both"],
                     help="restrict generation to one language")
     ap.add_argument("--force", action="store_true")
@@ -359,7 +380,7 @@ def main() -> None:
         print(f"[gen] {lang} ({args.style}): "
               f"{args.samples_per_language} samples")
         docs = generate(lang, args.samples_per_language, args.seed,
-                        style=args.style)
+                        style=args.style, temperature=args.temperature)
         if path.exists():
             path.unlink()
         n = append_jsonl(path, docs)

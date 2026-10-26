@@ -50,6 +50,7 @@ def main() -> None:
     ap.add_argument("--target", type=int, required=True)
     ap.add_argument("--style", default="plain", choices=["plain", "rick"])
     ap.add_argument("--seed", type=int, default=901)
+    ap.add_argument("--temperature", type=float, default=0.95)
     args = ap.parse_args()
 
     path = SHARDS / f"{args.name}.jsonl"
@@ -78,7 +79,8 @@ def main() -> None:
     missing = max(0, args.target - len(kept))
     if missing:
         print(f"[{args.name}] generating {missing} replacements")
-        fresh = generate(lang, missing, args.seed, style=args.style)
+        fresh = generate(lang, missing, args.seed, style=args.style,
+                         temperature=args.temperature)
         offset = len(kept)
         prefix = f"identity/{lang}" if args.style == "plain" else \
                  f"identity/{args.style}/{lang}"
