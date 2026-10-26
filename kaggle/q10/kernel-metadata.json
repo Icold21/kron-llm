@@ -1,0 +1,16 @@
+{
+  "id": "icold21/kron-q10",
+  "title": "Kron Q10 10M bilingual pretraining",
+  "code_file": "train.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "icold21/kron-llm-code",
+    "icold21/kron-corpus-2b"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}

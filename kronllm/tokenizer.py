@@ -107,7 +107,15 @@ def load_tokenizer(cfg: Mapping[str, Any]):
         raise FileNotFoundError(
             f"{path} missing -- run `python scripts/prepare_bpe.py` first")
     meta = json.loads(path.read_text(encoding="utf-8"))
-    return BPETokenizer(meta["tokenizer"], meta["vocab_size"],
+    tok_path = Path(str(meta["tokenizer"]))
+    if not tok_path.exists():
+        # The meta may carry the build machine's path (data/bilingual/...).  On
+        # Kaggle the bins and the tokenizer sit together in /kaggle/input/<ds>,
+        # so fall back to the file next to the meta.
+        candidate = Path(dc.get("data_dir", "data")) / tok_path.name
+        if candidate.exists():
+            tok_path = candidate
+    return BPETokenizer(tok_path, meta["vocab_size"],
                         meta["bytes_per_token"], meta["eot_id"])
 
 

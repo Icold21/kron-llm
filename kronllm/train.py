@@ -319,6 +319,10 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     eval_every = int(tc["eval_every"])
     log_every = int(tc["log_every"])
     save_every = int(tc.get("save_every", 0) or 0)
+    # Wall-clock budget for one session (Kaggle sessions are capped).  The
+    # cosine schedule stays tied to total_steps, so a run stopped by the budget
+    # resumes on the same curve.
+    max_minutes = float(tc.get("max_minutes", 0) or 0)
     spectral_every = int(cfg["metrics"].get("spectral_every", 2000))
     eval_batches = int(tc.get("eval_batches", 64))
     patience = int(tc.get("early_stop_patience", 4))
@@ -443,6 +447,12 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                       f"ppl {math.exp(min(train_loss,50)):.2f} | "
                       f"gnorm {gnorm:.3f} | {dt/max(1,log_every)*1000:.0f} ms/step")
             running, running_n = 0.0, 0
+
+        if max_minutes and (time.time() - t_start) / 60.0 >= max_minutes:
+            if is_main:
+                print(f"[budget] {max_minutes:.0f} min reached at step {step}; "
+                      "stopping so the next session can resume")
+            break
 
         if step % eval_every == 0 or step == total_steps:
             if random_recurse:
