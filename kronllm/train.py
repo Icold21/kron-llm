@@ -446,6 +446,17 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                 print(f"step {step:5d} | loss {train_loss:.4f} | "
                       f"ppl {math.exp(min(train_loss,50)):.2f} | "
                       f"gnorm {gnorm:.3f} | {dt/max(1,log_every)*1000:.0f} ms/step")
+                try:
+                    with open("/proc/self/statm") as fh:
+                        rss_gb = int(fh.read().split()[1]) * 4096 / 1e9
+                except OSError:
+                    rss_gb = 0.0
+                cuda_gb = (torch.cuda.memory_allocated(device) / 1e9
+                           if device.type == "cuda" else 0.0)
+                cuda_res = (torch.cuda.memory_reserved(device) / 1e9
+                            if device.type == "cuda" else 0.0)
+                print(f"      [mem] rss {rss_gb:.1f} GB | cuda {cuda_gb:.2f} GB "
+                      f"(reserved {cuda_res:.2f})", flush=True)
             running, running_n = 0.0, 0
 
         if max_minutes and (time.time() - t_start) / 60.0 >= max_minutes:
