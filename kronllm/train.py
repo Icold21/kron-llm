@@ -318,6 +318,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
     bs = int(tc["batch_size"])
+    eval_bs = int(tc.get("eval_batch_size", 0) or bs)
     accum = int(tc["grad_accum"])
     steps_per_epoch = max(1, len(train_ds) // world_size // (bs * accum))
     total_steps = int(tc.get("max_steps") or steps_per_epoch * int(tc["epochs"]))
@@ -478,7 +479,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
             # Every rank evaluates the same fixed validation batches, so the
             # numbers (and therefore early-stop decisions) agree without a
             # broadcast.  Only rank 0 logs and writes checkpoints.
-            ev = evaluate(raw_model, val_ds, bs, device, eval_batches, str(tc["amp"]))
+            ev = evaluate(raw_model, val_ds, eval_bs, device, eval_batches, str(tc["amp"]))
             ev["val_bpb"] = bits_per_byte(ev["val_loss"], bpt)
             if is_main:
                 row = {"step": step, "split": "val", **ev}
@@ -508,7 +509,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                     stop = True
 
             if spectral_every and (step % spectral_every == 0 or step == total_steps) and is_main:
-                dg = diagnostics(raw_model, val_ds, bs, device, spectral=True,
+                dg = diagnostics(raw_model, val_ds, eval_bs, device, spectral=True,
                                  amp=str(tc["amp"]))
                 logger.log({"step": step, "split": "diag", **{
                     k: v for k, v in dg.items() if isinstance(v, (int, float))}})
@@ -533,9 +534,13 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     if device.type == "cuda":
         peak_vram = torch.cuda.max_memory_allocated(device) / 1e9
 
-    final = evaluate(raw_model, val_ds, bs, device, eval_batches, str(tc["amp"]))
-    dg = diagnostics(raw_model, val_ds, bs, device, spectral=True,
-                     amp=str(tc["amp"])) if is_main else {}
+    final = evaluate(raw_model, val_ds, eval_bs, device, eval_batches, str(tc["amp"]))
+    # Spectral diagnostics run 250 SVDs of 512x512 matrices; at batch 32 the
+    # VRAM is already at the T4 limit, so Q10 disables them with
+    # spectral_every=0 and keeps only the bpb evaluation.
+    dg = (diagnostics(raw_model, val_ds, eval_bs, device, spectral=True,
+                      amp=str(tc["amp"]))
+          if (is_main and spectral_every) else {})
 
     results = {
         "experiment": cfg.get("experiment", "run"),
