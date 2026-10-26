@@ -1,5 +1,5 @@
 {
-  "id": "icold21/kron-q10",
+  "id": "icold21/kron-q10-10m-bilingual-pretraining",
   "title": "Kron Q10 10M bilingual pretraining",
   "code_file": "train.ipynb",
   "language": "python",
