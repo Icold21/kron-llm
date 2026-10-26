@@ -52,3 +52,6 @@ Thumbs.db
 data/wikitext/
 
 data/bilingual/pg_catalog.csv
+
+data/dumps/
+data/hf_cache/

@@ -182,24 +182,65 @@ def encode_corpus(stories: Sequence[bytes], tok: BPETokenizer,
                   chunk: int = 2000) -> dict:
     """Encode stories into a ``uint16`` memmap; returns byte/token stats.
 
-    Works in chunks and keeps the token ids as ``uint16`` numpy arrays, so peak
-    memory stays around ``2 * n_tokens`` bytes (~120 MB for TinyStories-200K).
+    Writes each chunk straight to disk instead of accumulating every token
+    array in memory.  At 2.5B tokens the old version held the whole corpus plus
+    a second concatenation buffer (~10 GB); this one keeps peak memory at one
+    chunk, which matters when the mix is 8 GB of text.
     """
     n_bytes = 0
-    pieces: List[np.ndarray] = []
-    for start in range(0, len(stories), chunk):
-        batch = stories[start:start + chunk]
-        n_bytes += sum(len(s) for s in batch)
-        texts = [s.decode("utf-8", errors="replace") for s in batch]
-        for seq in tok.encode_batch(texts):
-            arr = np.empty(len(seq) + 1, dtype=np.uint16)
-            arr[:-1] = np.asarray(seq, dtype=np.uint16)
-            arr[-1] = eot_id
-            pieces.append(arr)
-    flat = np.concatenate(pieces) if pieces else np.zeros(0, np.uint16)
+    n_tokens = 0
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    flat.tofile(out_path)
-    n_tokens = len(flat)
+    with open(out_path, "wb") as fh:
+        for start in range(0, len(stories), chunk):
+            batch = stories[start:start + chunk]
+            n_bytes += sum(len(s) for s in batch)
+            texts = [s.decode("utf-8", errors="replace") for s in batch]
+            for seq in tok.encode_batch(texts):
+                arr = np.empty(len(seq) + 1, dtype=np.uint16)
+                arr[:-1] = np.asarray(seq, dtype=np.uint16)
+                arr[-1] = eot_id
+                arr.tofile(fh)
+                n_tokens += len(arr)
+    return {"bytes": int(n_bytes), "tokens": int(n_tokens),
+            "bytes_per_token": float(n_bytes) / max(1, n_tokens)}
+
+
+def encode_docs(docs: Sequence[dict], tok: BPETokenizer,
+                out_path: str | Path, eot_id: int,
+                chunk: int = 2000, max_bytes: int = 0) -> dict:
+    """Encode document dicts without materialising the whole corpus as bytes.
+
+    ``encode_corpus`` expects a list of byte strings; at 8 GB of text that list
+    is another 8 GB of RAM.  This variant reads ``doc['text']`` chunk by chunk,
+    so peak memory stays at the document store plus one chunk.
+    """
+    n_bytes = 0
+    n_tokens = 0
+    used = 0
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "wb") as fh:
+        for start in range(0, len(docs), chunk):
+            batch = docs[start:start + chunk]
+            texts = []
+            for doc in batch:
+                text = doc["text"]
+                data = text.encode("utf-8")
+                if max_bytes and used + len(data) > max_bytes:
+                    break
+                texts.append(text)
+                used += len(data)
+                n_bytes += len(data)
+            if not texts:
+                break
+            for seq in tok.encode_batch(texts):
+                arr = np.empty(len(seq) + 1, dtype=np.uint16)
+                arr[:-1] = np.asarray(seq, dtype=np.uint16)
+                arr[-1] = eot_id
+                arr.tofile(fh)
+                n_tokens += len(arr)
+            if max_bytes and used >= max_bytes:
+                break
     return {"bytes": int(n_bytes), "tokens": int(n_tokens),
             "bytes_per_token": float(n_bytes) / max(1, n_tokens)}

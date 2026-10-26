@@ -51,11 +51,23 @@ def main() -> None:
               f"- после MinHash 0.8: **{d['kept']:,}** документов "
               f"({gb(d['kept_bytes'])} ГБ), выброшено {d['dropped']:,}",
               f"- микс: **{gb(report['mixed_total_bytes'])} ГБ**, "
-              f"доля русского **{round(report['ru_share'] * 100, 1)} %**", "",
+              f"доля русского **{round(report['ru_share'] * 100, 1)} %** по "
+              "байтам (в токенах — ниже)", "",
+              "Полная русская Википедия и Викитека добавлены после сборки по "
+              "квотам: категорийные шарды не могли дать нужный объём русского "
+              "текста. Заголовки, уже вошедшие в категорийные шарды, "
+              "пропущены, поэтому пересечения нет.", "",
               "| домен | доля |", "|---|---:|"]
-    for name, share in sorted(report["domain_share"].items(),
-                              key=lambda kv: -kv[1]):
-        lines.append(f"| {name} | {round(share * 100, 1)} % |")
+    # Shares come from the actual mix bytes, including anything appended after
+    # the quota build (the Russian bulk import).
+    mixed = report.get("mixed", {})
+    agg: dict[str, int] = {}
+    for lang in ("en", "ru"):
+        for dom, byts in mixed.get(lang, {}).items():
+            agg[dom] = agg.get(dom, 0) + byts
+    total = max(1, sum(agg.values()))
+    for name, byts in sorted(agg.items(), key=lambda kv: -kv[1]):
+        lines.append(f"| {name} | {round(byts / total * 100, 1)} % |")
     lines.append("")
     lines += ["Недостача (не добита искусственно):", ""]
     for item in report["shortfalls"]:

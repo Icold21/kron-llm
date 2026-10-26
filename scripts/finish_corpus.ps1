@@ -11,7 +11,7 @@ function Say($msg) {
     $line | Out-File -Encoding utf8 -Append $log
 }
 
-"=== finish corpus v2 $(Get-Date -Format 'HH:mm:ss')" | Out-File -Encoding utf8 $log
+"=== finish corpus v3 $(Get-Date -Format 'HH:mm:ss')" | Out-File -Encoding utf8 $log
 
 # ------------------------------------------------ 1. wait for identity v7
 $deadline = (Get-Date).AddHours(7)
@@ -29,19 +29,37 @@ Copy-Item "data\identity\*.jsonl" "C:\Users\Icold\Desktop\kron_corpus\data\ident
 Copy-Item "data\bilingual\manifest.jsonl" "C:\Users\Icold\Desktop\kron_corpus\manifest.jsonl" -Force
 Say "identity shards and manifest copied"
 
-# --------------------------------------------------------- 3. patch the mix
+# --------------------------------------------- 3. append the Russian bulk
+if (Test-Path "data\bilingual\shards\wikipedia_ru_bulk.jsonl") {
+    python -u scripts\add_bulk_to_mix.py --shard data\bilingual\shards\wikipedia_ru_bulk.jsonl --lang ru --domain encyclopedic 2>&1 | Out-File -Encoding utf8 -Append $log
+    Say ("bulk wikipedia exit " + $LASTEXITCODE)
+}
+if (Test-Path "data\bilingual\shards\wikisource_ru_bulk.jsonl") {
+    python -u scripts\add_bulk_to_mix.py --shard data\bilingual\shards\wikisource_ru_bulk.jsonl --lang ru --domain literature 2>&1 | Out-File -Encoding utf8 -Append $log
+    Say ("bulk wikisource exit " + $LASTEXITCODE)
+}
+
+# --------------------------------------------------------- 4. patch identity
 python -u scripts\patch_identity_mix.py --lang en --lang ru 2>&1 | Out-File -Encoding utf8 -Append $log
 Say ("patch exit " + $LASTEXITCODE)
 
-# ------------------------------------------------------ 4. tokenizer + bins
+# ------------------------------------------------------ 5. tokenizer + bins
 Say "tokenizer 8K + bins (final)"
 python -u scripts\prepare_bilingual_bin.py --vocab 8192 2>&1 | Out-File -Encoding utf8 -Append $log
 $tokExit = $LASTEXITCODE
 Say ("tokenizer exit " + $tokExit)
 
-# --------------------------------------------------------- 5. Kaggle upload
-$kaggleExit = -1
+# ------------------------------------------------------------- 6. hard gate
+$gateExit = 1
 if ($tokExit -eq 0) {
+    python -u scripts\check_corpus_gate.py 2>&1 | Out-File -Encoding utf8 -Append $log
+    $gateExit = $LASTEXITCODE
+    Say ("gate exit " + $gateExit)
+}
+
+# --------------------------------------------------------- 7. Kaggle upload
+$kaggleExit = -1
+if ($gateExit -eq 0) {
     $stage = Join-Path $root "data\kaggle_corpus"
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
     Copy-Item "data\bilingual\train.bpe.bin", "data\bilingual\val.bpe.bin" "$stage\" -Force
@@ -49,7 +67,7 @@ if ($tokExit -eq 0) {
     Copy-Item "data\bilingual\tokenizer_meta.json" "$stage\" -Force
     python scripts\make_kaggle_meta.py "$stage\dataset-metadata.json" 2>&1 | Out-File -Encoding utf8 -Append $log
     Say "uploading a new dataset version"
-    python -m kaggle datasets version -p $stage -m "identity v7: temp 0.7 pastiche, fact gate, plain prose" 2>&1 | Out-File -Encoding utf8 -Append $log
+    python -m kaggle datasets version -p $stage -m "identity v7 + full ruwiki/wikisource bulk: >=2B tokens, RU >=30%" 2>&1 | Out-File -Encoding utf8 -Append $log
     $kaggleExit = $LASTEXITCODE
     if ($kaggleExit -ne 0) {
         Say "version failed, trying create"
@@ -57,9 +75,11 @@ if ($tokExit -eq 0) {
         $kaggleExit = $LASTEXITCODE
     }
     Say ("kaggle exit " + $kaggleExit)
+} else {
+    Say "gate failed: bins are NOT uploaded"
 }
 
-# --------------------------------------------------------------- 6. report
+# --------------------------------------------------------------- 8. report
 python -u scripts\final_report.py 2>&1 | Out-File -Encoding utf8 -Append $log
 $rep = Join-Path $root "data\bilingual\final_report.md"
 Add-Content -Encoding utf8 $rep @"
@@ -68,10 +88,11 @@ Add-Content -Encoding utf8 $rep @"
 
 - identity v7: завершён
 - токенизация: exit $tokExit
+- гейт (>=2.0B токенов, RU >=30 %): exit $gateExit
 - Kaggle: exit $kaggleExit
 - лог: ``data\bilingual\finish_corpus.log``
 "@
 
-python $mail send --model "DeepSeek V4.1 Flash Free" --session $session --project "kron_llm" --subject "KronCorpus собран: identity v7, 1.64B токенов, бины в Kaggle" --body-file $rep 2>&1 | Out-File -Encoding utf8 -Append $log
+python $mail send --model "DeepSeek V4.1 Flash Free" --session $session --project "kron_llm" --subject "KronCorpus: итог сборки (2B гейт)" --body-file $rep 2>&1 | Out-File -Encoding utf8 -Append $log
 Say ("email exit " + $LASTEXITCODE)
 Say "FINAL DONE"

@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from kronllm.tokenizer import BPETokenizer, encode_corpus, train_bpe_merges
+from kronllm.tokenizer import BPETokenizer, encode_docs, train_bpe_merges
 
 ROOT = Path("data/bilingual")
 
@@ -118,24 +118,12 @@ def main() -> None:
           f"assistant={special_ids['assistant']}, eot={special_ids['eot']}, "
           f"endoftext={special_ids['endoftext']})")
 
-    def as_bytes(items: list[dict]) -> list[bytes]:
-        out = []
-        budget = 0
-        limit = int(args.max_train_mb * 1e6) if args.max_train_mb else None
-        for d in items:
-            b = d["text"].encode("utf-8")
-            out.append(b)
-            budget += len(b)
-            if limit and budget >= limit:
-                break
-        return out
-
-    train_stories = as_bytes(train)
-    val_stories = as_bytes(val)
-    tr = encode_corpus(train_stories, tok, Path(args.out_dir) / "train.bpe.bin",
-                       args.vocab - 1)
-    va = encode_corpus(val_stories, tok, Path(args.out_dir) / "val.bpe.bin",
-                       args.vocab - 1)
+    # encode_docs streams the text: no second copy of the corpus in memory.
+    limit = int(args.max_train_mb * 1e6) if args.max_train_mb else 0
+    tr = encode_docs(train, tok, Path(args.out_dir) / "train.bpe.bin",
+                     args.vocab - 1, max_bytes=limit)
+    va = encode_docs(val, tok, Path(args.out_dir) / "val.bpe.bin",
+                     args.vocab - 1)
 
     per_lang = {}
     for lang in ("en", "ru"):
