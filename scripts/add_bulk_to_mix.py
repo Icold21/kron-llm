@@ -31,16 +31,34 @@ def main() -> None:
     shard = Path(args.shard)
     docs = [json.loads(l) for l in shard.read_text(encoding="utf-8")
             .splitlines() if l.strip()]
-    added = sum(len(d["text"].encode("utf-8")) for d in docs)
 
     mix_path = MIX / f"{args.lang}_{args.domain}.jsonl.gz"
     before = 0
+    existing: set[str] = set()
     if mix_path.exists():
         with gzip.open(mix_path, "rt", encoding="utf-8") as fh:
-            before = sum(len(json.loads(l)["text"].encode("utf-8"))
-                         for l in fh if l.strip())
+            for line in fh:
+                if not line.strip():
+                    continue
+                doc = json.loads(line)
+                before += len(doc["text"].encode("utf-8"))
+                if doc.get("title"):
+                    existing.add(doc["title"])
+
+    # Title-level dedup against the bucket: the category fetchers overlap each
+    # other, and a duplicate article in the mix is pure waste.
+    fresh = []
+    seen: set[str] = set()
+    for doc in docs:
+        title = doc.get("title", "")
+        if title and (title in existing or title in seen):
+            continue
+        seen.add(title)
+        fresh.append(doc)
+    added = sum(len(d["text"].encode("utf-8")) for d in fresh)
+
     with gzip.open(mix_path, "at", encoding="utf-8") as fh:
-        for doc in docs:
+        for doc in fresh:
             fh.write(json.dumps(doc, ensure_ascii=False) + "\n")
 
     report = json.loads(REPORT.read_text(encoding="utf-8"))
@@ -56,7 +74,8 @@ def main() -> None:
 
     print(f"[mix] {mix_path.name}: {before/1e6:.0f} MB -> "
           f"{(before + added)/1e6:.0f} MB (+{added/1e6:.0f} MB, "
-          f"{len(docs):,} docs)")
+          f"{len(fresh):,} new of {len(docs):,} docs, "
+          f"{len(docs) - len(fresh):,} duplicates skipped)")
     print(f"[mix] total {report['mixed_total_bytes']/1e9:.2f} GB, "
           f"RU {report['ru_share']*100:.1f} % of bytes")
 

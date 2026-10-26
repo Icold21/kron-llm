@@ -623,8 +623,9 @@ EXPERIMENTS["Q8g"] = {
 }
 # Q10: the 10M bilingual run.  d=512, 25 layers, K=10, 8K BPE with reserved
 # chat ids, seq 512.  24,576 tokens per optimiser step on two GPUs (batch 24 x
-# seq 512 x 2 ranks).  The measured corpus is 1.637B train tokens, so 66,500
-# steps are one epoch; the earlier 82k estimate assumed the 2B target.
+# seq 512 x 2 ranks).  max_steps=0 means "derive from the train bin": the run
+# always does exactly one epoch, whatever the measured corpus size is, so the
+# step count never has to be edited when the corpus grows.
 EXPERIMENTS["Q10"] = {
     "desc": "10M bilingual: d=512, 25 layers, K=10, 8K BPE, seq 512",
     "overrides": {
@@ -646,7 +647,8 @@ EXPERIMENTS["Q10"] = {
         "training.seq_len": 512,
         "training.lr": 3e-4,
         "training.warmup_steps": 1000,
-        "training.max_steps": 66500,
+        "training.max_steps": 0,
+        "training.epochs": 1,
         "training.eval_every": 1000,
         "training.save_every": 500,
         "training.log_every": 100,
