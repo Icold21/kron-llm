@@ -1,12 +1,14 @@
-"""Replace the Rick-style identity documents in the mix after a regeneration.
+"""Rebuild the identity slice inside the mix after a regeneration.
 
 The corpus build is expensive (MinHash over ~800k documents), so regenerating a
-small slice does not justify a rebuild: this script rewrites the identity shard
-inside `mix/<lang>_identity.jsonl.gz` and leaves everything else untouched.
+small slice does not justify a rebuild: this script rewrites
+`mix/<lang>_identity.jsonl.gz` from the identity shards of that language and
+leaves everything else untouched.
 
 Usage::
 
-    python scripts/patch_identity_mix.py --lang ru --style rick
+    python scripts/patch_identity_mix.py --lang ru
+    python scripts/patch_identity_mix.py --lang en --lang ru
 """
 from __future__ import annotations
 
@@ -22,25 +24,34 @@ MIX = ROOT / "mix"
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--lang", default="ru", choices=["en", "ru"])
-    ap.add_argument("--style", default="rick", choices=["rick"])
+    ap.add_argument("--lang", action="append", choices=["en", "ru"],
+                    help="language to patch; repeat for both")
     args = ap.parse_args()
+    langs = args.lang or ["en", "ru"]
 
-    mix_path = MIX / f"{args.lang}_identity.jsonl.gz"
-    shard_path = SHARDS / f"identity_{args.style}_{args.lang}.jsonl"
-    if not mix_path.exists() or not shard_path.exists():
-        raise SystemExit(f"missing {mix_path} or {shard_path}")
+    for lang in langs:
+        mix_path = MIX / f"{lang}_identity.jsonl.gz"
+        sources = [SHARDS / f"identity_{lang}.jsonl",
+                   SHARDS / f"identity_rick_{lang}.jsonl"]
+        missing = [p for p in sources if not p.exists()]
+        if missing:
+            raise SystemExit(f"missing {missing}")
 
-    with gzip.open(mix_path, "rt", encoding="utf-8") as fh:
-        docs = [json.loads(l) for l in fh if l.strip()]
-    keep = [d for d in docs if not str(d.get("title", "")).startswith("identity/rick")]
-    new = [json.loads(l) for l in shard_path.read_text(encoding="utf-8").splitlines() if l.strip()]
-    merged = keep + new
-    with gzip.open(mix_path, "wt", encoding="utf-8") as fh:
-        for d in merged:
-            fh.write(json.dumps(d, ensure_ascii=False) + "\n")
-    print(f"[patch] {mix_path.name}: {len(docs)} -> {len(merged)} docs "
-          f"({len(docs) - len(keep)} replaced)")
+        docs = []
+        for path in sources:
+            docs.extend(json.loads(line) for line in
+                        path.read_text(encoding="utf-8").splitlines()
+                        if line.strip())
+
+        before = 0
+        if mix_path.exists():
+            with gzip.open(mix_path, "rt", encoding="utf-8") as fh:
+                before = sum(1 for line in fh if line.strip())
+
+        with gzip.open(mix_path, "wt", encoding="utf-8") as fh:
+            for doc in docs:
+                fh.write(json.dumps(doc, ensure_ascii=False) + "\n")
+        print(f"[patch] {mix_path.name}: {before} -> {len(docs)} docs")
 
 
 if __name__ == "__main__":

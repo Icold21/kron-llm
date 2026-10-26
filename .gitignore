@@ -16,6 +16,11 @@ data/bilingual/tokenizer.json
 data/bilingual/tokenizer_sample.txt
 data/bilingual/heldout_*.txt
 data/bilingual/*.log
+# Generated reports (emailed, reproducible from the scripts)
+data/bilingual/*email*.md
+data/bilingual/identity_report.md
+data/bilingual/final_report.md
+data/bilingual/identity_audit.json
 
 # Training artifacts
 runs/

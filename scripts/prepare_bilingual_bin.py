@@ -80,7 +80,9 @@ def main() -> None:
     ap.add_argument("--vocab", type=int, default=8192)
     ap.add_argument("--val-fraction", type=float, default=0.02)
     ap.add_argument("--merge-mb-per-language", type=float, default=10.0)
-    ap.add_argument("--max-train-mb", type=float, default=400.0)
+    ap.add_argument("--max-train-mb", type=float, default=0.0,
+                    help="optional cap on the training text in MB; 0 means the "
+                         "whole mix (the pilot used 400)")
     args = ap.parse_args()
 
     t0 = time.time()
@@ -95,22 +97,26 @@ def main() -> None:
     sample_bytes = sum(len(s.encode('utf-8')) for s in sample)
     print(f"[bpe] learning merges on {len(sample):,} docs "
           f"({sample_bytes/1e6:.1f} MB)")
-    # Reserve four ids: <|system|>, <|user|>, <|assistant|> (chat template for
-    # the SFT stage) and EOT.  Reserving them now means fine-tuning never has
-    # to resize the embedding.
-    chat_tokens = ["<|system|>", "<|user|>", "<|assistant|>"]
+    # Reserve five ids: the chat template (<|system|>, <|user|>, <|assistant|>,
+    # <|eot|> for turn ends) and EOT for document boundaries.  A turn end and a
+    # document end are different events: generation stops on <|eot|>, while the
+    # pretraining stream separates documents with EOT.  Benefits and costs are
+    # argued in docs/data_plan.md.
+    chat_tokens = ["<|system|>", "<|user|>", "<|assistant|>", "<|eot|>"]
     n_base = args.vocab - 1 - len(chat_tokens)
     train_bpe_merges(sample, vocab_size=n_base, out_path=tok_path,
                      min_frequency=2, special_tokens=chat_tokens)
     tok = BPETokenizer(tok_path, vocab_size=args.vocab, bytes_per_token=1.0,
                        eot_id=args.vocab - 1)
-    special_ids = {"eot": args.vocab - 1,
+    special_ids = {"endoftext": args.vocab - 1,
                    "system": n_base,
                    "user": n_base + 1,
-                   "assistant": n_base + 2}
+                   "assistant": n_base + 2,
+                   "eot": n_base + 3}
     print(f"[bpe] vocabulary {tok._tok.get_vocab_size()} ids "
           f"(system={special_ids['system']}, user={special_ids['user']}, "
-          f"assistant={special_ids['assistant']}, eot={special_ids['eot']})")
+          f"assistant={special_ids['assistant']}, eot={special_ids['eot']}, "
+          f"endoftext={special_ids['endoftext']})")
 
     def as_bytes(items: list[dict]) -> list[bytes]:
         out = []
@@ -136,8 +142,11 @@ def main() -> None:
         text = "".join(d["text"] for d in val if d["language"] == lang)
         if not text:
             continue
-        n_tok = sum(len(s) + 1 for s in tok.encode_batch([text[:2_000_000]]))
-        n_bytes = len(text[:2_000_000].encode("utf-8"))
+        # Measure fertility on the whole validation text of the language, not
+        # on a fixed character window: the same window means different byte
+        # counts in Latin and Cyrillic and would distort the language shares.
+        n_tok = sum(len(s) + 1 for s in tok.encode_batch([text]))
+        n_bytes = len(text.encode("utf-8"))
         per_lang[lang] = {"bytes": n_bytes, "tokens": n_tok,
                           "bytes_per_token": round(n_bytes / max(1, n_tok), 3)}
     total_tok = sum(v["tokens"] for v in per_lang.values())
@@ -158,6 +167,7 @@ def main() -> None:
                         "user": special_ids["user"],
                         "assistant": special_ids["assistant"],
                         "eot": special_ids["eot"]},
+        "endoftext_id": special_ids["endoftext"],
         "bytes_per_token": bpt,
         "train_tokens": tr["tokens"],
         "val_tokens": va["tokens"],

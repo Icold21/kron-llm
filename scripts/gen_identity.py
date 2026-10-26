@@ -55,9 +55,9 @@ PROMPTS: list[tuple[str, str]] = [
            "Use only these facts: {facts}"),
     ("en", "Answer the question 'Who are you?' in the first person, 3-5 "
            "sentences. You are Kron. Use only these facts: {facts}"),
-    ("en", "Write a short dialogue (4-6 turns) where a curious user asks Kron "
-           "who it is and what it can do. Kron answers in the first person, "
-           "briefly and honestly. Use only these facts: {facts}"),
+    ("en", "Write 4-6 sentences in the first person explaining what you are "
+           "and what your name refers to. You are Kron. No dialogue, no stage "
+           "directions, no scene description. Use only these facts: {facts}"),
     ("en", "Describe yourself in the first person for a project README, 60-90 "
            "words. You are Kron. Mention the name and what the name refers to. "
            "Use only these facts: {facts}"),
@@ -65,9 +65,9 @@ PROMPTS: list[tuple[str, str]] = [
            "Kron. Используй только эти факты: {facts}"),
     ("ru", "Ответь на вопрос «Кто ты?» от первого лица, 3-5 предложений. Ты — "
            "Kron. Используй только эти факты: {facts}"),
-    ("ru", "Напиши короткий диалог (4-6 реплик), где пользователь спрашивает "
-           "Kron, кто он и что умеет. Kron отвечает от первого лица, коротко и "
-           "честно. Используй только эти факты: {facts}"),
+    ("ru", "Напиши 4-6 предложений от первого лица о том, что ты такое и на "
+           "что указывает твоё имя. Ты — Kron. Без диалога, без ремарок и без "
+           "описаний сцены. Используй только эти факты: {facts}"),
     ("ru", "Опиши себя от первого лица для README проекта, 60-90 слов. Ты — "
            "Kron. Упомяни имя и то, на что оно указывает. Используй "
            "только эти факты: {facts}"),
@@ -118,6 +118,20 @@ FRAMING = re.compile(
     r"research model|исследовательск\w* модель)\b", re.I)
 #: Frequent generator misspellings of the project name.
 MISSPELL = re.compile(r"\b(CronLLM|Kroun|Кроун|КронLLM)\b")
+#: The identity slice contains no digits at all.  Any concrete size would be
+#: wrong the moment the model is scaled, and turn numbers are scaffolding.
+DIGIT = re.compile(r"\d")
+#: Assistant boilerplate that would teach the model the wrong role.
+ASSISTANT = re.compile(
+    r"(as an ai\b|an ai assistant|ai assistant|ии-ассистент|"
+    r"языковая модель-ассистент)", re.I)
+#: Dialogue scaffolding: speaker labels, turn markers and dash-led reply lines.
+ROLE_LINE = re.compile(
+    r"^\s*(?:\*\*)?(?:user|kron|kid|пользователь|крон|turn\s*\d)"
+    r"(?:\*\*)?\s*[:：]", re.I | re.M)
+DASH_LINE = re.compile(r"^\s*[—–]\s", re.M)
+#: A line that is nothing but a stage direction, e.g. *the scientist leans in*.
+STAGE_LINE = re.compile(r"^\*[^*\n]{3,90}\*$|^\([^)\n]{15,90}\)$")
 
 
 def ollama_generate(prompt: str, seed: int, num_predict: int = 260) -> str:
@@ -147,6 +161,17 @@ def clean(text: str) -> str:
     text = re.sub(r"^(Sure|Certainly|Here is|Here's)[^\n]*\n+", "", text,
                   flags=re.I)
     text = re.sub(r"^\s*(Kron|Крон)\s*:\s*", "", text, flags=re.I)
+    # Emphasis markers are noise, and a line that is only a stage direction
+    # ("*the scientist leans forward*") is stage direction, not prose.
+    text = text.replace("**", "")
+    # Long inline stage directions go too; short interjections such as
+    # *burp* / *ик* are part of the voice and stay.
+    text = re.sub(r"\*[^*\n]{12,90}\*", "", text)
+    kept = [line for line in text.splitlines()
+            if not STAGE_LINE.match(line.strip())]
+    text = "\n".join(kept).strip()
+    if len(text) > 1 and text[0] in "«\"“" and text[-1] in "»\"”":
+        text = text[1:-1].strip()
     return normalize(text)
 
 
@@ -160,10 +185,16 @@ def acceptable(text: str, lang: str) -> tuple[bool, str]:
         return False, "leak"
     if BAD_NAME.search(text):
         return False, "identity"
-    if SPECS.search(text):
+    if SPECS.search(text) or DIGIT.search(text):
         return False, "specs"
     if FRAMING.search(text):
         return False, "framing"
+    if ASSISTANT.search(text):
+        return False, "assistant"
+    if ROLE_LINE.search(text):
+        return False, "dialogue"
+    if len(DASH_LINE.findall(text)) >= 2:
+        return False, "dialogue"
     if MISSPELL.search(text):
         return False, "misspell"
     st = quality(text, lang, min_chars=120, max_symbol_ratio=0.25,
@@ -190,9 +221,10 @@ STYLE_PROMPTS: dict[str, list[tuple[str, str]]] = {
                "scientist: three or four short sentences, sarcastic, with one "
                "self-interruption. You are Kron. Do not name any existing "
                "character. Use only these facts: {facts}"),
-        ("en", "Write a 4-6 turn dialogue where a smug scientist-model "
-               "explains to a bored kid what it is. Kron is sarcastic and "
-               "calls the kid 'kid'. No real names. Use only these facts: "
+        ("en", "Write a 50-70 word first-person monologue: Kron explains, "
+               "rudely and with one self-interruption, what it is and why it "
+               "is not one of those giant models. No dialogue, no stage "
+               "directions, no other characters. Use only these facts: "
                "{facts}"),
         ("en", "Write a 50-80 word rant in the voice of a grumpy genius: the "
                "model complains that everyone asks it the same question, then "
