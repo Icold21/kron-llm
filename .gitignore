@@ -57,3 +57,15 @@ data/dumps/
 data/hf_cache/
 
 data/bilingual/identity_samples.md
+
+# Kaggle staging and run artefacts (large, reproducible from scripts/ and the API)
+data/kaggle_corpus/
+data/kaggle_ckpt/
+data/kaggle_out/
+data/kaggle_live/
+data/kaggle_code_v*/
+data/code_check/
+data/q10_history.csv
+data/report_q10.md
+data/report_q10_subject.txt
+data/q10_epoch_done.flag

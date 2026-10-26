@@ -10,32 +10,32 @@
     "eot": 8190
   },
   "endoftext_id": 8191,
-  "bytes_per_token": 3.802377431705417,
-  "train_tokens": 2183929941,
-  "val_tokens": 44809447,
-  "train_bytes": 8436175078,
-  "val_bytes": 170382430,
-  "merge_docs": 5585,
-  "merge_bytes": 27763678,
+  "bytes_per_token": 3.6942873873459674,
+  "train_tokens": 2250807719,
+  "val_tokens": 46197636,
+  "train_bytes": 8450012916,
+  "val_bytes": 170667344,
+  "merge_docs": 7462,
+  "merge_bytes": 29022231,
   "language": {
     "en": {
-      "bytes": 83322934,
-      "tokens": 27794894,
-      "bytes_per_token": 2.998
+      "bytes": 83436425,
+      "tokens": 28604250,
+      "bytes_per_token": 2.917
     },
     "ru": {
-      "bytes": 87059496,
-      "tokens": 16995799,
-      "bytes_per_token": 5.122
+      "bytes": 87230919,
+      "tokens": 17574174,
+      "bytes_per_token": 4.964
     }
   },
   "token_share": {
-    "en": 0.6206,
-    "ru": 0.3794
+    "en": 0.6194,
+    "ru": 0.3806
   },
   "byte_share": {
-    "en": 0.489,
-    "ru": 0.511
+    "en": 0.4889,
+    "ru": 0.5111
   },
   "val_fraction": 0.02
 }

@@ -613,12 +613,12 @@ the per-shard manifest and the measured composition.
 |---|---|
 | fetched text | 7.65 GB · 807k documents (+2.9 GB of Russian bulk imported later) |
 | after dedup | 787k documents · 7.12 GB (20,022 dropped, 2.5 %) |
-| mixed | **8.61 GB · 945,234 documents** |
-| measured size | **2,183,929,941 train tokens** (8K BPE, 3.80 bytes/token) |
-| by language | EN 46.2 % / RU 53.8 % of bytes · **EN 62.1 % / RU 37.9 % of tokens** |
-| domains | encyclopedic 30.3 %, literature 21.2 %, math 19.1 %, science 11.1 %, code 7.5 %, ML 5.4 %, logic 3.2 %, CS/engineering 2.3 %, identity 0.09 % |
+| mixed | **8.62 GB · 968,334 documents** (identity upsampled ×8) |
+| measured size | **2,250,807,719 train tokens** (8K BPE with digit isolation, 3.69 bytes/token) |
+| by language | EN 46.2 % / RU 53.8 % of bytes · **EN 61.9 % / RU 38.1 % of tokens** |
+| domains | encyclopedic 30.3 %, literature 21.2 %, math 19.1 %, science 11.1 %, code 7.5 %, ML 5.4 %, logic 3.2 %, CS/engineering 2.3 %, identity 0.19 % |
 | dedup | MinHash (Jaccard 0.8) · held-out 2 % per language, disjoint · title-level dedup for the bulk imports |
-| tokenizer | 8K byte-level BPE, bilingual, fertility measured per language (EN 3.00, RU 5.12 bytes/token) |
+| tokenizer | 8K byte-level BPE, bilingual, digits split before ByteLevel so every digit is one token; fertility EN 2.92, RU 4.96 bytes/token |
 | chat template | `<\|system\|>` 8187 · `<\|user\|>` 8188 · `<\|assistant\|>` 8189 · `<\|eot\|>` 8190 · `<\|endoftext\|>` 8191 |
 | identity slice | 800 plain + 850 pastiche per language, no numeric facts |
 
@@ -628,7 +628,7 @@ three for English. The quota-based mix therefore gave Russian only **15.7 % of
 tokens** even though it had 29 % of the bytes. The fix was not a quota tweak but
 more Russian data: the full Russian Wikipedia (2.0 GB of new articles) and the
 full Russian Wikisource (1.1 GB of public-domain literature), with titles
-already present in the curated shards skipped. That moved Russian to **37.9 % of
+already present in the curated shards skipped. That moved Russian to **38.1 % of
 tokens** — the original plan wanted 45–47 %, and closing the rest would need
 another ~1 GB of Russian prose that does not exist under a reusable licence.
 
@@ -642,8 +642,8 @@ Next steps:
 
 1. train **Q10** (9,938,886 params, d=512, 25 layers, K=10, seq 512) on the
    corpus on one Kaggle T4 with fp16 and batch 32 (DDP is unstable in the
-   Kaggle image; see `docs/goal_10m.md`), one epoch = 133,296 steps of 16,384
-   tokens = 2.184B, checkpoint every 500 steps;
+   Kaggle image; see `docs/goal_10m.md`), one epoch = 137,377 steps of 16,384
+   tokens = 2.251B, checkpoint every 500 steps;
 2. package the result, then compare against public small-model baselines
    before the SFT stage;
 3. decide the language rebalance for SFT (Russian is 38 % of tokens now).

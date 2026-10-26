@@ -7,12 +7,13 @@ detail.
 
 ## In progress
 
-- The corpus is final: **8.61 GB, 945,234 documents, 2,183,929,941 train
-  tokens**, Russian at **37.9 % of tokens**. Bins are on Kaggle as
-  `icold21/kron-corpus-2b` (4.37 GB train, 89.6 MB val).
-- **Q10** (d=512, 25 layers, K=10, 9,938,886 params, seq 512) is running on one
-  Kaggle T4 (fp16, batch 32); one epoch is **133,296 steps** (16,384 tokens per
-  step), `max_steps=0` derives it from the bin. Checkpoints every 500 steps,
+- The corpus is final: **8.62 GB, 968,334 documents, 2,250,807,719 train
+  tokens**, Russian at **38.1 % of tokens**, every digit its own token. Bins are
+  on Kaggle as `icold21/kron-corpus-2b` (4.50 GB train, 92.4 MB val), code as
+  `icold21/kron-llm-code-v10`.
+- **Q10** (d=512, 25 layers, terms 10, 9,938,886 params, seq 512) is running on
+  one Kaggle T4 (fp16, batch 32); one epoch is **137,377 steps** (16,384 tokens
+  per step), `max_steps=0` derives it from the bin. Checkpoints every 500 steps,
   500-minute sessions with resume.
 - After pretraining: Habr article #1, then SFT/Q&A with a KL anchor to the
   frozen pretrain policy plus 5–10 % replay, then article #2. Distillation is
@@ -20,7 +21,35 @@ detail.
 
 ## Results
 
-## 2026-10-26T15:10+03:00 — corpus final: 2.184B tokens, Russian 37.9 %; Q10 running
+## 2026-10-26T22:50+03:00 — digit tokenizer fixed, corpus retokenised (2.251B), Q10 restarted
+
+- **Digit isolation, second attempt.** The first version put
+  `Digits(individual_digits=True)` *after* ByteLevel. That split UTF-8 sequences
+  and Russian collapsed to raw bytes: **2.72 bytes/token instead of 4.96**, i.e.
+  the Russian half of the corpus became twice as expensive and semantically
+  poorer. Caught before publishing; the bins were discarded.
+- **The correct order** is `Split(Regex(r"\d"), behavior="isolated")` *before*
+  ByteLevel. UTF-8 stays intact and digits are still single tokens:
+  `'1234 + 5678 = 6912'` → `['1','2','3','4',' +',' ','5','6','7','8',' =',' ','6','9','1','2']`.
+  Round-trip exact on both languages. Cost: 2.184B → **2,250,807,719** tokens
+  (+3.1 %), fertility EN 2.92 / RU 4.96 bytes/token.
+- **Corpus after retokenisation**: 8.62 GB, 968,334 documents, val 46,197,636
+  tokens, **EN 61.9 % / RU 38.1 % of tokens**. Gate passes (≥2.0B, RU ≥30 %).
+  Dataset version published as `icold21/kron-corpus-2b` (train 4.50 GB).
+- **Identity upsampled ×8** in the mix: the epoch sampler shuffles 512-token
+  windows over the whole stream, so the slice was never seen as one chunk — but
+  its share was 0.014 % of tokens. Now **0.111 %** (2,493,752 tokens), spread
+  uniformly, exact copies (1,650 docs per language → 13,200).
+- **Config keys renamed** because three different `K`s were in one file:
+  `model.kron.terms` (10), `model.kron.carry_window` (2),
+  `model.embed_kron.terms` (32), `model.routed.active_rows` (10),
+  `model.kron.qkv_terms` (E4). Numeric behaviour unchanged, 110 tests pass.
+- **Run**: Q10 from scratch on one T4, batch 32 × 512 = 16,384 tokens/step,
+  **137,377 steps** per epoch, ~95.6 GPU-h, ~3.2 weeks at 30 GPU-h/week. Code
+  dataset `icold21/kron-llm-code-v10`, no checkpoint attached (the 2,000-step
+  test run used the broken tokenizer and is discarded).
+
+## 2026-10-26T15:10+03:00 — corpus final: 2.184B tokens, Russian 37.9 % (pre-digit tokenizer); Q10 test run
 
 - **Size**: 8.61 GB of mixed text, 945,234 documents, **2,183,929,941 train
   tokens** at 3.80 bytes/token (val 44.8M). EN 46.2 % / RU 53.8 % of bytes,

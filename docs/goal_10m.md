@@ -86,7 +86,7 @@ d=512 does not fit the 1660 Ti's memory (see §6).
 **Is one more layer worth it?** A layer costs 308,406 parameters (+3.1 %),
 5 MFLOP/token (+3.6 %) and 0.3 MB in int8:
 
-| layers | parameters | MFLOP/token | int8 size | 2.184B tokens |
+| layers | parameters | MFLOP/token | int8 size | 2.251B tokens |
 |---:|---:|---:|---:|---:|
 | 25 | 9,938,886 | 138 | 9.9 MB | 3.0×10¹⁷ |
 | 26 | 10,247,292 | 143 | 10.2 MB | 3.1×10¹⁷ |
@@ -103,10 +103,10 @@ therefore stays at 25 layers; 26 is the fallback if the corpus grows past
 
 | property | value |
 |---|---|
-| tokens | **2.184B measured** (8.61 GB mixed, 945k documents, 2 % held out) |
-| bytes | 5.19 GB mixed at 3.11 bytes/token |
-| languages | **EN 70.8 % / RU 29.2 % of bytes**; the token share is **EN 84.3 % / RU 15.7 %** because Russian costs 5.30 bytes/token against 2.67 for English — the contract is bytes, the consequence is stated |
-| domains | math 25.3 %, science 21.6 %, encyclopedic 16.4 %, code 14.0 %, literature 12.2 %, ML 5.2 %, logic 3.9 %, CS 1.2 %, humour 0.2 %, identity 0.09 % |
+| tokens | **2,250,807,719 measured** (8.62 GB mixed, 949k documents, 2 % held out) |
+| bytes | 8.45 GB of train text at 3.69 bytes/token |
+| languages | **EN 46 % / RU 54 % of bytes**; the token share is **EN 61.9 % / RU 38.1 %** because Russian costs 4.96 bytes/token against 2.92 for English — the contract is bytes, the consequence is stated |
+| domains | encyclopedic 30.3 %, literature 21.2 %, math 19.1 %, science 11.1 %, code 7.5 %, ML 5.4 %, logic 3.2 %, CS/engineering 2.3 %, identity 0.19 % |
 | dedup | MinHash, 0.8 Jaccard threshold, applied before the mix |
 | held-out | 2 % per language, disjoint by document |
 | provenance | every shard has source, licence, URL and SHA-256 in `manifest.jsonl` |
@@ -119,9 +119,9 @@ identity slice is synthetic and prompt-constrained (see
 ## 6. Compute plan
 
 FLOPs per token ≈ `6N + 12·L·seq·d` = 60M + 79M ≈ **138 MFLOP/token** at
-d=512, L=25, seq=512. For 2.184B tokens: **3.0 × 10^17 FLOPs**.
+d=512, L=25, seq=512. For 2.251B tokens: **3.1 × 10^17 FLOPs**.
 
-| hardware | assumed throughput | 2.184B tokens | notes |
+| hardware | assumed throughput | 2.251B tokens | notes |
 |---|---|---|---|
 | Kaggle T4 (16 GB, fp16) | 4–6× the 1660 Ti (tensor cores, batch 24×512) | **40–70 h** | 2–3 sessions at 30 GPU-h/week |
 | GTX 1660 Ti (6 GB, fp32) | **1,927 tokens/s measured** | **12 days** | d=384, batch 8×256, 4.59 GB peak |
@@ -138,7 +138,7 @@ constraints were found while measuring:
   which fits at batch 8×256; batch 16×256 OOMs.
 
 So the 1660 Ti is a valid fallback only as a multi-day checkpointed run
-(≈13 days for 2.184B), while the T4 is the intended path. A
+(≈13 days for 2.251B), while the T4 is the intended path. A
 prelude-checkpointing rewrite of `KronBank` would cut the memory enough to run
 d=512 on 6 GB; it is not on the critical path until the T4 is unavailable.
 
@@ -160,7 +160,7 @@ There is **one pretrain** in this cycle, followed by SFT. The order is fixed:
 
 | stage | what | deliverable |
 |---|---|---|
-| 1. Pretrain | 10M model on the bilingual corpus, 2.184B tokens | checkpoint, int8 artifact, held-out bpb, generation samples |
+| 1. Pretrain | 10M model on the bilingual corpus, 2.251B tokens | checkpoint, int8 artifact, held-out bpb, generation samples |
 | — | article #1 (Habr) written immediately after pretrain | published post with the bpb table and the negative results |
 | 2. SFT / QA | structured Q/A, math word problems, short code, guarded identity slice, 10–20 % pretrain replay | SFT checkpoint, before/after bpb and probe table |
 | — | article #2 (Habr) written immediately after QA, if there is something to report | published post with the SFT results |
@@ -186,11 +186,11 @@ probe, and generation at T=1.0, top_k=5–10.
 | epoch sampler | one shared permutation per epoch, ranks take 
 ank::world, so an epoch is a full pass (not the ~63 % of random sampling) |
 | checkpoints | save_every=500, last.pt carries model + optimizer + step, --resume tested |
-| steps | 133,296 x 16,384 tokens = 2.184B = one epoch (one T4, batch 32, fp16) |
+| steps | 137,377 x 16,384 tokens = 2.251B = one epoch (one T4, batch 32, fp16) |
 | Kaggle | code dataset icold21/kron-llm-code; bins icold21/kron-corpus-2b |
 
 The first epoch is the first segment, not a hard target: if validation bpb is
-still falling at step 133,296, the run resumes for a second epoch with a fresh
+still falling at step 137,377, the run resumes for a second epoch with a fresh
 cosine cycle. At 10M parameters and 1.6B tokens, a second pass is cheap and
 unlikely to overfit.
 
