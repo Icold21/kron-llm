@@ -151,6 +151,13 @@ DEFAULTS: Dict[str, Any] = {
         "warmup_steps": 500,
         "schedule": "cosine",
         "min_lr": 3e-5,
+        # WSD (warmup -> stable -> decay).  ``run_steps`` bounds *this* pass
+        # relative to wherever it resumes, and ``schedule_steps`` spans its own
+        # cosine; 0 keeps the plain one-epoch behaviour.  The decay pass then
+        # resumes the epoch-1 weights and anneals from 3e-4 to 1e-6 over a
+        # curated subset instead of finishing the epoch at a hot LR.
+        "run_steps": 0,
+        "schedule_steps": 0,
         "weight_decay": 0.1,
         "grad_clip": 1.0,
         "amp": "none",   # fp16 autocast is slower than fp32 on the reference GPU
@@ -653,12 +660,38 @@ EXPERIMENTS["Q10"] = {
         "training.spectral_every": 0,
         "training.seq_len": 512,
         "training.lr": 3e-4,
+        # Constant LR through the epoch: WSD keeps the whole first pass at one
+        # rate, so every token gets the same weight, and the quality work is
+        # done by the separate decay pass (Q10A) instead of by a cosine tail
+        # that would give the curated data almost no say (see README).
+        "training.min_lr": 3e-4,
         "training.warmup_steps": 1000,
         "training.max_steps": 0,
         "training.epochs": 1,
         "training.eval_every": 1000,
         "training.save_every": 500,
         "training.log_every": 100,
+    },
+}
+# Q10A: the WSD decay pass.  Resumes the end-of-epoch weights, then anneals
+# 3e-4 -> 1e-6 over 20 % of an epoch (27,475 steps, ~19 GPU-h) on a curated
+# subset: encyclopedic, literature, science, identity at a higher share, and a
+# minority of general text so the model is not narrowed.  No warmup: the pass
+# starts on the curve at full LR.
+EXPERIMENTS["Q10A"] = {
+    "desc": "Q10 decay pass: 20% of an epoch on curated data, LR 3e-4 -> 1e-6",
+    "overrides": {
+        **EXPERIMENTS["Q10"]["overrides"],
+        "training.lr": 3e-4,
+        "training.min_lr": 1e-6,
+        "training.warmup_steps": 0,
+        "training.run_steps": 27475,
+        "training.schedule_steps": 27475,
+        "training.max_steps": 0,
+        "training.epochs": 1,
+        "training.eval_every": 500,
+        "training.log_every": 50,
+        "training.save_every": 250,
     },
 }
 # Q8w: parameter-matched control for Q8g.  20 layers x 6 matrices is the same

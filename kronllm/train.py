@@ -380,6 +380,18 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
         if is_main:
             print(f"[resume] step {start_step}, best ppl {best_ppl:.3f}")
 
+    # WSD decay pass: a run that resumes the epoch-1 weights but has its own
+    # length and its own cosine.  ``run_steps`` counts from the resume point,
+    # so the pass does not have to know the absolute step it starts at.
+    run_steps = int(tc.get("run_steps", 0) or 0)
+    if run_steps:
+        total_steps = start_step + run_steps
+    sched_steps = int(tc.get("schedule_steps", 0) or 0) or (run_steps or total_steps)
+    sched_from = start_step if run_steps else 0
+    if is_main and run_steps:
+        print(f"[wsd] decay pass: {run_steps} steps from {start_step}, "
+              f"lr {float(tc['lr']):.1e} -> {float(tc['min_lr']):.1e}")
+
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
 
@@ -407,7 +419,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
             running_n += 1
             micro += 1
 
-        factor = cosine_factor(step, total_steps, warmup, min_ratio)
+        factor = cosine_factor(step - sched_from, sched_steps, warmup, min_ratio)
         set_lr(opt, factor)
         scaler.unscale_(opt)
         grads = grad_report(model)
