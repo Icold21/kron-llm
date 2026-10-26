@@ -27,6 +27,7 @@ runs/
 results/
 *.log
 tb/
+data/kaggle_code/
 
 # Python
 __pycache__/
