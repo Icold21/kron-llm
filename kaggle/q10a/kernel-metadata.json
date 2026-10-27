@@ -1,0 +1,17 @@
+{
+  "id": "icold21/kron-q10a-decay-pass",
+  "title": "Kron Q10A decay pass",
+  "code_file": "train.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "icold21/kron-llm-code-v13",
+    "icold21/kron-q10a-anneal-bin",
+    "icold21/kron-q10-ckpt"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}

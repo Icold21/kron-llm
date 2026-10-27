@@ -18,11 +18,15 @@ detail.
 - **WSD schedule**: the epoch runs at a **constant 3e-4** (`min_lr = lr`), so
   every token gets the same weight, and the quality work is done by a separate
   decay pass `Q10A`: resumes the end-of-epoch weights, anneals 3e-4 → 1e-6 over
-  **20 % of an epoch** (27,475 steps, ~19 GPU-ч) on a curated subset
-  (encyclopedic, literature, science, identity at a higher share, ~30 % general
-  text). The curated bin is not built yet — it is needed before the epoch ends.
-  A cosine tail inside the epoch was rejected: at 5 % of steps and LR ~1.5e-5 it
-  would have given the curated data ~0.2 % of the update mass.
+  **30 % of an epoch** (41,213 steps, ~28 GPU-ч) on a curated subset built by
+  `scripts/build_anneal_mix.py` (675M tokens: literature 31 %, encyclopedic
+  22 %, science 16 %, **math 14 %**, ML 6.5 %, code 6 %, logic 2 %, identity
+  2.5 %). Math was tripled against the first plan and the **whole identity
+  slice** (1,650 unique documents per language, deduped from the 8× epoch
+  copies) is repeated into the pass — at 0.11 % of the epoch it never gets
+  enough gradient to be memorised. A cosine tail inside the epoch was rejected:
+  at 5 % of steps and LR ~1.5e-5 it would have given the curated data ~0.2 % of
+  the update mass.
 - **Decision (2026-10-27, user)**: no mid-run LR damping and no early switch to
   the decay pass — the stable phase runs the **full 100 % of the epoch**, then
   `Q10A`. A 3× lower LR now would have bought roughly a third of the remaining

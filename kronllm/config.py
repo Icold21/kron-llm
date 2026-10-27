@@ -677,19 +677,21 @@ EXPERIMENTS["Q10"] = {
     },
 }
 # Q10A: the WSD decay pass.  Resumes the end-of-epoch weights, then anneals
-# 3e-4 -> 1e-6 over 20 % of an epoch (27,475 steps, ~19 GPU-h) on a curated
-# subset: encyclopedic, literature, science, identity at a higher share, and a
-# minority of general text so the model is not narrowed.  No warmup: the pass
-# starts on the curve at full LR.
+# 3e-4 -> 1e-6 over 30 % of an epoch (41,213 steps, ~28 GPU-h) on a curated
+# subset: encyclopedic, literature, science, more math than the epoch saw, and
+# the whole identity slice repeated to ~2.5 % of the tokens.  No warmup: the
+# pass starts on the curve at full LR.  The share was raised from 20 % on
+# 2026-10-27: a 10M model on 2.25B tokens is far past compute-optimal, so the
+# tail of the schedule is the cheapest descent left on the table.
 EXPERIMENTS["Q10A"] = {
-    "desc": "Q10 decay pass: 20% of an epoch on curated data, LR 3e-4 -> 1e-6",
+    "desc": "Q10 decay pass: 30% of an epoch on curated data, LR 3e-4 -> 1e-6",
     "overrides": {
         **EXPERIMENTS["Q10"]["overrides"],
         "training.lr": 3e-4,
         "training.min_lr": 1e-6,
         "training.warmup_steps": 0,
-        "training.run_steps": 27475,
-        "training.schedule_steps": 27475,
+        "training.run_steps": 41213,
+        "training.schedule_steps": 41213,
         # The decay pass deliberately resumes the epoch-1 weights with the
         # epoch-1 optimizer state on a *different* (curated) corpus; the token
         # id space is the same one, only the document mix changes.

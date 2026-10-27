@@ -20,7 +20,12 @@ import argparse
 import csv
 import math
 import statistics
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from kronllm.config import experiment_config  # noqa: E402
 
 RUN = Path("data/kaggle_out/q10")
 HIST = Path("data/q10_history.csv")
@@ -218,13 +223,16 @@ def main() -> None:
               f"против сырых байтов (xz на тексте даёт ~5–6×).", ""]
         L += [f"Вердикт по прогнозу: {verdict(projected)}.", ""]
 
+    q10a = experiment_config("Q10A")["training"]
     L += [
         "## Что дальше",
         "",
         "Эпоха идёт на константном LR (WSD). После её конца — decay-проход "
-        "20 % эпохи (27,475 шагов, ~19 GPU-ч) на отобранных данных, LR "
-        "3e-4 → 1e-6. Именно он, а не конец эпохи, даёт финальное качество: "
-        "чекпоинт конца эпохи останется «горячим».",
+        f"{100 * q10a['run_steps'] / EPOCH_STEPS:.0f} % эпохи "
+        f"({q10a['run_steps']:,} шагов, "
+        f"~{q10a['run_steps'] * 16384 / 6_500 / 3600:.0f} GPU-ч) на отобранных "
+        "данных, LR 3e-4 → 1e-6. Именно он, а не конец эпохи, даёт финальное "
+        "качество: чекпоинт конца эпохи останется «горячим».",
     ]
     OUT.write_text("\n".join(L) + "\n", encoding="utf-8")
     # The same report as email-safe HTML: tables are what get read in a mail

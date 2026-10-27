@@ -27,11 +27,17 @@ ROOT = Path("data/bilingual")
 
 
 def load_mixed(mix_dir: Path) -> list[dict]:
-    """Load every mixed shard into memory, tagged with language and domain."""
+    """Load every mixed shard into memory, tagged with language and domain.
+
+    Accepts both gzipped shards (the corpus build) and plain ``.jsonl`` (the
+    curated decay mix, which is consumed once and does not pay for gzip).
+    """
     docs: list[dict] = []
-    for path in sorted(mix_dir.glob("*.jsonl.gz")):
-        lang, domain = path.stem.split(".jsonl")[0].split("_")[:2]
-        with gzip.open(path, "rt", encoding="utf-8") as f:
+    shards = sorted(list(mix_dir.glob("*.jsonl.gz")) + list(mix_dir.glob("*.jsonl")))
+    for path in shards:
+        lang, domain = path.name.split(".jsonl")[0].split("_")[:2]
+        opener = gzip.open if path.suffix == ".gz" else open
+        with opener(path, "rt", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
