@@ -543,3 +543,92 @@ E8 values (`composition`, `groups`, `sigma_mode`), which points at data or code
 drift rather than a deliberate change. E8r is the control for this table; the
 historical number is not directly comparable and is not used for any delta
 above.
+
+## 17. Retired runs and artefacts (cleanup, 2026-10-27)
+
+The weights of the development bench were deleted; the numbers were not. This
+matters because it already went wrong once: `runs/E8` was removed in an earlier
+cleanup and its `results.json` went with it, so the 3.3 % gap between E8 (1.4789)
+and its re-run E8r (1.5282) can no longer be attributed to anything. Before
+deleting a single checkpoint this time, every `results.json` was dumped verbatim
+into [`retired_runs.json`](retired_runs.json).
+
+What is deleted is the checkpoint file (`best.pt` / `last.pt`). Each run
+directory keeps `log.csv`, `results.json` and `config.yaml`, so the curve and the
+configuration survive; the weights are reproducible from those.
+
+### Runs whose weights were deleted
+
+| run | params | steps | bpb | description |
+|---|---:|---:|---:|---|
+| D1 | 1,068,544 | 4,200 | **0.9770** | Dense+BPE control: E0 recipe, 1024-token BPE (~1.07M) |
+| E14 | 190,348 | 4,000 | **1.5508** | E2 + sum composition (sI + sum_l alpha_l D_l), full backprop |
+| E14w | 190,348 | 4,000 | **2.2118** | E14 (sum composition) on WikiText-103 bytes |
+| E15 | 221,308 | 4,000 | **1.5091** | E14 + input-dependent softmax gate (dense d x L) |
+| E16 | 193,468 | 4,000 | **1.5504** | E14 + input-dependent softmax gate (Kron g1 x g2) |
+| E17w | 190,348 | 4,000 | **2.1561** | E8 + grouped composition (G=2) on WikiText-103 bytes |
+| E17w_s43 | 190,348 | 4,000 | **2.1624** | E8 + grouped composition (G=2) on WikiText-103 bytes |
+| E18w | 190,348 | 4,000 | **2.1578** | E8 + alternating sum/product composition on WikiText-103 bytes |
+| E19 | 111,502 | 4,000 | **1.7172** | E2 + weight sharing: 6 unique blocks x2 (12 effective, ~half … |
+| E2 | 190,108 | 2,500 | — | Full Kron (base) |
+| E20 | 190,108 | 8,000 | **1.4271** | E2 + weight sharing: 12 unique blocks x2 (24 effective, same … |
+| E21 | 111,758 | 4,000 | **1.7180** | E19 + randomized recursion r~U{1,2} + pass embedding |
+| E22 | 111,502 | 8,000 | **1.5214** | 6 unique blocks x4 (24 effective, ~111K params) |
+| E25 | 190,108 | 4,000 | **1.5189** | nonlinear composition every 2 factors (2 fused GEMMs/token) |
+| E26 | 190,108 | 4,000 | **1.5675** | nonlinearity after the whole composition (1 GEMM, almost free) |
+| E26b | 190,108 | 4,000 | **1.5906** | E26 but additive: keeps the linear product skeleton |
+| E27 | 190,108 | 4,000 | **1.5455** | E8 without the depth carry: independent factors (sigma = 0) |
+| E28 | 190,108 | 4,000 | **1.5409** | E8 with sigma frozen at 0.5 (the reviewer's ablation) |
+| E29 | 190,108 | 4,000 | **1.5496** | E8 with K_win=4: state crosses four layers instead of two |
+| E30 | 190,108 | 4,000 | **1.5712** | E8 with K_win=0: state crosses the whole 12-layer stack |
+| E8r | 190,108 | 4,000 | **1.5282** | E8 re-run as the control for the E27-E30 sigma/K_win ablation |
+| E8w | 190,108 | 4,000 | **2.1848** | E8 (full backprop) on WikiText-103 bytes |
+| E8w_s43 | 190,108 | 4,000 | **2.1559** | E8 (full backprop) on WikiText-103 bytes |
+| Q2 | 2,079,992 | 10,000 | **0.8391** | BPE-1024, d=320/N=24, K=6, qk-norm (~2.08M params) |
+| Q4 | 2,079,992 | 4,000 | **0.9248** | Q2 + full backprop (no stop-grad, ~2.08M params) |
+| Q6 | 2,473,208 | 4,000 | **0.8489** | Q4 + BPE-4096 tokenizer (~2.47M params) |
+| Q6_10k | 2,473,208 | 10,000 | **0.7644** | Q4 + BPE-4096 tokenizer (~2.47M params) |
+| Q8g | 2,851,280 | 5,333 | **0.8318** | Q6 + gated FFN (SwiGLU) (~2.85M params, batch 24) |
+| Q8g_long | 2,851,280 | 13,333 | **0.7542** | Q6 + gated FFN (SwiGLU) (~2.85M params, batch 24) |
+| Q8w | 2,470,328 | 5,333 | **0.8359** | Q8g with 20 layers: same params as Q6 (2.47M), gated FFN |
+| Q9 | 2,463,776 | 5,333 | **0.8740** | Q6 with a bilinear (GLU) FFN instead of the linear Kron FFN (… |
+| Q9k | 2,462,468 | 5,333 | **0.8673** | Q9 + the Kron map as a non-interacting term (20 layers, ~2.47M) |
+| S1 | 2,079,992 | 400 | **1.1102** | Q2 + supervised fine-tuning on Dolly-15k Q/A (~2.08M params) |
+
+Kept on purpose: `runs/Q8g_long/best.pt` (the fp32 reference behind the shipped
+int8 artefact) and `runs/Q6_10k/best.pt` (the previous reference). Everything
+else is regenerable, and the two shipped artefacts live in `artifacts/`.
+
+### Smoke tests removed with their logs
+
+`amp_test`, `budget_test`, `ckpt_test`, `ckpt_test2`, `ddp_test`, `epoch_test`,
+`q10_cpu_test` — one to six steps each, plumbing checks (does AMP run, does the
+optimizer state resume, does DDP start). No measurement value, and
+`q10_cpu_test` alone held 160 MB.
+
+### Kaggle datasets deleted
+
+- `icold21/kron-llm-code`
+- `icold21/kron-llm-code-v2`
+- `icold21/kron-llm-code-v3`
+- `icold21/kron-llm-code-v4`
+- `icold21/kron-llm-code-v5`
+- `icold21/kron-llm-code-v6`
+- `icold21/kron-llm-code-v7`
+- `icold21/kron-llm-code-v8`
+- `icold21/kron-llm-code-v9`
+- `icold21/kron-llm-code-v10`
+- `icold21/kron-llm-code-v11`
+- `icold21/kron-llm-code-v13`
+- `icold21/kron-llm-code-v14`
+- `icold21/kg-test-delete-me`
+
+These were one-off code bundles: a new dataset id was cut on every code change
+so a resumed session could never silently mount stale code. That made sense
+during the run; keeping all fourteen afterwards does not.
+
+Kept: `kron-corpus-2b` (the training bins), `kron-q10-ckpt` (the live resume
+point, one version per session), `kron-q10a-anneal-bin` (the decay pass),
+`kron-llm-code-v15` (current code) and `kron-llm-code-v12`, which stays only
+until the session that has it mounted finishes — deleting a dataset a running
+kernel has open is not worth the risk for 208 kB.
