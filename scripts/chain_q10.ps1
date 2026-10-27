@@ -5,16 +5,29 @@ Set-Location $root
 $log = Join-Path $root "data\q10_chain.log"
 $kernel = "icold21/kron-q10-10m-bilingual-pretraining"
 $code = "icold21/kron-llm-code-v12"
+$mail = "$env:USERPROFILE\.config\opencode\skills\email-control\scripts\mail.py"
 
 function Say($msg) {
     $line = "[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $msg
     $line | Out-File -Encoding utf8 -Append $log
 }
 
-function Mail($subject, $body) {
-    python "$env:USERPROFILE\.config\opencode\skills\email-control\scripts\mail.py" send `
-        --model "DeepSeek V4.1 Flash Free" --project "kron_llm" `
-        --subject $subject --body-file $body 2>&1 | Out-File -Encoding utf8 -Append $log
+# Every report goes out as HTML: Markdown pipe tables do not render in mail
+# clients, and the tables are the point.  Markdown stays as the repo record.
+function SendReport($subject, $mdPath, $htmlPath) {
+    if (-not (Test-Path $htmlPath) -and (Test-Path $mdPath)) {
+        python scripts\md_to_html.py $mdPath $htmlPath 2>&1 |
+            Out-File -Encoding utf8 -Append $log
+    }
+    if (Test-Path $htmlPath) {
+        python $mail send --model "DeepSeek V4.1 Flash Free" --project "kron_llm" `
+            --subject $subject --body-file $htmlPath --html 2>&1 |
+            Out-File -Encoding utf8 -Append $log
+    } elseif (Test-Path $mdPath) {
+        python $mail send --model "DeepSeek V4.1 Flash Free" --project "kron_llm" `
+            --subject $subject --body-file $mdPath 2>&1 |
+            Out-File -Encoding utf8 -Append $log
+    }
 }
 
 "=== chain started $(Get-Date -Format 'HH:mm:ss')" | Out-File -Encoding utf8 $log
@@ -35,8 +48,8 @@ while ($true) {
 $errored = $status -match "ERROR|CANCEL|FAILED"
 
 # 2. download the session output.  The directory is cleared first: a failed run
-#    can return the previous version's files, and stale weights are worse than
-#    no weights.
+#    can hand back the previous version's files, and stale weights are worse
+#    than no weights.
 $out = Join-Path $root "data\kaggle_out"
 Remove-Item (Join-Path $out "q10") -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $out | Out-Null
@@ -46,27 +59,18 @@ Say ("output exit " + $LASTEXITCODE)
 $nowStep = [int](python scripts\session_progress.py --new 2>$null | Select-Object -Last 1)
 Say ("this download ends at step " + $nowStep)
 
-# 3. no progress means the run died before a checkpoint: say so, do not resume
-#    from whatever old file happened to be lying around.
+# 3. no progress means the run died before writing a checkpoint: report it and
+#    stop rather than resuming from whatever old file is lying around.
 if ($nowStep -le $prevStep) {
-    python scripts\kaggle_log.py "" 4000 > data\session_failure.txt 2>&1
-    $body = Join-Path $root "data\session_failure.md"
-    @"
-# Q10: сессия упала, прогресса нет
-
-Кернел завершился со статусом ``$status``, но в выходных файлах нет шага
-больше $prevStep — то есть новый чекпоинт не записался, и прогон не продвинулся.
-
-**Ничего не публикую и не перезапускаю автоматически**: продолжать с чужого
-или устаревшего чекпоинта хуже, чем остановиться.
-
-Хвост лога сессии — в ``data/session_failure.txt``. Коротко он здесь:
-
-``````
-"@ | Out-File -Encoding utf8 $body
-    Get-Content "data\session_failure.txt" -Tail 60 -Encoding utf8 | Out-File -Encoding utf8 -Append $body
-    "``````" | Out-File -Encoding utf8 -Append $body
-    Mail "Q10: сессия упала без прогресса" $body
+    python scripts\kaggle_log.py "" 20 4000 > data\session_failure.txt 2>&1
+    $tail = (Get-Content "data\session_failure.txt" -Tail 60 -Encoding utf8) -join "`n"
+    $md = Join-Path $root "data\session_failure.md"
+    $head = "# Q10: session failed, no progress`n`n"
+    $head += "The kernel ended with status ``$status``, but the output has no step beyond $prevStep.`n"
+    $head += "No new checkpoint was written, so nothing is published and nothing is resumed.`n`n"
+    $head += "## Log tail`n`n``````n" + $tail + "`n``````"
+    $head | Out-File -Encoding utf8 $md
+    SendReport "Q10: session failed without progress" $md (Join-Path $root "data\session_failure.html")
     Say "FAILED SESSION: reported, nothing pushed"
     exit 3
 }
@@ -74,19 +78,21 @@ if ($nowStep -le $prevStep) {
 # 4. report the curve and mail it
 Remove-Item "data\q10_epoch_done.flag" -ErrorAction SilentlyContinue
 python scripts\report_q10.py --tag session 2>&1 | Out-File -Encoding utf8 -Append $log
-$body = Join-Path $root "data\report_q10.md"
+$md = Join-Path $root "data\report_q10.md"
+$html = Join-Path $root "data\report_q10.html"
 $subjectFile = Join-Path $root "data\report_q10_subject.txt"
 $subject = if (Test-Path $subjectFile) { (Get-Content $subjectFile -Raw -Encoding utf8).Trim() } else { "Q10 session report" }
-if ($errored) { $subject = $subject + " (сессия завершилась ошибкой)" }
-if (Test-Path $body) {
-    if ($errored) {
-        python scripts\kaggle_log.py "" 3000 > data\session_failure.txt 2>&1
-        "`n## Хвост лога`n`n``````" | Out-File -Encoding utf8 -Append $body
-        Get-Content "data\session_failure.txt" -Tail 40 -Encoding utf8 | Out-File -Encoding utf8 -Append $body
-        "``````" | Out-File -Encoding utf8 -Append $body
-    }
-    Mail $subject $body
+if ($errored) { $subject = $subject + " (session ended with an error)" }
+if ($errored -and (Test-Path $html)) {
+    # The traceback is the whole point of an error report, so append it as <pre>
+    # after rendering rather than fighting the Markdown converter for it.
+    python scripts\kaggle_log.py "" 20 3000 > data\session_failure.txt 2>&1
+    $tail = (Get-Content "data\session_failure.txt" -Tail 40 -Encoding utf8) -join "`n"
+    $encoded = [System.Net.WebUtility]::HtmlEncode($tail)
+    $suffix = '<hr><h3>Log tail</h3><pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;font-size:12px;overflow-x:auto">' + $encoded + '</pre>'
+    Add-Content -Encoding utf8 $html $suffix
 }
+SendReport $subject $md $html
 
 # 5. publish the checkpoint so the next session can attach it
 $ckpt = Join-Path $root "data\kaggle_out\q10\last.pt"
@@ -105,8 +111,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 Say ("checkpoint dataset exit " + $LASTEXITCODE)
 
-# 6. the epoch is complete: keep the weights, do not push another training
-#    session -- the WSD decay pass is launched separately, on curated data.
+# 6. the epoch is complete: keep the weights and stop pushing sessions; the WSD
+#    decay pass is launched separately, on curated data.
 if (Test-Path "data\q10_epoch_done.flag") {
     Say "EPOCH COMPLETE: checkpoint published, waiting for the decay pass"
     Say "NEXT: launch Q10A (decay, 20% of an epoch, LR 3e-4 -> 1e-6)"

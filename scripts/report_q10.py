@@ -227,6 +227,16 @@ def main() -> None:
         "чекпоинт конца эпохи останется «горячим».",
     ]
     OUT.write_text("\n".join(L) + "\n", encoding="utf-8")
+    # The same report as email-safe HTML: tables are what get read in a mail
+    # client, and Markdown pipes do not render there.
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from md_to_html import convert
+        OUT.with_suffix(".html").write_text(convert(OUT.read_text(encoding="utf-8")),
+                                           encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[report] html render failed: {exc}")
     # Subject hint and the "epoch finished" flag for the chain script.
     val_bpb = fnum(val[-1], "val_bpb") if val else float("nan")
     if step >= EPOCH_STEPS:
