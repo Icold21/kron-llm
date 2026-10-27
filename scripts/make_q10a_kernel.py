@@ -44,9 +44,10 @@ def main() -> None:
     nb["cells"][0]["source"] = """# KronLLM Q10A — decay pass (WSD tail)
 
 Resumes the end-of-epoch Q10 weights and anneals the LR 3e-4 → 1e-6 over
-**30 % of an epoch** (41,213 steps × 16,384 tokens = 675M tokens) on the
+**29.6 % of an epoch** (40,649 steps × 16,384 tokens = 666M tokens) on the
 curated mix: literature, encyclopedic, science, 3× more math than the epoch saw,
-and the whole identity slice repeated to ~2.5 % of the tokens.
+and the whole identity slice repeated to ~2.5 % of the tokens. The step count is
+the bin divided by the step size, so the pass reads its data exactly once.
 
 No warmup: the pass starts at full LR on the curve. Checkpoints every 250 steps
 to `/kaggle/working/q10a`; the session stops at the 500-minute wall clock and

@@ -44,8 +44,13 @@ def main() -> None:
     epoch_meta = json.loads((BASE / "tokenizer_meta.json").read_text(encoding="utf-8"))
     same = (bin_meta["val_tokens"] == epoch_meta["val_tokens"]
             and bin_meta["vocab_size"] == epoch_meta["vocab_size"])
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from kronllm.config import experiment_config
+
+    steps = experiment_config("Q10A")["training"]["run_steps"]
     print(f"train tokens {bin_meta['train_tokens']:,} "
-          f"({bin_meta['train_tokens']/41213/16384:.2f}x the 41,213-step budget)")
+          f"({bin_meta['train_tokens']/steps/16384:.2f}x the {steps:,}-step budget)")
     print(f"val tokens   {bin_meta['val_tokens']:,} "
           f"(same held-out as the epoch: {same})")
     print(f"{OUT} total {total/1e9:.2f} GB")
