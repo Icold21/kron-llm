@@ -369,6 +369,117 @@ The following properties are enforced by the test suite:
   GPU, so `amp` defaults to `none`. No DDP, no gradient checkpointing, no CUDA
   graphs (capture fails on `baddbmm` in this environment).
 
+## 10. The Q10 configuration (the run that matters)
+
+Q10 is the first model in this repo trained at token budget, not at toy scale, so
+its numbers are the ones the papers and the article quote. Everything below is
+measured from the built model (`KronTransformer(experiment_config("Q10"))`).
+
+### Geometry
+
+| knob | value |
+|---|---|
+| `d_model` | 512 |
+| layers / heads | 25 / 8 (`d_head = 64`, full MHA) |
+| context | 512 |
+| vocabulary | 8,192 (BPE, digit-split) |
+| embedding | factorised `V×256` + `256×512`, tied head |
+| Kronecker | `L = 4` channels, `K = 10` terms, `n₁ × n₂ = 16 × 32` |
+| depth recurrence | `K_win = 2`, product composition, `σ` learned, `stop_gradient = False` |
+| anchor | `s = 1.0`, frozen (not learnable) |
+| FFN | gated Kronecker: `silu(W_f h) ⊙ W_g h`, both `d → d` |
+| norms | RMSNorm, `qk_norm` on every layer |
+| initialisation | `τ = 0.1`, `γ = 0.1` (ReZero), `θ ~ N(0, 0.1)`, unit-gain factors |
+
+### Parameters (measured, not estimated)
+
+| component | parameters | share |
+|---|---:|---:|
+| 150 Kronecker modules (6 per block × 25) | 7,681,350 | 77.3 % |
+| embedding `E` (8192 × 256) | 2,097,152 | 21.1 % |
+| embedding up-projection `U` (256 × 512) | 131,072 | 1.3 % |
+| RMSNorms (2 × 512 per block + final) | 26,112 | 0.3 % |
+| QK-norm (2 × 64 per block) | 3,200 | 0.03 % |
+| **total** | **9,938,886** | **100 %** |
+
+One module costs
+
+```
+L·K·(n₁² + n₂²) + 2L + 1 = 4·10·(256 + 1024) + 8 + 1 = 51,209
+```
+
+against 262,144 for a dense `512 × 512` map: **5.12× fewer parameters at full
+rank**, because `rank(A ⊗ B) = rank(A)·rank(B)` and the `s·Id` anchor keeps the
+composed map away from zero. The six roles per block are `q, k, v, o, f, f_g`;
+the only dense matrices left are the tied embedding pair.
+
+For comparison, a dense transformer with the same width and depth would spend
+`150 × 262,144 = 39.3M` parameters on matrices alone, i.e. ~4× the whole Q10
+model.
+
+### Why the budget looks thin and the data looks fat
+
+9.94M parameters against 2.25B training tokens is **226 tokens per parameter**
+— roughly 40× past compute-optimal for a model this size. That is deliberate:
+the Kronecker parameterisation is only interesting if it holds up when the
+*data* is the constraint, so the run is set up to be data-bound from the first
+step. The decay pass (Q10A) then spends the last 30 % of the schedule at
+`LR 3e-4 → 1e-6` on curated data.
+
+### Arithmetic cost: the prelude is not free
+
+`flops_per_token(seq_len)` at the Q10 geometry:
+
+| seq len | forward MFLOP/token |
+|---:|---:|
+| 128 | 1,348.6 |
+| 256 | 726.0 |
+| 512 | **424.5** |
+| 1024 | 293.4 |
+
+The composition `P = (sI + D_4) ⋯ (sI + D_1)` costs `L·d³` MACs per module per
+forward: `4 × 512³ ≈ 537M` MACs, i.e. `1.07 GFLOP`, times 6 modules and 25
+blocks = **161 GFLOP per forward at `seq_len = 512`** — 315 MFLOP per token.
+The body (attention, FFN, and the single `h @ Pᵀ` application per module) is
+`~105 MFLOP` per token plus `2·T·d` for attention. So at 512 tokens the
+Kronecker prelude is **about three quarters of the forward FLOPs**, and that
+share falls as `1/T`: at 1024 tokens the measured cost is 293 MFLOP/token, of
+which 157 is prelude.
+
+This is the honest trade of the whole approach: parameters are bought with
+arithmetic, not with rank. The saving matters when the model must fit in a
+memory budget (a T4, a phone, a 4 GB checkpoint); it does not make training
+cheaper per token. A `torch.compile`/Triton fused prelude and a factorised
+recurrence state are the obvious next steps, and neither exists on this setup
+(Windows PyTorch ships without Triton).
+
+### Training setup
+
+| knob | value |
+|---|---|
+| optimiser | AdamW, `β` defaults, `ε` default |
+| LR | 3e-4 constant through the epoch (WSD), `θ` at 1e-2, `τ`/`γ` at LR |
+| weight decay | 0.1 on matrices, 0 on `θ` (learned mixing rates) |
+| grad clip | 1.0 |
+| precision | fp16 autocast, single T4 |
+| batch | 32 × 512 = 16,384 tokens/step |
+| epoch | 137,377 steps = 2.2508B tokens |
+| measured | 2.53 s/step, ~6,500 tok/s, ~95.6 GPU-h per epoch |
+| sessions | 500 minutes, resume from `last.pt`, `save_every = 500` |
+
+### What Q10 deliberately does **not** use
+
+* **GQA** (`n_kv_heads = 8`, i.e. plain MHA) — at `d_head = 64` the KV cache is
+  not the bottleneck.
+* **Recursion / weight sharing** (`recurse = 1`, 25 unique blocks) — E2 showed
+  untrained recursion degrades, and the run has no budget for the fine-tune.
+* **Mixture-of-experts or routed embedding** — Q3/Q7 both lost to the dense
+  factorised table.
+* **Dropout, gradient checkpointing, DDP** — a 10M model on 500-minute sessions
+  does not need them; DDP is blocked by the 32 GB host cgroup, not by the code.
+* **The sum/grouped/alternating compositions** — E14/E17/E18 measured lower
+  effective rank and no better bpb than the product; Q10 is the product path.
+
 ## References
 
 - Rank inequalities (Sylvester, subadditivity): *Rank (linear algebra)*,
