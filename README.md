@@ -587,6 +587,7 @@ scripts/            data prep (TinyStories, BPE, WikiText, SFT,
                     dashboard
 tests/              102 tests, CPU-only
 docs/               architecture.md, results.md (full tables),
+                    reproducing.md (one command per claim),
                     data_plan.md (bilingual corpus), roadmap.md
 artifacts/          q8g_int8.pt (shipped), q2_int8.pt (previous),
                     q10_tokenizer.json (8K bilingual BPE for Q10 inference)
