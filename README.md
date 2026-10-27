@@ -238,8 +238,13 @@ the development bench".
 ## 6. Running
 
 ```bash
-# environment
+# environment (from the repo root)
 pip install -r requirements.txt
+
+# ...or install the package itself; it ships the `kronllm` CLI:
+pip install "git+https://github.com/Icold21/kron-llm.git"        # needs git
+pip install https://github.com/Icold21/kron-llm/archive/refs/heads/main.zip
+pip install -e ".[dev]"                                          # editable, from a clone
 
 # data: downloads TinyStories, writes a byte memmap
 python scripts/prepare_data.py
@@ -257,6 +262,11 @@ python -m kronllm.cli generate --run runs/Q8g_long \
 python -m kronllm.cli analyze --run runs/Q8g_long
 python -m kronllm.cli quantize --run runs/Q8g_long --bits 8
 ```
+
+One trap worth naming: `pip install https://github.com/Icold21/kron-llm` does
+**not** work — that URL is the repository's web page, so pip downloads HTML and
+fails with `cannot detect archive format`. Use one of the three forms above;
+nothing else in the recipe changes.
 
 ### Hugging Face interface
 
