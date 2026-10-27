@@ -146,7 +146,6 @@ def main() -> None:
         rows = eval_ckpt(args.ckpt, starts, tok, device)
     else:
         rows = eval_gpt2(starts, tok, device)
-
     total_nats = sum(r["nats"] for r in rows)
     total_bytes = sum(r["bytes"] for r in rows)
     bpb = total_nats / math.log(2) / total_bytes
@@ -168,9 +167,17 @@ def main() -> None:
         "bytes": total_bytes,
         "nats": total_nats,
         "bpb": bpb,
+        "bytes_per_token": total_bytes / max(1, sum(r.get("tokens",
+                                                        r.get("gpt2_tokens", 0))
+                                                    for r in rows)),
         "by_language": by_lang,
         "per_block": rows,
     }
+    if args.source == "ckpt":
+        # The step travels with the number: the plot needs to place the point
+        # on the same axis as the training curve.
+        out["step"] = int(torch.load(args.ckpt, map_location="cpu",
+                                     weights_only=False).get("step") or 0)
     args.out.write_text(json.dumps(out, indent=1), encoding="utf-8")
     print(f"[{args.source}] {len(rows)} blocks, {total_bytes/1e6:.1f} MB, "
           f"bpb {bpb:.4f}")

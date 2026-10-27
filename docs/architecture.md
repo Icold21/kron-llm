@@ -482,20 +482,28 @@ recurrence state are the obvious next steps, and neither exists on this setup
 
 ### What `val_bpb` measures (and why it was optimistic)
 
-Until 2026-10-27 the reported `val_bpb` came from `evaluate()` with
-`eval_batches = 64`, a *sequential* pass.  Because the val bin is written bucket
-by bucket and `en/code` sorts first, those 64 batches (262,144 tokens) were
-English Python.  Two optimistic effects stacked:
+The training-time `val_bpb` comes from `evaluate()` with `eval_batches = 64`, a
+*sequential* pass over the first 512 blocks of the val bin.  Two things were
+wrong with it, and only one of them was about the data:
 
-1. **Domain**: code is the most predictable part of the mixture.
-2. **Denominator**: `bits_per_byte` divides by the corpus-wide 3.694 bytes per
-   token, but code runs at ~2.3, so the same loss is reported ~1.6× lower than
-   the true bits per byte.
+1. **Denominator (the big one).** `bits_per_byte` divides by the corpus-wide
+   3.694 bytes per token, but that span is English Python at **2.558** bytes per
+   token.  Every logged number is therefore low by exactly `3.694 / 2.558 =
+   1.444`.
+2. **Coverage.** The bin is written bucket by bucket and `en/code` sorts first,
+   so 262,144 tokens of 46.2M were measured — 0.6 % of the held-out set, all
+   from one domain.
 
-Measured on the same 262,144 tokens, the honest figure for the step 11,723
-checkpoint is **1.477 bpb**, not the 0.884 the curve showed.  On a strided
-sample of the whole held-out set (1,024 blocks, 1.9 MB of text, real UTF-8 byte
-counts) the same checkpoint scores **1.248 bpb** (EN 1.518, RU 0.990).
+Rescaled by 1.444, the step 11,000 number (0.884) is **1.276**; the measured
+value at step 11,723 is **1.265** on the code span and **1.248** on a strided
+sample of the whole held-out set (EN 1.518, RU 0.990).  The mixed number is
+*lower* than the code span because Russian carries ~5 bytes per token against
+2.9 for Latin text, so the byte-weighted average is pulled down — bpb is not
+comparable across languages, only across models on the same text.
+
+GPT-2 (124M) on the same strided blocks: **1.554** (EN 1.306, RU 1.792), and
+**1.365** on the code span.  So at 8.5 % of the epoch a 10M bilingual model
+already wins overall, loses on English by 0.21 bpb, and wins on code by 0.10.
 
 `training.eval_uniform` now adds a strided pass over the whole bin next to the
 legacy number, and `scripts/eval_reference.py` scores any checkpoint — or GPT-2

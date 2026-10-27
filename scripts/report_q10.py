@@ -34,6 +34,7 @@ OUT = Path("data/report_q10.md")
 
 EPOCH_STEPS = 137_377
 TOKENS_PER_STEP = 32 * 512
+BPT_CORPUS = 3.6942873873459674
 
 
 def load_rows() -> list[dict]:
@@ -166,9 +167,19 @@ def main() -> None:
     # the same budget.  Prefer the strided number when the run logs it, and say
     # which one is being quoted -- the two differ by more than 0.3 bpb.
     has_uniform = any(r.get("val_bpb_uniform") for r in val)
+    # Without the strided series the legacy one can still be put on the honest
+    # scale: same tokens, only the byte denominator is wrong.  The factor is
+    # measured (3.694 / 2.558 = 1.444) and stored next to the reference evals.
+    k = 1.0
+    if not has_uniform:
+        span = Path("data/baseline_q10_first512.json")
+        if span.exists():
+            d = json.loads(span.read_text(encoding="utf-8"))
+            bpt = d["bytes"] / max(1, d["blocks"] * 512)
+            k = BPT_CORPUS / bpt if bpt else 1.0
     val_pts = [(int(r["step"]),
-                fnum(r, "val_bpb_uniform") if has_uniform else fnum(r, "val_bpb"))
-               for r in val]
+                (fnum(r, "val_bpb_uniform") if has_uniform
+                 else fnum(r, "val_bpb") * k)) for r in val]
     val_pts = [(x, y) for x, y in val_pts if math.isfinite(y) and y > 0]
     fit = power_fit(val_pts) if len(val_pts) >= 8 else (
         power_fit(curve[-200:]) if len(curve) >= 8 else None)
@@ -197,8 +208,10 @@ def main() -> None:
                      f"{lv['step']} (страйд по всему бину; легаси-число на "
                      f"первых 262k токенов — {fnum(lv, 'val_bpb'):.4f})")
         else:
-            L.append(f"- **val bpb {fnum(lv, 'val_bpb'):.4f}** на шаге {lv['step']} "
-                     "(первые 262k токенов бина — это английский код)")
+            L.append(f"- **val bpb {fnum(lv, 'val_bpb') * k:.4f}** на шаге "
+                     f"{lv['step']} — код, честные байты (старый протокол давал "
+                     f"{fnum(lv, 'val_bpb'):.4f}; страйд по всему бину пойдёт "
+                     "с сессии 3)")
     L += [
         f"- до конца эпохи ~**{gpu_h:.1f} GPU-ч** ≈ {sessions:.1f} сессий "
         f"(~{sessions * 8.5 / 24:.1f} суток календаря)",
@@ -218,14 +231,26 @@ def main() -> None:
                          f"{fnum(r, 'val_bpb_uniform'):.4f} | "
                          f"{fnum(r, 'val_bpb'):.4f} |")
         else:
-            L += ["| шаг | val loss | val bpb |", "|---:|---:|---:|"]
+            L += ["| шаг | val loss | bpb (код, честные байты) | старый протокол |",
+                  "|---:|---:|---:|---:|"]
             for r in val[-10:]:
                 L.append(f"| {r['step']} | {fnum(r, 'val_loss'):.3f} | "
+                         f"{fnum(r, 'val_bpb') * k:.4f} | "
                          f"{fnum(r, 'val_bpb'):.4f} |")
+            L += ["", f"Честная колонка — та же кривая, умноженная на {k:.3f} "
+                  "(3.694 байта на токен вместо реальных 2.558 у этого спана). "
+                  "Домен всё равно один — английский код, первые 262 144 токена "
+                  "бина. С сессии 3 к нему добавляется страйд по всему held-out "
+                  "(`val_bpb_uniform`), и вот его уже можно сравнивать с GPT-2.", ""]
 
     # Honest reference points: the same strided blocks scored by GPT-2 (124M).
     # Written by scripts/eval_reference.py, run by the chain at every session end.
     latest = Path("data/baseline_latest.json")
+    if not latest.exists():
+        # Fall back to the last offline measurement of a downloaded checkpoint.
+        cands = sorted(p for p in Path("data").glob("baseline_q10_*.json")
+                       if "first" not in p.name)
+        latest = cands[-1] if cands else latest
     gpt2 = Path("data/baseline_gpt2.json")
     if latest.exists() and gpt2.exists():
         q = json.loads(latest.read_text(encoding="utf-8"))
@@ -294,8 +319,10 @@ def main() -> None:
     val_bpb = float("nan")
     if val:
         last_val = val[-1]
-        val_bpb = fnum(last_val, "val_bpb_uniform") if has_uniform else fnum(
-            last_val, "val_bpb")
+        if has_uniform:
+            val_bpb = fnum(last_val, "val_bpb_uniform")
+        else:
+            val_bpb = fnum(last_val, "val_bpb") * k
     if step >= EPOCH_STEPS:
         subject = (f"Q10: эпоха завершена — val bpb {val_bpb:.3f}, "
                    f"{tok_seen / 1e9:.2f}B токенов")
