@@ -672,10 +672,13 @@ EXPERIMENTS["Q10"] = {
         "training.max_steps": 0,
         "training.epochs": 1,
         "training.eval_every": 1000,
-        # Strided validation on top of the legacy sequential pass: the latter
-        # only ever saw the first 262k tokens of the val bin, which are English
-        # Python (the bin is written bucket by bucket and en/code sorts first).
-        "training.eval_uniform": True,
+        # Validation: the legacy sequential pass stays for curve continuity;
+        # the slice-aware pass reports bits per byte per language and domain
+        # with the byte count taken from the batch itself (code is 2.6 bytes
+        # per token, Russian 5.0, so one constant is wrong for every slice).
+        "training.eval_slices": True,
+        "training.eval_blocks_per_bucket": 32,
+        "training.val_index": "val_index.json",
         "training.save_every": 500,
         "training.log_every": 100,
     },

@@ -113,6 +113,24 @@ class ByteDataset(Dataset):
                 ys.append(y)
             yield torch.stack(xs).to(device), torch.stack(ys).to(device)
 
+    def iter_blocks_indexed(self, batch_size: int, block_indices,
+                            device: torch.device | str = "cpu"
+                            ) -> Iterator[Tuple[torch.Tensor, torch.Tensor]]:
+        """Batches over an explicit list of block indices.
+
+        Used by the slice-aware validation: the caller decides *which* blocks
+        (evenly spaced inside each language/domain bucket), so a batch never
+        mixes buckets and the loss can be attributed to the right slice.
+        """
+        for start in range(0, len(block_indices), batch_size):
+            chunk = block_indices[start:start + batch_size]
+            xs, ys = [], []
+            for b in chunk:
+                x, y = self[b]
+                xs.append(x)
+                ys.append(y)
+            yield torch.stack(xs).to(device), torch.stack(ys).to(device)
+
     def iter_blocks_uniform(self, batch_size: int, max_batches: int,
                             device: torch.device | str = "cpu"
                             ) -> Iterator[Tuple[torch.Tensor, torch.Tensor]]:
@@ -120,10 +138,10 @@ class ByteDataset(Dataset):
 
         ``iter_blocks`` is sequential, so ``max_batches`` caps it to the first
         documents of the bin.  For Q10 that meant the reported val bpb was
-        measured on English Python only -- the easiest domain, and the one with
-        the fewest bytes per token, which also inflated it.  Striding across the
-        file keeps the cost capped while covering every domain and both
-        languages.
+        measured on English Python only.  Striding across the file keeps the
+        cost capped while covering every domain and both languages; the
+        slice-aware path in ``train.py`` goes further and reports each bucket
+        separately.
         """
         n_blocks = len(self)
         want = max(1, int(max_batches) * int(batch_size))

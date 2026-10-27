@@ -122,12 +122,30 @@ def main() -> None:
 
     # --- validation --------------------------------------------------------
     k = correction()
+    mixed = [(int(r["step"]), f(r, "val_bpb_mixed")) for r in data
+             if r["split"] == "val" and math.isfinite(f(r, "val_bpb_mixed"))]
+    en = [(int(r["step"]), f(r, "val_bpb_en")) for r in data
+          if r["split"] == "val" and math.isfinite(f(r, "val_bpb_en"))]
+    ru = [(int(r["step"]), f(r, "val_bpb_ru")) for r in data
+          if r["split"] == "val" and math.isfinite(f(r, "val_bpb_ru"))]
+
     vx = [s for s, _ in val]
     vy = [v for _, v in val]
     ax2.plot(vx, vy, ":", color="#b0b0b0", lw=1.2,
              label=f"старый протокол (делит на {BPT_CORPUS:.2f} б/ток)")
-    ax2.plot(vx, [v * k for v in vy], "-o", color="#1b6b3a", ms=3.5, lw=1.5,
-             label=f"код, честные байты (×{k:.2f})")
+    if mixed:
+        ax2.plot([s for s, _ in mixed], [v for _, v in mixed], "-o",
+                 color="#1b6b3a", ms=4, lw=1.6,
+                 label="весь бин, стратифицированно (EN+RU)")
+        if en:
+            ax2.plot([s for s, _ in en], [v for _, v in en], "-", lw=1.0,
+                     color="#2f7fd0", alpha=0.9, label="EN")
+        if ru:
+            ax2.plot([s for s, _ in ru], [v for _, v in ru], "-", lw=1.0,
+                     color="#c07020", alpha=0.9, label="RU")
+    else:
+        ax2.plot(vx, [v * k for v in vy], "-o", color="#1b6b3a", ms=3.5,
+                 lw=1.5, label=f"код, честные байты (×{k:.2f})")
 
     pts = honest_points()
     if pts:

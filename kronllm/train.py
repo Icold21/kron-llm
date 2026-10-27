@@ -164,6 +164,118 @@ def named_lrs(opt: torch.optim.Optimizer) -> Dict[str, float]:
 # evaluation
 # ---------------------------------------------------------------------------
 @torch.no_grad()
+def evaluate_slices(model: nn.Module, ds: ByteDataset, batch_size: int,
+                    device: torch.device, groups: List[Tuple[List[int], str, str]],
+                    byte_lens: np.ndarray, amp: str = "fp16") -> Dict[str, float]:
+    """Bits per byte per language and domain, with exact byte counts.
+
+    Two things this fixes compared to a plain token-mean:
+
+    * the denominator is ``sum(byte_len[targets])`` for the batch, not one
+      corpus-wide bytes/token constant -- code runs at 2.6, Russian at 5.0, so a
+      constant reports the wrong number for every slice;
+    * blocks are drawn inside each (language, domain) bucket, so the losses can
+      be attributed to the slice they came from instead of one average.
+
+    Batches never mix buckets, which is why ``groups`` is per bucket.
+    """
+    model.eval()
+    use_amp = amp == "fp16" and device.type == "cuda"
+    ln2 = math.log(2.0)
+    per_bucket: List[Dict[str, float]] = []
+    tot = {"nats": 0.0, "bytes": 0, "tokens": 0}
+
+    for block_ids, lang, domain, bucket_tokens in groups:
+        acc = {"nats": 0.0, "bytes": 0, "tokens": 0}
+        for x, y in ds.iter_blocks_indexed(batch_size, block_ids, device):
+            with torch.amp.autocast("cuda", dtype=torch.float16, enabled=use_amp):
+                out = model(x, y)
+            ntok = int(x.numel())
+            acc["nats"] += float(out["loss"].detach()) * ntok
+            acc["tokens"] += ntok
+            acc["bytes"] += int(byte_lens[y.reshape(-1).cpu().numpy()].sum())
+        acc.update({"lang": lang, "domain": domain,
+                    "bucket_tokens": float(bucket_tokens)})
+        per_bucket.append(acc)
+        for k in ("nats", "bytes", "tokens"):
+            tot[k] += acc[k]
+
+    model.train()
+    if tot["tokens"] == 0 or tot["bytes"] == 0:
+        return {}
+
+    # Sampling is per bucket, so a plain sum would weight the tiny identity
+    # slice like a major one (32 blocks out of 558 against 0.1 % of the set).
+    # Reweight by the bytes each bucket actually holds in the val bin:
+    # bpb_mixed = sum_b w_b * bpb_b with w_b ~ bytes_b.
+    for acc in per_bucket:
+        acc["weight"] = acc["bucket_tokens"] * (acc["bytes"] / acc["tokens"])
+
+    def weighted(items: List[Dict[str, float]]) -> float:
+        wsum = sum(a["weight"] for a in items)
+        if not wsum:
+            return float("nan")
+        return sum(a["weight"] * (a["nats"] / ln2 / a["bytes"])
+                   for a in items if a["bytes"]) / wsum
+
+    out: Dict[str, float] = {
+        "val_loss_mixed": tot["nats"] / tot["tokens"],
+        "val_bpb_mixed": weighted(per_bucket),
+        "val_bytes_per_token": tot["bytes"] / tot["tokens"],
+    }
+    for lang in sorted({a["lang"] for a in per_bucket}):
+        sel = [a for a in per_bucket if a["lang"] == lang and a["bytes"]]
+        if sel:
+            out[f"val_bpb_{lang}"] = weighted(sel)
+    # A domain that appears in both languages is reported once, aggregated:
+    # that is the number the article wants, while ``val_bpb_ru``/``val_bpb_en``
+    # answer "which language moved".
+    for domain in sorted({a["domain"] for a in per_bucket}):
+        sel = [a for a in per_bucket if a["domain"] == domain and a["bytes"]]
+        if sel:
+            out[f"val_bpb_{domain}"] = weighted(sel)
+    return {k: float(v) for k, v in out.items()}
+
+
+def load_val_index(path: str | Path) -> Optional[Dict[str, Any]]:
+    """Read the bucket offsets written by ``scripts/make_val_index.py``."""
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not data.get("buckets"):
+        return None
+    return data
+
+
+def stratified_blocks(index: Mapping[str, Any], per_bucket: int
+                      ) -> List[Tuple[List[int], str, str, int]]:
+    """Evenly spaced blocks inside every (language, domain) bucket.
+
+    Returns ``(block_indices, language, domain, bucket_tokens)``; the last field
+    is what lets the caller reweight the slices back to the val distribution.
+    """
+    groups: List[Tuple[List[int], str, str, int]] = []
+    for bucket in index["buckets"]:
+        start, end = int(bucket["start"]), int(bucket["end"])
+        n_blocks = (end - start - 1) // 512
+        if n_blocks <= 0:
+            continue
+        want = max(1, min(int(per_bucket), n_blocks))
+        if want == n_blocks:
+            picks = list(range(n_blocks))
+        else:
+            step = (n_blocks - 1) / (want - 1)
+            picks = sorted({int(round(i * step)) for i in range(want)})
+        groups.append(([start // 512 + p for p in picks],
+                       str(bucket["lang"]), str(bucket["domain"]), end - start))
+    return groups
+
+
+@torch.no_grad()
 def evaluate(model: nn.Module, ds: ByteDataset, batch_size: int,
              device: torch.device, max_batches: Optional[int] = None,
              amp: str = "fp16", uniform: bool = False) -> Dict[str, float]:
@@ -362,6 +474,23 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     # Strided validation: covers the whole bin at the same cost.  Logged next to
     # the legacy sequential number, which only ever saw the first documents.
     eval_uniform = bool(tc.get("eval_uniform", False))
+    # Slice-aware validation: bits per byte per language and domain, with the
+    # byte count taken from the batch itself.  Needs the bucket index produced
+    # by scripts/make_val_index.py; without it the flag is a no-op, not an error.
+    eval_slices = bool(tc.get("eval_slices", False))
+    slice_groups = None
+    byte_lens = None
+    if eval_slices:
+        val_index = load_val_index(
+            Path(str(cfg["data"].get("data_dir", "data"))) /
+            str(tc.get("val_index", "val_index.json")))
+        if val_index:
+            slice_groups = stratified_blocks(
+                val_index, int(tc.get("eval_blocks_per_bucket", 32)))
+            byte_lens = tok.byte_lengths()
+        elif is_main:
+            print("[val] eval_slices is on but val_index.json is missing; "
+                  "falling back to the plain sequential eval")
     patience = int(tc.get("early_stop_patience", 4))
     random_recurse = (bool(tc.get("recurse_random"))
                       and getattr(model, "max_recurse", 1) > 1)
@@ -543,6 +672,10 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                 ev["val_loss_uniform"] = evu["val_loss"]
                 ev["val_ppl_uniform"] = evu["val_ppl"]
                 ev["val_bpb_uniform"] = bits_per_byte(evu["val_loss"], bpt)
+            if slice_groups:
+                ev.update(evaluate_slices(raw_model, val_ds, eval_bs, device,
+                                          slice_groups, byte_lens,
+                                          str(tc["amp"])))
             if is_main:
                 row = {"step": step, "split": "val", **ev}
                 logger.log(row)
@@ -561,6 +694,20 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                 if eval_uniform:
                     print(f"  [val] step {step:5d} | uniform bpb "
                           f"{ev['val_bpb_uniform']:.3f} (whole-bin stride)")
+                if slice_groups:
+                    # The honest number and its slices: this is what gets read
+                    # in the report and in the article.
+                    print(f"  [val] step {step:5d} | mixed bpb "
+                          f"{ev['val_bpb_mixed']:.4f} | en {ev['val_bpb_en']:.4f}"
+                          f" | ru {ev['val_bpb_ru']:.4f} | code "
+                          f"{ev.get('val_bpb_code', float('nan')):.4f}")
+                    if tb:
+                        for k, v in ev.items():
+                            if k.startswith("val_bpb_"):
+                                tb.add_scalar(f"val/{k[8:]}", v, step)
+                    if wb:
+                        wb.log({k: v for k, v in ev.items()
+                                if k.startswith("val_bpb_")}, step=step)
 
             if ev["val_ppl"] < best_ppl:
                 best_ppl = ev["val_ppl"]
@@ -609,6 +756,9 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
         final["val_loss_uniform"] = final_u["val_loss"]
         final["val_ppl_uniform"] = final_u["val_ppl"]
         final["val_bpb_uniform"] = bits_per_byte(final_u["val_loss"], bpt)
+    if slice_groups:
+        final.update(evaluate_slices(raw_model, val_ds, eval_bs, device,
+                                     slice_groups, byte_lens, str(tc["amp"])))
     # Spectral diagnostics run 250 SVDs of 512x512 matrices; at batch 32 the
     # VRAM is already at the T4 limit, so Q10 disables them with
     # spectral_every=0 and keeps only the bpb evaluation.

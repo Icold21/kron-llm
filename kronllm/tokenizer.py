@@ -82,6 +82,37 @@ class BPETokenizer:
             return ""
         return self._tok.decode(clean, skip_special_tokens=False)
 
+    def byte_lengths(self) -> np.ndarray:
+        """Bytes of UTF-8 text behind every token id (0 for special tokens).
+
+        The validation loss is a mean over tokens, but the honest denominator is
+        bytes, and the ratio differs per domain: code runs at 2.6 bytes/token,
+        Russian at 5.0.  A single corpus-wide constant therefore reports the
+        wrong number for any slice (for Q10 it was 3.694 against 2.558 on the
+        span the trainer actually measured).  This table turns bytes per batch
+        into a lookup: ``sum(byte_len[targets])`` is exact, because a byte-level
+        BPE token always decodes to the same byte string.
+        """
+        table = np.zeros(self.vocab_size, dtype=np.int32)
+        if not hasattr(self._tok, "id_to_token"):
+            return table
+        mapping = _byte_decoder()
+        for idx in range(self.vocab_size):
+            piece = self._tok.id_to_token(idx)
+            if not piece:
+                continue
+            if piece.startswith("<|") and piece.endswith("|>"):
+                # Chat/EOT specials are markers, not text: counting their
+                # characters as bytes would inflate the denominator.
+                continue
+            try:
+                raw = bytes(mapping[ch] for ch in piece)
+            except KeyError:
+                # Special tokens (<|user|>, ...) are not text.
+                continue
+            table[idx] = len(raw)
+        return table
+
     def __repr__(self) -> str:
         return (f"BPETokenizer(vocab={self.vocab_size}, "
                 f"{self.bytes_per_token:.2f} bytes/token)")
@@ -128,6 +159,26 @@ def bits_per_byte(loss_nats: float, bytes_per_token: float) -> float:
     import math
 
     return float(loss_nats) / max(float(bytes_per_token), 1e-9) / math.log(2.0)
+
+
+def _byte_decoder() -> dict[str, int]:
+    """The inverse of the GPT-2 byte-level alphabet used by ByteLevel.
+
+    ``ByteLevel`` maps each raw byte to a printable character (``Ġ`` for space,
+    ``Ċ`` for newline, ...).  To recover the byte length of a token, its string
+    has to be mapped back through exactly this table.
+    """
+    printable = (list(range(ord("!"), ord("~") + 1))
+                 + list(range(ord("¡"), ord("¬") + 1))
+                 + list(range(ord("®"), ord("ÿ") + 1)))
+    codes = printable[:]
+    extra = 0
+    for byte in range(256):
+        if byte not in printable:
+            printable.append(byte)
+            codes.append(256 + extra)
+            extra += 1
+    return {chr(code): byte for byte, code in zip(printable, codes)}
 
 
 # ---------------------------------------------------------------------------

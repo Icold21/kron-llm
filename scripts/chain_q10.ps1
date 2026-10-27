@@ -4,7 +4,7 @@ $root = "C:\Users\Icold\Desktop\kron_llm"
 Set-Location $root
 $log = Join-Path $root "data\q10_chain.log"
 $kernel = "icold21/kron-q10-10m-bilingual-pretraining"
-$code = "icold21/kron-llm-code-v14"
+$code = "icold21/kron-llm-code-v15"
 $mail = "$env:USERPROFILE\.config\opencode\skills\email-control\scripts\mail.py"
 
 function Say($msg) {

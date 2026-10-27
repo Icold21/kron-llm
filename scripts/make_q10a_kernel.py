@@ -24,7 +24,7 @@ PATCHES = [
     # The decay pass ships with its own config (run_steps, step-size schedule),
     # so it must mount the code dataset that contains that config.
     ("find_dataset('kron-llm-code-v12', 'kronllm')",
-     "find_dataset('kron-llm-code-v14', 'kronllm')"),
+     "find_dataset('kron-llm-code-v15', 'kronllm')"),
     ("'--exp', 'Q10'", "'--exp', 'Q10A'"),
     ("'/kaggle/working/q10'", "'/kaggle/working/q10a'"),
     ("open('/kaggle/working/q10/results.json')",
@@ -71,7 +71,7 @@ the next one resumes from `last.pt`.
         "enable_gpu": True,
         "enable_internet": True,
         "dataset_sources": [
-            "icold21/kron-llm-code-v14",
+            "icold21/kron-llm-code-v15",
             "icold21/kron-q10a-anneal-bin",
             "icold21/kron-q10-ckpt",
         ],

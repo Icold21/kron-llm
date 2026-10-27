@@ -39,6 +39,12 @@ def main() -> None:
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for path in files:
             z.write(path, path.relative_to(ROOT).as_posix())
+        # The val bucket index (offset of every language/domain slice inside
+        # val.bpe.bin) is tiny and belongs with the code that consumes it; the
+        # 4.5 GB corpus dataset does not need a new version for one JSON file.
+        extra = ROOT / "data" / "bilingual" / "val_index.json"
+        if extra.exists():
+            z.write(extra, "val_index.json")
 
     meta = {
         "title": f"KronLLM code v{args.version}",

@@ -166,20 +166,27 @@ def main() -> None:
     # en/code sorts first).  ``val_bpb_uniform`` strides across the whole bin on
     # the same budget.  Prefer the strided number when the run logs it, and say
     # which one is being quoted -- the two differ by more than 0.3 bpb.
-    has_uniform = any(r.get("val_bpb_uniform") for r in val)
-    # Without the strided series the legacy one can still be put on the honest
+    has_mixed = any(r.get("val_bpb_mixed") for r in val)
+    has_uniform = (not has_mixed) and any(r.get("val_bpb_uniform") for r in val)
+    # Without a mixed series the legacy one can still be put on the honest
     # scale: same tokens, only the byte denominator is wrong.  The factor is
     # measured (3.694 / 2.558 = 1.444) and stored next to the reference evals.
     k = 1.0
-    if not has_uniform:
+    if not (has_mixed or has_uniform):
         span = Path("data/baseline_q10_first512.json")
         if span.exists():
             d = json.loads(span.read_text(encoding="utf-8"))
             bpt = d["bytes"] / max(1, d["blocks"] * 512)
             k = BPT_CORPUS / bpt if bpt else 1.0
-    val_pts = [(int(r["step"]),
-                (fnum(r, "val_bpb_uniform") if has_uniform
-                 else fnum(r, "val_bpb") * k)) for r in val]
+
+    def val_value(r: dict) -> float:
+        if has_mixed:
+            return fnum(r, "val_bpb_mixed")
+        if has_uniform:
+            return fnum(r, "val_bpb_uniform")
+        return fnum(r, "val_bpb") * k
+
+    val_pts = [(int(r["step"]), val_value(r)) for r in val]
     val_pts = [(x, y) for x, y in val_pts if math.isfinite(y) and y > 0]
     fit = power_fit(val_pts) if len(val_pts) >= 8 else (
         power_fit(curve[-200:]) if len(curve) >= 8 else None)
@@ -203,7 +210,12 @@ def main() -> None:
     ]
     if val:
         lv = val[-1]
-        if has_uniform:
+        if has_mixed:
+            L.append(f"- **val bpb {fnum(lv, 'val_bpb_mixed'):.4f}** на шаге "
+                     f"{lv['step']} — стратифицированно по доменам и языкам, "
+                     f"байты из батча (EN {fnum(lv, 'val_bpb_en'):.3f} / "
+                     f"RU {fnum(lv, 'val_bpb_ru'):.3f})")
+        elif has_uniform:
             L.append(f"- **val bpb {fnum(lv, 'val_bpb_uniform'):.4f}** на шаге "
                      f"{lv['step']} (страйд по всему бину; легаси-число на "
                      f"первых 262k токенов — {fnum(lv, 'val_bpb'):.4f})")
@@ -223,7 +235,27 @@ def main() -> None:
 
     if val:
         L += ["", "## Валидация", ""]
-        if has_uniform:
+        if has_mixed:
+            L += ["| шаг | mixed | EN | RU | код |", "|---:|---:|---:|---:|---:|"]
+            for r in val[-10:]:
+                L.append(f"| {r['step']} | {fnum(r, 'val_bpb_mixed'):.4f} | "
+                         f"{fnum(r, 'val_bpb_en'):.4f} | "
+                         f"{fnum(r, 'val_bpb_ru'):.4f} | "
+                         f"{fnum(r, 'val_bpb_code'):.4f} |")
+            last = val[-1]
+            domains = [(k[8:], fnum(last, k)) for k in last
+                       if k.startswith("val_bpb_")
+                       and k[8:] not in ("mixed", "en", "ru", "ppl")
+                       and math.isfinite(fnum(last, k))]
+            if domains:
+                L += ["", "Последний замер по доменам:", "",
+                      "| домен | bpb |", "|---|---:|"]
+                for name, v in sorted(domains, key=lambda kv: kv[1]):
+                    L.append(f"| {name} | {v:.4f} |")
+                L += ["", "Домен считается отдельно, потому что среднее прячет "
+                      "именно то, ради чего вал разложен: математика и CS отстают, "
+                      "энциклопедика и identity идут впереди.", ""]
+        elif has_uniform:
             L += ["| шаг | val loss | bpb (весь бин) | bpb (первые 262k) |",
                   "|---:|---:|---:|---:|"]
             for r in val[-10:]:
@@ -319,7 +351,9 @@ def main() -> None:
     val_bpb = float("nan")
     if val:
         last_val = val[-1]
-        if has_uniform:
+        if has_mixed:
+            val_bpb = fnum(last_val, "val_bpb_mixed")
+        elif has_uniform:
             val_bpb = fnum(last_val, "val_bpb_uniform")
         else:
             val_bpb = fnum(last_val, "val_bpb") * k
