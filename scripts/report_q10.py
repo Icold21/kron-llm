@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import math
 import statistics
 import sys
@@ -158,7 +159,16 @@ def main() -> None:
     curve = smooth(train[-400:])
     # Validation bpb is cleaner than the batch losses, so prefer it when there
     # are enough points; fall back to the smoothed training curve early on.
-    val_pts = [(int(r["step"]), fnum(r, "val_bpb")) for r in val]
+    #
+    # ``val_bpb`` is the legacy sequential pass: the first 262,144 tokens of the
+    # val bin, which are English Python (the bin is written bucket by bucket and
+    # en/code sorts first).  ``val_bpb_uniform`` strides across the whole bin on
+    # the same budget.  Prefer the strided number when the run logs it, and say
+    # which one is being quoted -- the two differ by more than 0.3 bpb.
+    has_uniform = any(r.get("val_bpb_uniform") for r in val)
+    val_pts = [(int(r["step"]),
+                fnum(r, "val_bpb_uniform") if has_uniform else fnum(r, "val_bpb"))
+               for r in val]
     val_pts = [(x, y) for x, y in val_pts if math.isfinite(y) and y > 0]
     fit = power_fit(val_pts) if len(val_pts) >= 8 else (
         power_fit(curve[-200:]) if len(curve) >= 8 else None)
@@ -182,7 +192,13 @@ def main() -> None:
     ]
     if val:
         lv = val[-1]
-        L.append(f"- **val bpb {fnum(lv, 'val_bpb'):.4f}** на шаге {lv['step']}")
+        if has_uniform:
+            L.append(f"- **val bpb {fnum(lv, 'val_bpb_uniform'):.4f}** на шаге "
+                     f"{lv['step']} (страйд по всему бину; легаси-число на "
+                     f"первых 262k токенов — {fnum(lv, 'val_bpb'):.4f})")
+        else:
+            L.append(f"- **val bpb {fnum(lv, 'val_bpb'):.4f}** на шаге {lv['step']} "
+                     "(первые 262k токенов бина — это английский код)")
     L += [
         f"- до конца эпохи ~**{gpu_h:.1f} GPU-ч** ≈ {sessions:.1f} сессий "
         f"(~{sessions * 8.5 / 24:.1f} суток календаря)",
@@ -193,11 +209,40 @@ def main() -> None:
     ]
 
     if val:
-        L += ["", "## Валидация", "", "| шаг | val loss | val bpb |",
-              "|---:|---:|---:|"]
-        for r in val[-10:]:
-            L.append(f"| {r['step']} | {fnum(r, 'val_loss'):.3f} | "
-                     f"{fnum(r, 'val_bpb'):.4f} |")
+        L += ["", "## Валидация", ""]
+        if has_uniform:
+            L += ["| шаг | val loss | bpb (весь бин) | bpb (первые 262k) |",
+                  "|---:|---:|---:|---:|"]
+            for r in val[-10:]:
+                L.append(f"| {r['step']} | {fnum(r, 'val_loss'):.3f} | "
+                         f"{fnum(r, 'val_bpb_uniform'):.4f} | "
+                         f"{fnum(r, 'val_bpb'):.4f} |")
+        else:
+            L += ["| шаг | val loss | val bpb |", "|---:|---:|---:|"]
+            for r in val[-10:]:
+                L.append(f"| {r['step']} | {fnum(r, 'val_loss'):.3f} | "
+                         f"{fnum(r, 'val_bpb'):.4f} |")
+
+    # Honest reference points: the same strided blocks scored by GPT-2 (124M).
+    # Written by scripts/eval_reference.py, run by the chain at every session end.
+    latest = Path("data/baseline_latest.json")
+    gpt2 = Path("data/baseline_gpt2.json")
+    if latest.exists() and gpt2.exists():
+        q = json.loads(latest.read_text(encoding="utf-8"))
+        g = json.loads(gpt2.read_text(encoding="utf-8"))
+        L += ["", "## Сравнение с GPT-2 на одном тексте", "",
+              "| модель | bpb | EN | RU |", "|---|---:|---:|---:|"]
+        for name, d in (("Q10 (этот чекпоинт)", q), ("GPT-2 124M", g)):
+            en = d["by_language"].get("en", {}).get("bpb", float("nan"))
+            ru = d["by_language"].get("ru", {}).get("bpb", float("nan"))
+            L.append(f"| {name} | **{d['bpb']:.4f}** | {en:.4f} | {ru:.4f} |")
+        L += ["", f"Оба числа посчитаны на одних и тех же {q['blocks']} блоках "
+              f"({q['bytes']/1e6:.1f} МБ текста) страйдом по всему held-out: "
+              "русский, английский, код, математика, литература. Нормализация — "
+              "реальные UTF-8 байты, а не среднее 3.69 байта на токен.", "",
+              "bpb **не сравним между языками**: на кириллице один токен — это "
+              "~5 байт, на латинице ~2.9, поэтому русский bpb ниже при том же "
+              "качестве. Сравнивать надо по столбцам, а не по итоговой строке.", ""]
 
     if fit:
         L += ["", "## Оценка", "",
@@ -246,7 +291,11 @@ def main() -> None:
     except Exception as exc:  # noqa: BLE001
         print(f"[report] html render failed: {exc}")
     # Subject hint and the "epoch finished" flag for the chain script.
-    val_bpb = fnum(val[-1], "val_bpb") if val else float("nan")
+    val_bpb = float("nan")
+    if val:
+        last_val = val[-1]
+        val_bpb = fnum(last_val, "val_bpb_uniform") if has_uniform else fnum(
+            last_val, "val_bpb")
     if step >= EPOCH_STEPS:
         subject = (f"Q10: эпоха завершена — val bpb {val_bpb:.3f}, "
                    f"{tok_seen / 1e9:.2f}B токенов")

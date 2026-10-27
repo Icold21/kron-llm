@@ -672,6 +672,10 @@ EXPERIMENTS["Q10"] = {
         "training.max_steps": 0,
         "training.epochs": 1,
         "training.eval_every": 1000,
+        # Strided validation on top of the legacy sequential pass: the latter
+        # only ever saw the first 262k tokens of the val bin, which are English
+        # Python (the bin is written bucket by bucket and en/code sorts first).
+        "training.eval_uniform": True,
         "training.save_every": 500,
         "training.log_every": 100,
     },

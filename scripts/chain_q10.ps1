@@ -4,7 +4,7 @@ $root = "C:\Users\Icold\Desktop\kron_llm"
 Set-Location $root
 $log = Join-Path $root "data\q10_chain.log"
 $kernel = "icold21/kron-q10-10m-bilingual-pretraining"
-$code = "icold21/kron-llm-code-v12"
+$code = "icold21/kron-llm-code-v14"
 $mail = "$env:USERPROFILE\.config\opencode\skills\email-control\scripts\mail.py"
 
 function Say($msg) {
@@ -73,6 +73,23 @@ if ($nowStep -le $prevStep) {
     SendReport "Q10: session failed without progress" $md (Join-Path $root "data\session_failure.html")
     Say "FAILED SESSION: reported, nothing pushed"
     exit 3
+}
+
+# 3b. honest validation: score the downloaded checkpoint on a strided sample of
+#     the whole val bin, and once with GPT-2 on the same blocks.  The stock
+#     val_bpb only sees the first 262k tokens of the bin, which are English code.
+$ckptNow = Join-Path $root "data\kaggle_out\q10\last.pt"
+if (Test-Path $ckptNow) {
+    Say "scoring the checkpoint on the strided val sample"
+    python scripts\eval_reference.py --source ckpt --ckpt $ckptNow --blocks 1024 `
+        --out data\baseline_latest.json 2>&1 | Out-File -Encoding utf8 -Append $log
+    Say ("strided eval exit " + $LASTEXITCODE)
+    if (-not (Test-Path "data\baseline_gpt2.json")) {
+        Say "no GPT-2 baseline yet, computing one on the same blocks"
+        python scripts\eval_reference.py --source gpt2 --blocks 1024 `
+            --out data\baseline_gpt2.json 2>&1 | Out-File -Encoding utf8 -Append $log
+        Say ("gpt2 eval exit " + $LASTEXITCODE)
+    }
 }
 
 # 4. report the curve and mail it

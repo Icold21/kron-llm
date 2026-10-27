@@ -480,6 +480,28 @@ recurrence state are the obvious next steps, and neither exists on this setup
 * **The sum/grouped/alternating compositions** — E14/E17/E18 measured lower
   effective rank and no better bpb than the product; Q10 is the product path.
 
+### What `val_bpb` measures (and why it was optimistic)
+
+Until 2026-10-27 the reported `val_bpb` came from `evaluate()` with
+`eval_batches = 64`, a *sequential* pass.  Because the val bin is written bucket
+by bucket and `en/code` sorts first, those 64 batches (262,144 tokens) were
+English Python.  Two optimistic effects stacked:
+
+1. **Domain**: code is the most predictable part of the mixture.
+2. **Denominator**: `bits_per_byte` divides by the corpus-wide 3.694 bytes per
+   token, but code runs at ~2.3, so the same loss is reported ~1.6× lower than
+   the true bits per byte.
+
+Measured on the same 262,144 tokens, the honest figure for the step 11,723
+checkpoint is **1.477 bpb**, not the 0.884 the curve showed.  On a strided
+sample of the whole held-out set (1,024 blocks, 1.9 MB of text, real UTF-8 byte
+counts) the same checkpoint scores **1.248 bpb** (EN 1.518, RU 0.990).
+
+`training.eval_uniform` now adds a strided pass over the whole bin next to the
+legacy number, and `scripts/eval_reference.py` scores any checkpoint — or GPT-2
+— on identical blocks.  The legacy column is kept so the existing curve stays
+continuous; it is not the number to quote.
+
 ## References
 
 - Rank inequalities (Sylvester, subadditivity): *Rank (linear algebra)*,

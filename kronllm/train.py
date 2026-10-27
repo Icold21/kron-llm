@@ -166,12 +166,24 @@ def named_lrs(opt: torch.optim.Optimizer) -> Dict[str, float]:
 @torch.no_grad()
 def evaluate(model: nn.Module, ds: ByteDataset, batch_size: int,
              device: torch.device, max_batches: Optional[int] = None,
-             amp: str = "fp16") -> Dict[str, float]:
+             amp: str = "fp16", uniform: bool = False) -> Dict[str, float]:
+    """Cross-entropy on the validation bin.
+
+    ``uniform=False`` keeps the historical sequential pass (the first
+    ``max_batches`` batches), which is what every number logged so far used.
+    ``uniform=True`` strides across the whole bin instead: same cost, but it
+    covers every domain and both languages rather than the first documents in
+    file order.  Q10 logs both.
+    """
     model.eval()
     total_loss, total_tokens = 0.0, 0
     use_amp = amp == "fp16" and device.type == "cuda"
-    for i, (x, y) in enumerate(ds.iter_blocks(batch_size, device)):
-        if max_batches is not None and i >= max_batches:
+    if uniform:
+        blocks = ds.iter_blocks_uniform(batch_size, max_batches or 1, device)
+    else:
+        blocks = ds.iter_blocks(batch_size, device)
+    for i, (x, y) in enumerate(blocks):
+        if not uniform and max_batches is not None and i >= max_batches:
             break
         with torch.amp.autocast("cuda", dtype=torch.float16, enabled=use_amp):
             out = model(x, y)
@@ -347,6 +359,9 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     max_minutes = float(tc.get("max_minutes", 0) or 0)
     spectral_every = int(cfg["metrics"].get("spectral_every", 2000))
     eval_batches = int(tc.get("eval_batches", 64))
+    # Strided validation: covers the whole bin at the same cost.  Logged next to
+    # the legacy sequential number, which only ever saw the first documents.
+    eval_uniform = bool(tc.get("eval_uniform", False))
     patience = int(tc.get("early_stop_patience", 4))
     random_recurse = (bool(tc.get("recurse_random"))
                       and getattr(model, "max_recurse", 1) > 1)
@@ -520,6 +535,14 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
             # broadcast.  Only rank 0 logs and writes checkpoints.
             ev = evaluate(raw_model, val_ds, eval_bs, device, eval_batches, str(tc["amp"]))
             ev["val_bpb"] = bits_per_byte(ev["val_loss"], bpt)
+            if eval_uniform:
+                # Same cost, honest denominator: strided blocks instead of the
+                # first documents of the bin (see ByteDataset.iter_blocks_uniform).
+                evu = evaluate(raw_model, val_ds, eval_bs, device, eval_batches,
+                               str(tc["amp"]), uniform=True)
+                ev["val_loss_uniform"] = evu["val_loss"]
+                ev["val_ppl_uniform"] = evu["val_ppl"]
+                ev["val_bpb_uniform"] = bits_per_byte(evu["val_loss"], bpt)
             if is_main:
                 row = {"step": step, "split": "val", **ev}
                 logger.log(row)
@@ -527,11 +550,17 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                     tb.add_scalar("val/loss", ev["val_loss"], step)
                     tb.add_scalar("val/ppl", ev["val_ppl"], step)
                     tb.add_scalar("val/bpb", ev["val_bpb"], step)
+                    if eval_uniform:
+                        tb.add_scalar("val/bpb_uniform",
+                                      ev["val_bpb_uniform"], step)
                 if wb:
                     wb.log({"val/loss": ev["val_loss"], "val/ppl": ev["val_ppl"],
                             "val/bpb": ev["val_bpb"]}, step=step)
                 print(f"  [val] step {step:5d} | loss {ev['val_loss']:.4f} | "
                       f"ppl {ev['val_ppl']:.2f} | bpb {ev['val_bpb']:.3f}")
+                if eval_uniform:
+                    print(f"  [val] step {step:5d} | uniform bpb "
+                          f"{ev['val_bpb_uniform']:.3f} (whole-bin stride)")
 
             if ev["val_ppl"] < best_ppl:
                 best_ppl = ev["val_ppl"]
@@ -574,6 +603,12 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
         peak_vram = torch.cuda.max_memory_allocated(device) / 1e9
 
     final = evaluate(raw_model, val_ds, eval_bs, device, eval_batches, str(tc["amp"]))
+    if eval_uniform:
+        final_u = evaluate(raw_model, val_ds, eval_bs, device, eval_batches,
+                           str(tc["amp"]), uniform=True)
+        final["val_loss_uniform"] = final_u["val_loss"]
+        final["val_ppl_uniform"] = final_u["val_ppl"]
+        final["val_bpb_uniform"] = bits_per_byte(final_u["val_loss"], bpt)
     # Spectral diagnostics run 250 SVDs of 512x512 matrices; at batch 32 the
     # VRAM is already at the T4 limit, so Q10 disables them with
     # spectral_every=0 and keeps only the bpb evaluation.

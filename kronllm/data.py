@@ -113,6 +113,34 @@ class ByteDataset(Dataset):
                 ys.append(y)
             yield torch.stack(xs).to(device), torch.stack(ys).to(device)
 
+    def iter_blocks_uniform(self, batch_size: int, max_batches: int,
+                            device: torch.device | str = "cpu"
+                            ) -> Iterator[Tuple[torch.Tensor, torch.Tensor]]:
+        """Evenly spaced blocks: a capped eval that still covers the whole bin.
+
+        ``iter_blocks`` is sequential, so ``max_batches`` caps it to the first
+        documents of the bin.  For Q10 that meant the reported val bpb was
+        measured on English Python only -- the easiest domain, and the one with
+        the fewest bytes per token, which also inflated it.  Striding across the
+        file keeps the cost capped while covering every domain and both
+        languages.
+        """
+        n_blocks = len(self)
+        want = max(1, int(max_batches) * int(batch_size))
+        if want >= n_blocks:
+            idxs = list(range(n_blocks))
+        else:
+            step = (n_blocks - 1) / (want - 1)
+            idxs = sorted({int(round(i * step)) for i in range(want)})
+        for start in range(0, len(idxs), batch_size):
+            chunk = idxs[start:start + batch_size]
+            xs, ys = [], []
+            for b in chunk:
+                x, y = self[b]
+                xs.append(x)
+                ys.append(y)
+            yield torch.stack(xs).to(device), torch.stack(ys).to(device)
+
 
 def make_synthetic_bin(path: str | Path, n_bytes: int = 1 << 20,
                        seed: int = 0) -> Path:
