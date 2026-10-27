@@ -690,6 +690,10 @@ EXPERIMENTS["Q10A"] = {
         "training.warmup_steps": 0,
         "training.run_steps": 27475,
         "training.schedule_steps": 27475,
+        # The decay pass deliberately resumes the epoch-1 weights with the
+        # epoch-1 optimizer state on a *different* (curated) corpus; the token
+        # id space is the same one, only the document mix changes.
+        "training.allow_data_change": True,
         "training.max_steps": 0,
         "training.epochs": 1,
         "training.eval_every": 500,

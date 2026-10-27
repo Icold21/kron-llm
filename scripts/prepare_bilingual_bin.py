@@ -94,6 +94,14 @@ def main() -> None:
     ap.add_argument("--max-train-mb", type=float, default=0.0,
                     help="optional cap on the training text in MB; 0 means the "
                          "whole mix (the pilot used 400)")
+    ap.add_argument("--reuse-tokenizer", default=None,
+                    help="encode with an existing tokenizer.json instead of "
+                         "training BPE on this mix; required for a decay pass, "
+                         "which must not change the token id space")
+    ap.add_argument("--reuse-val-dir", default=None,
+                    help="copy val.bpe.bin and tokenizer_meta.json from this "
+                         "directory instead of building a new split, so the "
+                         "decay pass is measured on the epoch-1 held-out set")
     args = ap.parse_args()
 
     t0 = time.time()
@@ -104,10 +112,13 @@ def main() -> None:
     print(f"[split] {len(train):,} train docs, {len(val):,} val docs")
 
     tok_path = Path(args.out_dir) / "tokenizer.json"
-    sample = stratified_sample(docs, int(args.merge_mb_per_language * 1e6))
-    sample_bytes = sum(len(s.encode('utf-8')) for s in sample)
-    print(f"[bpe] learning merges on {len(sample):,} docs "
-          f"({sample_bytes/1e6:.1f} MB)")
+    if args.reuse_tokenizer:
+        sample, sample_bytes = [], 0
+    else:
+        sample = stratified_sample(docs, int(args.merge_mb_per_language * 1e6))
+        sample_bytes = sum(len(s.encode('utf-8')) for s in sample)
+        print(f"[bpe] learning merges on {len(sample):,} docs "
+              f"({sample_bytes/1e6:.1f} MB)")
     # Reserve five ids: the chat template (<|system|>, <|user|>, <|assistant|>,
     # <|eot|> for turn ends) and EOT for document boundaries.  A turn end and a
     # document end are different events: generation stops on <|eot|>, while the
@@ -115,8 +126,16 @@ def main() -> None:
     # argued in docs/data_plan.md.
     chat_tokens = ["<|system|>", "<|user|>", "<|assistant|>", "<|eot|>"]
     n_base = args.vocab - 1 - len(chat_tokens)
-    train_bpe_merges(sample, vocab_size=n_base, out_path=tok_path,
-                     min_frequency=2, special_tokens=chat_tokens)
+    if args.reuse_tokenizer:
+        # Decay pass: the token ids must stay exactly the ones the checkpoint
+        # was trained on, so the BPE is loaded, not retrained.  Copying the file
+        # also keeps the output directory self-contained for Kaggle.
+        src_tok = Path(args.reuse_tokenizer)
+        tok_path.write_bytes(src_tok.read_bytes())
+        print(f"[bpe] reused {src_tok} (no merges learned on this mix)")
+    else:
+        train_bpe_merges(sample, vocab_size=n_base, out_path=tok_path,
+                         min_frequency=2, special_tokens=chat_tokens)
     tok = BPETokenizer(tok_path, vocab_size=args.vocab, bytes_per_token=1.0,
                        eot_id=args.vocab - 1)
     special_ids = {"endoftext": args.vocab - 1,
@@ -133,6 +152,24 @@ def main() -> None:
     limit = int(args.max_train_mb * 1e6) if args.max_train_mb else 0
     tr = encode_docs(train, tok, Path(args.out_dir) / "train.bpe.bin",
                      args.vocab - 1, max_bytes=limit)
+    if args.reuse_val_dir:
+        # The decay pass must be scored on the epoch-1 held-out set, otherwise
+        # its bpb cannot be compared with the epoch-end checkpoint.
+        src = Path(args.reuse_val_dir)
+        (Path(args.out_dir) / "val.bpe.bin").write_bytes(
+            (src / "val.bpe.bin").read_bytes())
+        meta_src = json.loads((src / "tokenizer_meta.json").read_text(encoding="utf-8"))
+        meta = dict(meta_src)
+        meta["train_tokens"] = tr["tokens"]
+        meta["train_bytes"] = tr["bytes"]
+        meta["anneal"] = True
+        meta["anneal_source"] = str(src).replace("\\", "/")
+        out_meta = Path(args.out_dir) / "tokenizer_meta.json"
+        out_meta.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        print(f"[bin] train {tr['tokens']:,} tokens ({tr['bytes_per_token']:.2f} B/t)")
+        print(f"[bin] val   reused from {src} ({meta['val_tokens']:,} tokens)")
+        print(f"[done] {out_meta} in {time.time()-t0:.1f}s")
+        return
     va = encode_docs(val, tok, Path(args.out_dir) / "val.bpe.bin",
                      args.vocab - 1)
 

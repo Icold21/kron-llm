@@ -388,12 +388,13 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     if resume:
         ck = torch.load(resume, map_location="cpu")
         saved_key = ck.get("data_key")
-        if saved_key and data_key and saved_key != data_key:
+        if (saved_key and data_key and saved_key != data_key
+                and not tc.get("allow_data_change")):
             raise SystemExit(
                 f"[resume] checkpoint was trained on a different corpus "
                 f"(data_key {saved_key} != {data_key}); resuming would mix two "
-                f"token id spaces.  Restart, or pass --init to warm-start the "
-                f"weights deliberately.")
+                f"token id spaces.  Restart, or set training.allow_data_change "
+                f"for an intentional decay pass on a curated subset.")
         raw_model.load_state_dict(ck["model"])
         opt.load_state_dict(ck["optimizer"])
         start_step = int(ck.get("step", 0))
