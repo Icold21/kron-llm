@@ -23,6 +23,12 @@ detail.
   text). The curated bin is not built yet — it is needed before the epoch ends.
   A cosine tail inside the epoch was rejected: at 5 % of steps and LR ~1.5e-5 it
   would have given the curated data ~0.2 % of the update mass.
+- **Decision (2026-10-27, user)**: no mid-run LR damping and no early switch to
+  the decay pass — the stable phase runs the **full 100 % of the epoch**, then
+  `Q10A`. A 3× lower LR now would have bought roughly a third of the remaining
+  descent for the same 125k steps (~0.05–0.10 bpb worse at the same compute).
+  `early_stop_patience` is 99 evals (99k steps), so nothing can cut the epoch
+  short by accident.
 - After pretraining: Habr article #1, then SFT/Q&A with a KL anchor to the
   frozen pretrain policy plus 5–10 % replay, then article #2. Distillation is
   shelved until an unaligned teacher exists.
