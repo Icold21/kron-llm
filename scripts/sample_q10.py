@@ -28,12 +28,12 @@ PROMPTS = [
     ("The Moon orbits the Earth at a distance of", {}),
     ("She opened the door and", {}),
     ("Он открыл дверь и", {}),
-    ("def add(a, b):\n    return", {"temperature": 0.5}),
-    ("17 + 25 =", {"temperature": 0.2, "top_k": 20, "max_new_tokens": 24}),
+    ("def add(a, b):\n    return", {}),
+    ("17 + 25 =", {}),
     ("В 1961 году", {}),
     ("KronLLM is", {}),
     ("<|system|>You are KronLLM, a compact bilingual model.<|eot|>"
-     "<|user|>Who are you?<|eot|><|assistant|>", {"temperature": 0.7}),
+     "<|user|>Who are you?<|eot|><|assistant|>", {}),
 ]
 
 
@@ -80,9 +80,9 @@ def main() -> None:
     ap.add_argument("--tokenizer", default=None)
     ap.add_argument("--prompt", default=None)
     ap.add_argument("--max-new-tokens", type=int, default=80)
-    ap.add_argument("--temperature", type=float, default=0.8)
-    ap.add_argument("--top-k", type=int, default=40)
-    ap.add_argument("--rep-penalty", type=float, default=1.2)
+    ap.add_argument("--temperature", type=float, default=1.0)
+    ap.add_argument("--top-k", type=int, default=8)
+    ap.add_argument("--rep-penalty", type=float, default=1.1)
     args = ap.parse_args()
 
     ckpt = Path(args.ckpt)
