@@ -21,6 +21,10 @@ DST = Path("kaggle/q10a")
 PATCHES = [
     ("find_dataset('kron-corpus-2b', 'train.bpe.bin')",
      "find_dataset('kron-q10a-anneal-bin', 'train.bpe.bin')"),
+    # The decay pass ships with its own config (run_steps, step-size schedule),
+    # so it must mount the code dataset that contains that config.
+    ("find_dataset('kron-llm-code-v12', 'kronllm')",
+     "find_dataset('kron-llm-code-v13', 'kronllm')"),
     ("'--exp', 'Q10'", "'--exp', 'Q10A'"),
     ("'/kaggle/working/q10'", "'/kaggle/working/q10a'"),
     ("open('/kaggle/working/q10/results.json')",
