@@ -111,6 +111,7 @@ def main() -> None:
     args = ap.parse_args()
 
     t0 = time.time()
+    Path(args.out_dir).mkdir(parents=True, exist_ok=True)
     docs = load_mixed(Path(args.mix_dir))
     if not docs:
         raise SystemExit("no mixed shards found; run `build` first")
