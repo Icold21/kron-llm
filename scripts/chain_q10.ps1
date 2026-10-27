@@ -30,6 +30,40 @@ function SendReport($subject, $mdPath, $htmlPath) {
     }
 }
 
+# Session reports are held until 08:00: a mail that arrives at 03:00 is read
+# half-asleep or not at all, and the point of the report is that someone reads
+# it.  The chain cannot sleep to achieve that -- it would stop watching the next
+# session -- so the queue is a marker file plus a one-off task `kron_report_mail`
+# that runs scripts/send_pending_report.ps1 at 08:00.  A report generated after
+# 08:00 is sent at once.  Failures never go through here: an error mail must not
+# sit for five hours.
+function QueueReport($subject, $htmlPath) {
+    $due = (Get-Date).Date.AddHours(8)
+    if ((Get-Date) -ge $due) {
+        SendReport $subject $null $htmlPath
+        return
+    }
+    $file = Join-Path $root "data\report_mail_pending.json"
+    # ConvertFrom-Json hands back a JSON array as one object, so wrapping it in
+    # @() would nest the whole queue as a single entry; unwrap it by hand.
+    $queue = @()
+    if (Test-Path $file) {
+        $parsed = Get-Content $file -Raw -Encoding utf8 | ConvertFrom-Json
+        if ($parsed -is [System.Array]) { $queue = $parsed } elseif ($null -ne $parsed) { $queue = @($parsed) }
+    }
+    $queue += @{ subject = $subject
+                 html = $htmlPath.Substring($root.Length + 1)
+                 queued = (Get-Date -Format "s") }
+    ConvertTo-Json -InputObject @($queue) -Depth 3 | Out-File -Encoding utf8 $file
+
+    # /SC ONCE without /SD defaults to today, so this needs no locale-specific
+    # date and cannot fire on the wrong day.
+    $action = 'wscript.exe //B "C:\Users\Icold\Desktop\kron_llm\scripts\run_report_mail_hidden.vbs"'
+    schtasks /Create /TN "kron_report_mail" /TR $action /SC ONCE /ST 08:00 /F 2>&1 |
+        Out-File -Encoding utf8 -Append $log
+    Say ("report queued for 08:00 (" + $queue.Count + " in the queue): " + $subject)
+}
+
 # External calls can hang: the Kaggle CLI has no timeout of its own, and a stuck
 # request once blocked this chain for 20 minutes while the run kept burning GPU
 # hours.  Every API call goes through a job with a deadline; a timeout is logged
@@ -152,7 +186,7 @@ Say ("last step seen before this session: " + $prevStep)
         $suffix = '<hr><h3>Log tail</h3><pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;font-size:12px;overflow-x:auto">' + $encoded + '</pre>'
         Add-Content -Encoding utf8 $html $suffix
     }
-    SendReport $subject $md $html
+    if ($errored) { SendReport $subject $md $html } else { QueueReport $subject $html }
 
     # 5. publish the checkpoint so the next session can attach it
     if (-not (Test-Path $ckptNow)) {
