@@ -129,6 +129,12 @@ Say ("last step seen before this session: " + $prevStep)
                        '--out','data\baseline_gpt2.json') |
                 Out-File -Encoding utf8 -Append $log
         }
+        # Generation goes in the report: the bpb table says whether the loss
+        # moved, the samples say whether the model became a better writer.
+        Run 900 @('scripts\report_samples.py','--ckpt',$ckptNow,
+                  '--out','data\report_samples.md') |
+            Out-File -Encoding utf8 -Append $log
+        Say "generation samples refreshed"
     }
 
     # 4. report the curve and mail it

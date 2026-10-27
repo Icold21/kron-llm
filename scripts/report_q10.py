@@ -275,6 +275,17 @@ def main() -> None:
                   "бина. С сессии 3 к нему добавляется страйд по всему held-out "
                   "(`val_bpb_uniform`), и вот его уже можно сравнивать с GPT-2.", ""]
 
+    # Generation samples, rendered by scripts/report_samples.py at session end:
+    # the table says whether the loss moved, the samples say whether the model
+    # became a better writer.  Absent file = section skipped, not an error.
+    samples = Path("data/report_samples.md")
+    if samples.exists():
+        body = samples.read_text(encoding="utf-8").strip()
+        if body.startswith("##"):
+            L += ["", body]
+        else:
+            L += ["", "## Генерация", "", body]
+
     # Honest reference points: the same strided blocks scored by GPT-2 (124M).
     # Written by scripts/eval_reference.py, run by the chain at every session end.
     latest = Path("data/baseline_latest.json")
