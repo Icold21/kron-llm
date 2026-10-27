@@ -32,6 +32,22 @@ function SendReport($subject, $mdPath, $htmlPath) {
 
 "=== chain started $(Get-Date -Format 'HH:mm:ss')" | Out-File -Encoding utf8 $log
 
+# External calls can hang: the Kaggle CLI has no timeout of its own, and a stuck
+# request once blocked this chain for 20 minutes while the run kept burning GPU
+# hours.  Every API call goes through a job with a deadline; a timeout is logged
+# and treated as "no information", never as a result.
+function Run($timeoutSec, [string[]]$pyArgs) {
+    $job = Start-Job -ScriptBlock { param($a) & python @a 2>&1 } -ArgumentList (,$pyArgs)
+    if (Wait-Job $job -Timeout $timeoutSec) {
+        $result = Receive-Job $job
+    } else {
+        Stop-Job $job -ErrorAction SilentlyContinue
+        $result = @("TIMEOUT after $timeoutSec s: python $($pyArgs -join ' ')")
+    }
+    Remove-Job $job -Force -ErrorAction SilentlyContinue
+    return $result
+}
+
 $prevStep = [int](python scripts\session_progress.py --history 2>$null | Select-Object -Last 1)
 Say ("last step seen before this session: " + $prevStep)
 
@@ -40,7 +56,7 @@ Say ("last step seen before this session: " + $prevStep)
 $deadline = (Get-Date).AddHours(14)
 while ($true) {
     if ((Get-Date) -gt $deadline) { Say "TIMEOUT waiting for the session"; exit 1 }
-    $status = python -m kaggle kernels status $kernel 2>&1 | Select-Object -Last 1
+    $status = Run 180 @('-m','kaggle','kernels','status',$kernel) | Select-Object -Last 1
     Say $status
     if ($status -match "COMPLETE|ERROR|CANCEL|FAILED") { break }
     Start-Sleep -Seconds 300
@@ -53,8 +69,9 @@ $errored = $status -match "ERROR|CANCEL|FAILED"
 $out = Join-Path $root "data\kaggle_out"
 Remove-Item (Join-Path $out "q10") -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $out | Out-Null
-python -m kaggle kernels output $kernel -p $out 2>&1 | Out-File -Encoding utf8 -Append $log
-Say ("output exit " + $LASTEXITCODE)
+Run 1800 @('-m','kaggle','kernels','output',$kernel,'-p',$out) |
+    Out-File -Encoding utf8 -Append $log
+Say "output download finished"
 
 $nowStep = [int](python scripts\session_progress.py --new 2>$null | Select-Object -Last 1)
 Say ("this download ends at step " + $nowStep)
@@ -121,12 +138,14 @@ $stage = Join-Path $root "data\kaggle_ckpt"
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 Copy-Item $ckpt (Join-Path $stage "last.pt") -Force
 python -c "import json; json.dump({'title':'Kron Q10 checkpoint','id':'icold21/kron-q10-ckpt','licenses':[{'name':'other'}]}, open(r'$stage\dataset-metadata.json','w'), indent=2)"
-python -m kaggle datasets version -p $stage -m "session checkpoint" 2>&1 | Out-File -Encoding utf8 -Append $log
-if ($LASTEXITCODE -ne 0) {
-    Say "version failed, creating the checkpoint dataset"
-    python -m kaggle datasets create -p $stage 2>&1 | Out-File -Encoding utf8 -Append $log
+$ver = Run 1800 @('-m','kaggle','datasets','version','-p',$stage,'-m',"session checkpoint step $nowStep")
+$ver | Out-File -Encoding utf8 -Append $log
+if (-not ($ver -match "successfully|being created|Dataset version")) {
+    Say "version failed or timed out, trying create"
+    Run 1800 @('-m','kaggle','datasets','create','-p',$stage) |
+        Out-File -Encoding utf8 -Append $log
 }
-Say ("checkpoint dataset exit " + $LASTEXITCODE)
+Say "checkpoint dataset updated"
 
 # 6. the epoch is complete: keep the weights and stop pushing sessions; the WSD
 #    decay pass is launched separately, on curated data.
@@ -138,6 +157,7 @@ if (Test-Path "data\q10_epoch_done.flag") {
 
 # 7. otherwise push the next session: same code, same corpus, plus the checkpoint
 python -c "import json; p=r'kaggle/q10/kernel-metadata.json'; d=json.load(open(p)); d['dataset_sources']=['$code','icold21/kron-corpus-2b','icold21/kron-q10-ckpt']; json.dump(d, open(p,'w'), indent=2)"
-python -m kaggle kernels push -p kaggle/q10 2>&1 | Out-File -Encoding utf8 -Append $log
-Say ("kernel push exit " + $LASTEXITCODE)
+$push = Run 600 @('-m','kaggle','kernels','push','-p','kaggle/q10')
+$push | Out-File -Encoding utf8 -Append $log
+Say ("push: " + (($push | Select-Object -Last 1) -join " "))
 Say "NEXT SESSION PUSHED"
