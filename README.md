@@ -588,7 +588,8 @@ scripts/            data prep (TinyStories, BPE, WikiText, SFT,
 tests/              102 tests, CPU-only
 docs/               architecture.md, results.md (full tables),
                     data_plan.md (bilingual corpus), roadmap.md
-artifacts/          q8g_int8.pt (shipped), q2_int8.pt (previous)
+artifacts/          q8g_int8.pt (shipped), q2_int8.pt (previous),
+                    q10_tokenizer.json (8K bilingual BPE for Q10 inference)
 runs/               per-experiment logs and metrics; only the two best
                     checkpoints are kept (Q8g_long, Q6_10k)
 notebooks/          walkthrough of the architecture and the measurements
