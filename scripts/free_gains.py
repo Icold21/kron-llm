@@ -79,6 +79,11 @@ SAMPLERS = [
                        no_repeat_ngram_size=3)),
     ("min_p0.05+norep3", dict(temperature=1.0, top_k=0, min_p=0.05,
                               no_repeat_ngram_size=3)),
+    # The soup repeated itself slightly more than its parents; this variant asks
+    # whether that can be undone with the repetition penalty instead of by
+    # choosing different weights.
+    ("recipe+top_p0.9 rp1.15", dict(temperature=1.0, top_k=8, top_p=0.9,
+                                    repetition_penalty=1.15)),
 ]
 
 # Primers are prepended verbatim.  The point is not that these are good

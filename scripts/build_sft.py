@@ -337,6 +337,7 @@ class Cell:
         self.domain, self.lang, self.budget = domain, lang, budget
         self.bytes = 0
         self.records = 0
+        self.dropped = 0
         self.consumed: Dict[str, int] = {}
         self.per_source: Dict[str, int] = {}
 
@@ -345,12 +346,20 @@ class Cell:
         return max(0, self.budget - self.bytes)
 
 
-def fill_cell(cell: Cell, sources: List[Source], raw: Path) -> Iterator[dict]:
+def fill_cell(cell: Cell, sources: List[Source], raw: Path,
+              keep=None) -> Iterator[dict]:
     """Yield records from ``sources`` until the cell budget is met.
 
     Each source is capped at ``cap_share`` of the cell budget (or 1.8x an even
     split when it declares none), so a single large dataset cannot swallow the
     whole cell while a source that was fetched generously can still fill it.
+
+    ``keep`` is the length filter, and it is applied **before** the cap is
+    charged.  The cap exists to stop one source from swallowing the cell; a
+    record that the trainer cannot use does not contribute a byte, so charging
+    it against the cap lets a long chain-of-thought source swallow the cell
+    without filling it.  That is what happened to ``code_en`` and ``qa_en`` in
+    the first build (see ``scripts/sft_headroom.py``).
     """
     share = cell.budget * 1.8 / max(1, len(sources))
     for src in sources:
@@ -373,11 +382,14 @@ def fill_cell(cell: Cell, sources: List[Source], raw: Path) -> Iterator[dict]:
                 break
             if cell.shortfall <= 0:
                 return
+            cell.consumed[src.name] = cell.consumed.get(src.name, 0) + 1
+            if keep is not None and not keep(record):
+                cell.dropped += 1
+                continue
             size = record_bytes(record)
             cell.records += 1
             cell.bytes += size
             taken += size
-            cell.consumed[src.name] = cell.consumed.get(src.name, 0) + 1
             cell.per_source[src.name] = cell.per_source.get(src.name, 0) + 1
             yield record
 
@@ -391,10 +403,12 @@ def write_parts(raw: Path, out: Path, target_bytes: int,
     and the move is recorded.  Mathematics is where the user asked the emphasis
     to be, and arithmetic generation can always absorb the extra.
 
-    The length filter (512 tokens) is applied **before** the byte accounting:
-    a cell whose source is mostly long chain-of-thought would otherwise fill its
-    budget with text that the trainer cannot use, and the reported mix would
-    describe bytes that never reach the model.
+    The length filter (512 tokens) is applied **before** the byte accounting and
+    before the per-source cap is charged: a cell whose source is mostly long
+    chain-of-thought would otherwise fill its budget with text that the trainer
+    cannot use, and the reported mix would describe bytes that never reach the
+    model.  Charging rejected records against the cap was the second half of the
+    same bug — see ``scripts/sft_headroom.py`` for how much that cost.
     """
     parts_dir = out / "parts"
     parts_dir.mkdir(parents=True, exist_ok=True)
@@ -432,23 +446,21 @@ def write_parts(raw: Path, out: Path, target_bytes: int,
                                     if v == name}}
         started = time.time()
         sink = parts_dir / f"{name}.jsonl.gz"
-        dropped = 0
+
+        def keep(record: dict) -> bool:
+            if tok is None:
+                return True
+            full, _ = render(record["messages"])
+            return len(tok.encode(full)) + 1 <= MAX_TOKENS
+
         with gzip.open(sink, "wt", encoding="utf-8", compresslevel=3) as fh:
-            for record in fill_cell(cell, group_sources(domain, lang), raw):
+            for record in fill_cell(cell, group_sources(domain, lang), raw,
+                                    keep=keep):
                 full, _ = render(record["messages"])
-                if tok is not None and len(tok.encode(full)) + 1 > MAX_TOKENS:
-                    # Too long for the 512-token context: it cannot be learned
-                    # as one unit, so it does not count towards the budget.
-                    dropped += 1
-                    cell.bytes -= record_bytes(record)
-                    cell.records -= 1
-                    cell.per_source[record["source"]] = \
-                        cell.per_source.get(record["source"], 1) - 1
-                    continue
                 fh.write(json.dumps({"text": full}, ensure_ascii=False) + "\n")
         stats[name].update(bytes=cell.bytes, records=cell.records,
                            per_source=cell.per_source,
-                           shortfall=cell.shortfall, dropped_long=dropped)
+                           shortfall=cell.shortfall, dropped_long=cell.dropped)
         print(f"  [part] {name}: {cell.records:,} records, "
               f"{cell.bytes / 1e6:.1f} MB of {cell.budget / 1e6:.1f} MB "
               f"({time.time() - started:.0f}s)", flush=True)
@@ -743,9 +755,17 @@ def cmd_report(args: argparse.Namespace) -> None:
               "| source | language | domain | records | MB | licence |",
               "|---|---|---|---:|---:|---|"]
     for st in sorted(stats, key=lambda s: s["source"]):
+        nbytes = st.get("bytes") or 0
+        if not nbytes:
+            # Shards written by the translator carry no ``bytes`` field, and a
+            # zero in this table reads as "33,405 records of nothing".  Measure
+            # the shard instead of printing a hole.
+            path = raw_path(raw, st["source"])
+            if path.exists() and done_path(raw, st["source"]).exists():
+                nbytes = sum(record_bytes(r) for r in iter_raw(path))
         lines.append(f"| {st['source']} | {st.get('lang', '—')} | "
                      f"{st.get('domain', '—')} | {st.get('rows_kept', 0):,} | "
-                     f"{st.get('bytes', 0) / 1e6:.1f} | "
+                     f"{nbytes / 1e6:.1f} | "
                      f"{st.get('licence', '—')} |")
     lines += ["", "## Share by language and domain", "",
               "| language | tokens | share |", "|---|---:|---:|"]
