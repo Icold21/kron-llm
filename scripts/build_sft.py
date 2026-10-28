@@ -754,6 +754,35 @@ def cmd_report(args: argparse.Namespace) -> None:
     lines += ["", "| domain | tokens | share |", "|---|---:|---:|"]
     for domain, count in sorted(per_domain.items()):
         lines.append(f"| {domain} | {count:,} | {count / max(tokens, 1):.1%} |")
+
+    # The mix contract is stated in *bytes*, and the pretraining corpus it has
+    # to match is 59.3/40.7 by bytes.  Tokens are the wrong unit to check it in:
+    # Russian runs ~3.1 bytes per token here and English ~2.2, so a token table
+    # can look balanced while the byte ratio is off by eight points.
+    per_lang_bytes: Dict[str, int] = {}
+    per_domain_bytes: Dict[str, int] = {}
+    for part in meta["parts"]:
+        domain, _, lang = part["name"].rpartition("_")
+        nbytes = parts_stats.get(part["name"], {}).get("bytes", 0)
+        per_lang_bytes[lang] = per_lang_bytes.get(lang, 0) + nbytes
+        per_domain_bytes[domain] = per_domain_bytes.get(domain, 0) + nbytes
+    total_bytes = sum(per_lang_bytes.values()) or 1
+    lines += ["", "## Share by bytes (the contract is in bytes)", "",
+              "| language | MB | share | contract |", "|---|---:|---:|---:|"]
+    for lang, nbytes in sorted(per_lang_bytes.items()):
+        lines.append(f"| {lang} | {nbytes / 1e6:.1f} | "
+                     f"{nbytes / total_bytes:.1%} | "
+                     f"{LANG_SHARE.get(lang, 0):.1%} |")
+    lines += ["", "| domain | MB | share | contract |", "|---|---:|---:|---:|"]
+    for domain, nbytes in sorted(per_domain_bytes.items()):
+        lines.append(f"| {domain} | {nbytes / 1e6:.1f} | "
+                     f"{nbytes / total_bytes:.1%} | "
+                     f"{DOMAIN_SHARE.get(domain, 0):.1%} |")
+    lines += ["", "The contract is the pretraining mix, so that SFT does not shift "
+              "the language balance of the model.  When a cell cannot fill its "
+              "budget, the cells that *can* keep their own budgets and the "
+              "realised mix drifts towards whichever language had the slack; "
+              "the two tables above are the check, not the budget."]
     lines += ["", "## What was rejected", "",
               "| source | kept | rejected | top reasons |", "|---|---:|---:|---|"]
     for st in sorted(stats, key=lambda s: s["source"]):

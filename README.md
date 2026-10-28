@@ -597,6 +597,7 @@ scripts/            data prep (TinyStories, BPE, WikiText, SFT,
 tests/              102 tests, CPU-only
 docs/               architecture.md, results.md (full tables),
                     decoding.md (measured sampling recipe),
+                    free_gains.md (what improves without training),
                     reproducing.md (one command per claim),
                     data_plan.md (bilingual corpus), roadmap.md
 artifacts/          q8g_int8.pt (shipped), q2_int8.pt (previous),

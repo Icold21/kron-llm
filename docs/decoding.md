@@ -145,6 +145,24 @@ the remaining 17 % the narrower one won.
 | measurement (default) | T = 1.0, top_k = 8, top_p = 0.9, rp = 1.1 | nothing in the grid beats it; `top_p = 0.9` adds a measured −0.11 bpb on English |
 | code | T = 0.8, top_k = 8, rp = 1.1 | lower entropy keeps indentation and `def` lines; the judge cannot see this, the samples can |
 | demo only, must be labelled | T = 0.8, top_k = 40, rp = 1.2 | smoothest reading; do not quote it as the model's quality |
+| structured output | T = 0, `no_repeat_ngram_size=3` | greedy plus an n-gram ban; loops are the failure mode there, prose quality is not the criterion |
+
+## Samplers the first sweep did not try
+
+`min_p`, locally typical sampling and the n-gram ban were measured later, on the
+same probes (`docs/free_gains.md` §2).  None of them beats the recipe: `min_p`
+0.02–0.10 costs 0.15–0.4 bpb of English, typical sampling 0.6–0.7 bpb (it does
+cut loops from 0.81 to 0.67 and raises distinct-3 to 0.86), and the 3-gram ban
+0.12–0.18 bpb while leaving the loops this model actually produces untouched.
+
+One result there is worth repeating here because it is a scoring trap:
+
+> **Greedy decoding has the lowest judge bpb in the whole table (0.46) and is the
+> worst text in it** — every greedy sample loops (`loops = 1.00`,
+> `distinct-3 = 0.24`).  `" 1000000000000000"` is perfectly predictable, so a
+> likelihood judge loves it.  This is why every probe in this repository reports
+> `loops` and `distinct-3` next to the judge bpb, and why a bpb win on one
+> sample is never enough to adopt a setting.
 
 ## What this does not show
 

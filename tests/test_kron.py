@@ -550,6 +550,49 @@ def test_generate_cache_matches_uncached():
     assert torch.equal(g1, g2)
 
 
+def test_generate_greedy_is_argmax_and_matches_top_k_one():
+    """``temperature=0`` must be plain argmax, and equal to top_k=1 sampling."""
+    torch.manual_seed(0)
+    model = KronTransformer(make_cfg()).eval()
+    prompt = torch.randint(0, 256, (1, 4))
+    greedy = model.generate(prompt, max_new_tokens=8, temperature=0.0)
+    torch.manual_seed(3)
+    top1 = model.generate(prompt, max_new_tokens=8, top_k=1, use_cache=False)
+    assert torch.equal(greedy, top1)
+
+
+def test_generate_min_p_one_reduces_to_greedy():
+    """min_p=1.0 keeps only tokens at the top probability, i.e. one token."""
+    torch.manual_seed(0)
+    model = KronTransformer(make_cfg()).eval()
+    prompt = torch.randint(0, 256, (1, 4))
+    greedy = model.generate(prompt, max_new_tokens=6, temperature=0.0)
+    picked = model.generate(prompt, max_new_tokens=6, top_k=0, min_p=1.0)
+    assert torch.equal(greedy, picked)
+
+
+def test_generate_no_repeat_ngram_bans_repeats():
+    """No 3-gram of the result may appear twice in the prompt+result."""
+    torch.manual_seed(0)
+    model = KronTransformer(make_cfg()).eval()
+    prompt = torch.randint(0, 64, (1, 3))
+    out = model.generate(prompt, max_new_tokens=24, temperature=0.0,
+                         top_k=0, no_repeat_ngram_size=3)
+    seq = out[0].tolist()
+    grams = [tuple(seq[i:i + 3]) for i in range(len(seq) - 2)]
+    assert len(grams) == len(set(grams))
+
+
+def test_generate_typical_p_stays_in_vocabulary():
+    """Typical sampling must return real ids, not a masked-out token."""
+    torch.manual_seed(0)
+    model = KronTransformer(make_cfg()).eval()
+    prompt = torch.randint(0, 256, (1, 4))
+    out = model.generate(prompt, max_new_tokens=8, top_k=0, typical_p=0.5)
+    assert out.shape == (1, 4 + 8)
+    assert int(out.max()) < model.vocab_size and int(out.min()) >= 0
+
+
 def test_kron_innovation_factorized_matches_dense():
     """Applying A (x) B through its factors must equal the dense innovation."""
     torch.manual_seed(0)

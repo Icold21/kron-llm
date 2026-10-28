@@ -41,6 +41,40 @@ nothing, and the model cannot be given a longer context without retraining its
 position encoding.  How much is dropped is recorded per part in `meta.json`
 (`dropped_long`).
 
+### 1.1 What the build actually achieved
+
+The mix is built by filling each (domain, language) cell up to its byte budget
+from whatever the sources can supply.  Where a cell cannot fill its budget, the
+other cells keep theirs and the realised mix drifts.  The full build on
+2026-10-28 produced **358,374,942 tokens** (351.2 M train / 7.2 M val),
+2,625,058 examples, and this is the drift:
+
+| | realised (bytes) | contract | note |
+|---|---:|---:|---|
+| English | 51.2 % | 60 % | every EN cell except `qa_ru` fell short |
+| Russian | 48.8 % | 40 % | RU cells were the ones with slack, so RU gained |
+| math | 53.2 % | 42 % | absorbs whatever the other domains cannot fill |
+| code | **13.0 %** | 20 % | capped by the 512-token filter, not by the catalogue |
+| open Q/A | 18.1 % | 22 % | 138 MB of EN Q/A is longer than 512 tokens |
+| forum Q/A | 14.9 % | 12.5 % | the only cell over its budget, mail.ru is short by design |
+| general | 0.7 % | 3 % | Dolly is the only licensed source; 20 MB short |
+| identity | 0.1 % | 0.5 % | 800 examples per language by design |
+
+Two independent constraints cause it, and they need different fixes:
+
+* **Code is capped by length.**  `code_en` has 174 MB of candidate text and
+  keeps 80.4 MB; 83,948 rows are dropped for being longer than 512 tokens.
+  Raising the code share therefore needs **answer chunking** (split a long
+  solution into ≤512-token windows, keep the question with the first window and
+  a continuation marker with the rest), not more sources.
+* **The language ratio drifts because EN cells are short.**  Restoring 60/40
+  exactly means trimming Russian, and the arithmetic is unforgiving: the largest
+  corpus that satisfies it is 795.6 MB (EN 471.8 + RU 323.8), i.e. 126 MB of
+  Russian text — mostly `math_ru` and `qa_ru` — would be thrown away to fix a
+  ratio, while the model would see less data overall.  That is why the build
+  leaves the ratio at 51/49 and reports it instead of silently enforcing it; the
+  decision belongs to whoever owns the SFT run.
+
 ## 2. Sources
 
 Everything comes from the Hub through a mirror with a declared licence.  Nothing
@@ -84,11 +118,21 @@ restarted that index at zero for every question, so a question could receive the
 *first* question's prose while keeping its own answer: 874 of 11,234 pairs were
 such hybrids.  They are fluent, they pass every aggregate counter, and they are
 only visible when the pairs are read.  `scripts/verify_translated_pairs.py` now
-does exactly that — it maps each Russian question back to the English question
-that produced it and checks that the answer carried alongside is that question's
+does exactly that — it maps each Russian question back to the question that
+produced it and checks that the answer carried alongside is that question's
 answer.  It found the 874; the fix was to use absolute offsets in the flattened
 batch; the shard is rebuilt from the translation cache, so re-running the audit
 costs no GPU.
+
+Getting that check right took two rounds, and both false alarms are worth
+knowing about.  The same English question sits in several code datasets with
+different answers (the alpaca-style sets share whole rows), so comparing against
+one answer per question flagged 2,474 healthy pairs; and two questions that
+differ only in trailing whitespace translate to the same Russian sentence, so
+keying on the hash flagged the second of each pair.  The index is therefore
+`russian question -> every answer of every question that translated to it`: a
+hybrid still fails, because its answer belongs to a question whose Russian text
+is a different sentence.  The current shard is 33,405 records with 0 mismatches.
 
 The cache is keyed by the hash of the English question, and the shard is always
 rebuilt from it in candidate order.  A rerun therefore never re-translates what

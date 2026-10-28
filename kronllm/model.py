@@ -1050,6 +1050,9 @@ class KronTransformer(nn.Module):
     def generate(self, idx: torch.Tensor, max_new_tokens: int = 200,
                  temperature: float = 1.0, top_k: Optional[int] = 8,
                  top_p: Optional[float] = None,
+                 min_p: Optional[float] = None,
+                 typical_p: Optional[float] = None,
+                 no_repeat_ngram_size: Optional[int] = None,
                  repetition_penalty: Optional[float] = None,
                  rep_window: int = 64,
                  eot_id: Optional[int] = None,
@@ -1066,13 +1069,47 @@ class KronTransformer(nn.Module):
         ``repetition_penalty`` default to off so that older callers keep their
         behaviour.  ``top_p`` is applied after ``top_k``: it can only tighten
         the cap, never widen it.
+
+        The alternatives measured in ``docs/free_gains.md`` are all off by
+        default: ``min_p`` keeps every token whose probability is at least
+        ``min_p`` times the top one (a relative floor, so it adapts to how
+        peaked the step is); ``typical_p`` keeps the tokens whose surprisal is
+        closest to the distribution's entropy (locally typical sampling);
+        ``no_repeat_ngram_size`` bans the token that would repeat an n-gram
+        already in the context.  ``temperature <= 0`` decodes greedily, which
+        is the only setting where the samplers below do not apply.
         """
         was_training = self.training
         eot_id = int(self.eot_id if eot_id is None else eot_id)
+        greedy = temperature is not None and temperature <= 0.0
         self.eval()
 
+        def banned_ngram_tokens() -> set:
+            """Tokens that would repeat an n-gram already in ``idx``."""
+            n = int(no_repeat_ngram_size or 0)
+            if n < 2 or idx.shape[1] < n:
+                return set()
+            seq = idx[0].tolist()
+            prefix = tuple(seq[-(n - 1):])
+            banned = set()
+            for i in range(len(seq) - n + 1):
+                if tuple(seq[i:i + n - 1]) == prefix:
+                    banned.add(seq[i + n - 1])
+            return banned
+
         def sample(logits: torch.Tensor) -> torch.Tensor:
-            logits = logits.float() / max(temperature, 1e-5)
+            logits = logits.float()
+            raw = logits
+            banned = banned_ngram_tokens()
+            if banned:
+                # Applied before the greedy shortcut too: "greedy with a
+                # no-repeat ban" is the standard way to stop a small model
+                # from looping, and it must not be silently ignored.
+                logits = logits.clone()
+                logits[0, list(banned)] = float("-inf")
+            if greedy:
+                return logits.argmax(dim=-1, keepdim=True)
+            logits = logits / max(temperature, 1e-5)
             if repetition_penalty and repetition_penalty != 1.0:
                 recent = torch.unique(idx[0, -rep_window:])
                 target = logits[0, recent]
@@ -1091,7 +1128,33 @@ class KronTransformer(nn.Module):
                 cut[..., 0] = False
                 ordered = ordered.masked_fill(cut, float("-inf"))
                 logits = torch.empty_like(logits).scatter(-1, order, ordered)
+            if min_p is not None and 0.0 < min_p <= 1.0:
+                # Relative floor: a peaked step keeps one token, a flat step
+                # keeps many.  This is what top_p cannot express.
+                probs = torch.softmax(logits, dim=-1)
+                floor = probs.max(dim=-1, keepdim=True).values * min_p
+                logits = logits.masked_fill(probs < floor, float("-inf"))
+            if typical_p is not None and 0.0 < typical_p < 1.0:
+                logp = torch.log_softmax(logits, dim=-1)
+                probs = logp.exp()
+                entropy = -(probs * logp).sum(dim=-1, keepdim=True)
+                surprise = (logp + entropy).abs()
+                order = surprise.argsort(dim=-1)
+                ordered_logits = logits.gather(-1, order)
+                ordered_probs = probs.gather(-1, order)
+                cum = torch.cumsum(ordered_probs, dim=-1)
+                cut = cum > typical_p
+                cut[..., 1:] = cut[..., :-1].clone()
+                cut[..., 0] = False
+                ordered_logits = ordered_logits.masked_fill(cut, float("-inf"))
+                logits = torch.empty_like(logits).scatter(-1, order,
+                                                          ordered_logits)
             probs = torch.softmax(logits, dim=-1)
+            if not torch.isfinite(probs).all() or probs.sum() <= 0:
+                # Every candidate was masked (e.g. no_repeat_ngram banned the
+                # whole top_k): fall back to the unfiltered distribution
+                # rather than sampling from NaN.
+                return raw.argmax(dim=-1, keepdim=True)
             return torch.multinomial(probs, num_samples=1)
 
         past = None
