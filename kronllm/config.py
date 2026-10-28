@@ -713,6 +713,31 @@ EXPERIMENTS["Q10A"] = {
         "training.save_every": 250,
     },
 }
+# S10: supervised fine-tuning on top of the Q10 pretrained model.  The corpus is
+# built by ``scripts/build_sft.py`` into ``data/sft`` (0.5B-token reservoir); a
+# run takes a slice of it rather than a full epoch, because at 10M parameters
+# one epoch of 0.5B SFT tokens is twenty times the compute of an epoch of
+# pretraining data per parameter and buys memorisation, not skill.  4,000 steps
+# of 16,384 tokens is 65.5M tokens -- roughly 13 % of the reservoir.
+EXPERIMENTS["S10"] = {
+    "desc": "Q10 + SFT on the measured bilingual math/QA corpus (~10M params)",
+    "overrides": {
+        **EXPERIMENTS["Q10"]["overrides"],
+        "data.data_dir": "data/sft",
+        "data.train_bin": "train.bpe.bin",
+        "data.val_bin": "val.bpe.bin",
+        "training.init_from": "runs/Q10/best.pt",
+        "training.max_steps": 4000,
+        "training.schedule_steps": 4000,
+        "training.lr": 5e-5,
+        "training.min_lr": 5e-6,
+        "training.warmup_steps": 100,
+        "training.eval_every": 100,
+        "training.log_every": 25,
+        "training.save_every": 250,
+        "training.allow_data_change": True,
+    },
+}
 # Q8w: parameter-matched control for Q8g.  20 layers x 6 matrices is the same
 # block count and the same parameter count as Q6's 24 layers x 5 matrices, so
 # the only difference from Q6 is the gated FFN, not extra capacity.

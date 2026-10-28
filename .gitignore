@@ -69,3 +69,8 @@ data/q10_history.csv
 data/report_q10.md
 data/report_q10_subject.txt
 data/q10_epoch_done.flag
+
+# SFT corpus: built by scripts/build_sft.py (~2 GB of bins and parts),
+# reproducible from the Hub sources plus the arithmetic generator.
+data/sft/
+data/report_sft.md
