@@ -6,6 +6,10 @@ $log = Join-Path $root "data\q10_chain.log"
 $kernel = "icold21/kron-q10-10m-bilingual-pretraining"
 $code = "icold21/kron-llm-code-v15"
 $mail = "$env:USERPROFILE\.config\opencode\skills\email-control\scripts\mail.py"
+# The mailer refuses to send without a session label (the client update made it
+# mandatory).  The chain has no OpenCode session of its own, so it labels its
+# reports with its own name.
+$label = "kron_chain"
 
 function Say($msg) {
     $line = "[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $msg
@@ -20,11 +24,11 @@ function SendReport($subject, $mdPath, $htmlPath) {
             Out-File -Encoding utf8 -Append $log
     }
     if (Test-Path $htmlPath) {
-        python $mail send --model "DeepSeek V4.1 Flash Free" --project "kron_llm" `
+        python $mail send --model "DeepSeek V4.1 Flash" --project "kron_llm" --session $label `
             --subject $subject --body-file $htmlPath --html 2>&1 |
             Out-File -Encoding utf8 -Append $log
     } elseif (Test-Path $mdPath) {
-        python $mail send --model "DeepSeek V4.1 Flash Free" --project "kron_llm" `
+        python $mail send --model "DeepSeek V4.1 Flash" --project "kron_llm" --session $label `
             --subject $subject --body-file $mdPath 2>&1 |
             Out-File -Encoding utf8 -Append $log
     }
@@ -69,7 +73,11 @@ function QueueReport($subject, $htmlPath) {
 # hours.  Every API call goes through a job with a deadline; a timeout is logged
 # and treated as "no information", never as a result.
 function Run($timeoutSec, [string[]]$pyArgs) {
-    $job = Start-Job -ScriptBlock { param($a) & python @a 2>&1 } -ArgumentList (,$pyArgs)
+    # Start-Job runs in the user's home directory, not the repo, so every
+    # relative path inside the job ("kaggle/q10", "scripts\...") silently missed
+    # when the chain was started by Task Scheduler instead of from the repo.
+    $job = Start-Job -ScriptBlock { param($a, $wd) Set-Location $wd; & python @a 2>&1 } `
+        -ArgumentList (,$pyArgs), $root
     if (Wait-Job $job -Timeout $timeoutSec) {
         $result = Receive-Job $job
     } else {
@@ -81,15 +89,34 @@ function Run($timeoutSec, [string[]]$pyArgs) {
 }
 
 function PushSession() {
-    $push = Run 600 @('-m','kaggle','kernels','push','-p','kaggle/q10')
-    $push | Out-File -Encoding utf8 -Append $log
-    Say ("push: " + (($push | Select-Object -Last 1) -join " "))
+    # A push can be refused because the weekly GPU quota is spent.  That is a
+    # calendar event, not a failure, so it is retried every three hours until it
+    # goes through -- the alternative was the chain seeing the previous version's
+    # COMPLETE, downloading the same checkpoint, deciding "no progress" and
+    # mailing a false failure every five minutes.
+    while ($true) {
+        $push = Run 600 @('-m','kaggle','kernels','push','-p','kaggle/q10')
+        $push | Out-File -Encoding utf8 -Append $log
+        $line = (($push | Select-Object -Last 1) -join " ").Trim()
+        Say ("push: " + $line)
+        if ($line -match "quota|Quota|QUOTA") {
+            Say "GPU QUOTA WALL: retrying the push in 3 hours"
+            Start-Sleep -Seconds 10800
+            continue
+        }
+        if ($line -match "successfully|Kernel version") { return "ok" }
+        return "error"
+    }
 }
 
 "=== chain started $(Get-Date -Format 'HH:mm:ss')" | Out-File -Encoding utf8 $log
 
 $prevStep = [int](python scripts\session_progress.py --history 2>$null | Select-Object -Last 1)
 Say ("last step seen before this session: " + $prevStep)
+# `kernels status` can report the *previous* version's state, so a COMPLETE that
+# arrives within minutes of a push is stale, not the end of the new session.
+$pushedAt = (Get-Date).AddHours(-2)
+$stalled = 0
 
 # One instance now drives the whole run: wait -> download -> report -> publish ->
 # push -> wait again.  It used to handle a single session and exit, which meant
@@ -104,7 +131,14 @@ Say ("last step seen before this session: " + $prevStep)
         if ((Get-Date) -gt $deadline) { Say "TIMEOUT waiting for the session"; exit 1 }
         $status = Run 180 @('-m','kaggle','kernels','status',$kernel) | Select-Object -Last 1
         Say $status
-        if ($status -match "COMPLETE|ERROR|CANCEL|FAILED") { break }
+        if ($status -match "COMPLETE|ERROR|CANCEL|FAILED") {
+            if ((Get-Date) -lt $pushedAt.AddMinutes(10)) {
+                Say "status is the previous version's; waiting for the new run to start"
+                Start-Sleep -Seconds 300
+                continue
+            }
+            break
+        }
         Start-Sleep -Seconds 300
     }
     $errored = $status -match "ERROR|CANCEL|FAILED"
@@ -123,30 +157,36 @@ Say ("last step seen before this session: " + $prevStep)
     $nowStep = [int](python scripts\session_progress.py --new 2>$null | Select-Object -Last 1)
     Say ("this download ends at step " + $nowStep)
 
-    # 3. no progress: either the run died, or Kaggle refused to start it because
-    #    the weekly GPU quota is spent.  The first is a bug, the second is a
-    #    calendar event -- waiting for it costs nothing but a sleep.
+    # 3. no progress: the run either died or never started at all (a refused push
+    #    and a spent GPU quota both look like this).  Pushing again is the right
+    #    response to both, but a real crash would then loop forever, so three
+    #    consecutive stalls are reported as a failure -- and only the third.
     if ($nowStep -le $prevStep) {
-        $sessionLog = Join-Path $out "kron-q10-10m-bilingual-pretraining.log"
-        $text = if (Test-Path $sessionLog) { Get-Content $sessionLog -Raw -Encoding utf8 } else { "" }
-        if ($text -match "quota|Quota|QUOTA") {
-            Say "GPU QUOTA WALL: waiting 3 hours before pushing again"
-            Start-Sleep -Seconds 10800
-            PushSession
-            continue session
+        Say "no progress this session, pushing again"
+        # PushSession sleeps through a spent weekly quota on its own, so waiting
+        # for the reset never counts as a failed attempt.
+        if ((PushSession) -ne "ok") { Say "push did not go through either" }
+        $stalled++
+        if ($stalled -ge 3) {
+            python scripts\kaggle_log.py "" 20 4000 > data\session_failure.txt 2>&1
+            $tail = (Get-Content "data\session_failure.txt" -Tail 60 -Encoding utf8) -join "`n"
+            $md = Join-Path $root "data\session_failure.md"
+            $head = "# Q10: three sessions in a row without progress`n`n"
+            $head += "The kernel ended with status ``$status``, but the output still has no step beyond $prevStep.`n"
+            $head += "Each retry pushed the same session again; three of them came back empty, so this`n"
+            $head += "is not a quota wait -- something is wrong with the run and it needs a look.`n`n"
+            $head += "## Log tail`n`n``````n" + $tail + "`n``````"
+            $head | Out-File -Encoding utf8 $md
+            SendReport "Q10: three sessions in a row failed without progress" $md (Join-Path $root "data\session_failure.html")
+            Say "FAILED SESSION: reported after $stalled stalls, stopping"
+            exit 3
         }
-        python scripts\kaggle_log.py "" 20 4000 > data\session_failure.txt 2>&1
-        $tail = (Get-Content "data\session_failure.txt" -Tail 60 -Encoding utf8) -join "`n"
-        $md = Join-Path $root "data\session_failure.md"
-        $head = "# Q10: session failed, no progress`n`n"
-        $head += "The kernel ended with status ``$status``, but the output has no step beyond $prevStep.`n"
-        $head += "No new checkpoint was written, so nothing is published and nothing is resumed.`n`n"
-        $head += "## Log tail`n`n``````n" + $tail + "`n``````"
-        $head | Out-File -Encoding utf8 $md
-        SendReport "Q10: session failed without progress" $md (Join-Path $root "data\session_failure.html")
-        Say "FAILED SESSION: reported, nothing pushed"
-        exit 3
+        Say "retry $stalled of 3 queued"
+        $pushedAt = Get-Date
+        Start-Sleep -Seconds 120
+        continue session
     }
+    $stalled = 0
 
     # 3b. honest validation: score the downloaded checkpoint on a strided sample of
     #     the whole val bin, and once with GPT-2 on the same blocks.  The stock
@@ -216,7 +256,8 @@ Say ("last step seen before this session: " + $prevStep)
 
     # 7. push the next session and wait for it
     $prevStep = $nowStep
-    PushSession
+    if ((PushSession) -ne "ok") { Say "push did not go through" }
+    $pushedAt = Get-Date
     Say "NEXT SESSION PUSHED"
     Start-Sleep -Seconds 180
 }

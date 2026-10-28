@@ -43,8 +43,8 @@ foreach ($item in $queue) {
         Say ("queued report: " + $item.html + " is missing, dropped")
         continue
     }
-    $out = python $mail send --model "DeepSeek V4.1 Flash Free" --project "kron_llm" `
-        --subject $item.subject --body-file $html --html 2>&1
+    $out = python $mail send --model "DeepSeek V4.1 Flash" --project "kron_llm" `
+        --session "kron_chain" --subject $item.subject --body-file $html --html 2>&1
     $out | Out-File -Encoding utf8 -Append $log
     if ($LASTEXITCODE -eq 0) {
         Say ("queued report sent: " + $item.subject)
