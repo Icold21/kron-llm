@@ -13,11 +13,11 @@ filtered out, and where the gaps are.  The generated numbers live in
 | | value | why |
 |---|---|---|
 | language split | 60 % EN / 40 % RU **by bytes** | same ratio as pretraining, so SFT does not silently re-balance the model |
-| math | 45 % of bytes | the stage's purpose: structured task→solution pairs |
-| open Q/A | 30 % | instruction following, translation, definitions |
-| forum Q/A (Stack Exchange, mail.ru, ELI5, Reddit) | 15 % | real questions with real answers, including code and technical threads |
-| code | 6 % | docstring→snippet pairs; kept small because pretraining already had a code slice |
-| general instructions | 3.5 % | Dolly-style tasks that are neither math nor forum |
+| math | 42 % of bytes | the stage's purpose: structured task→solution pairs |
+| code | 20 % of bytes | code is what carries the mathematics: following a statement and writing a loop is closer to algebra than a word problem is, and the structure of the answer stays visible |
+| open Q/A | 22 % | instruction following, translation, definitions |
+| forum Q/A (Stack Exchange, mail.ru, ELI5, Reddit) | 12.5 % | real questions with real answers, including technical threads |
+| general instructions | 3 % | Dolly-style tasks that are neither math nor forum |
 | identity | 0.5 % | 100–300 examples, guarded (see `docs/roadmap.md` §6) |
 
 The template is the one the notebook and the sampler already use:
@@ -28,9 +28,18 @@ The template is the one the notebook and the sampler already use:
 ```
 
 `<|eot|>` ends a turn, token `8191` ends an example.  `sft_index.npy` stores
-`(start, prompt_tokens, total_tokens)` per example, so the trainer can mask the
-loss on the prompt without re-tokenising — the roadmap asks for that masking and
-the flat bin alone does not carry it.
+`(start, prompt_tokens, total_tokens, file)` per example, so a trainer *can* mask
+the loss on the prompt without re-tokenising.  The current trainer does not
+consume that index yet — it trains on the whole rendered text, which still
+teaches the answer but spends capacity on predicting the prompt.  Wiring the
+mask in is a follow-up, and the index exists so it is a data-loader change, not
+a rebuild.
+
+Examples longer than **512 tokens** (the Q10 context) are dropped at packing
+time, not truncated: a window cut through the middle of an answer teaches
+nothing, and the model cannot be given a longer context without retraining its
+position encoding.  How much is dropped is recorded per part in `meta.json`
+(`dropped_long`).
 
 ## 2. Sources
 
@@ -44,13 +53,50 @@ policy in `docs/data_plan.md` §2, so those sites enter through
 | math, EN | OpenMathInstruct-2 (1M slice), MetaMathQA, Orca-Math, MathInstruct, GSM8K, MATH (algebra/geometry/number theory) |
 | math, RU | translated Orca-Math (`d0rj/…-ru`), translated MathInstruct, Russian math dialogues, ru-alpaca-math |
 | math, synthetic | 13 templated arithmetic families in both languages: exact answers, computed by Python, with a written-out derivation |
-| Q/A, EN | OpenOrca, OpenHermes-2.5, SQuAD v2, HotpotQA |
+| code, EN | OpenCodeReasoning (competitive programming: statement + reasoning + solution), Magicoder-OSS-Instruct, self-oss-instruct-sc2, CodeAlpaca, python-instructions-18k |
+| code, RU | English code tasks whose **question** was machine-translated to Russian; the code stays English, as it does in the wild |
+| Q/A, EN | OpenOrca, OpenHermes-2.5, HotpotQA |
 | Q/A, RU | saiga_scored (`opus_score ≥ 6`), russian_instructions_2 |
 | forum, EN | Stack Exchange dump (best answer per thread, score ≥ 2), ELI5, Reddit top Q&A |
 | forum, RU | mail.ru QA (two mirrors, short answers by design) |
-| code | Russian code Q/A (question → snippet) |
 | general | Dolly-15k |
 | identity | generated locally from `data/identity` (CC0) |
+
+### 2.1 Russian code questions by translation
+
+Code is written in English everywhere, so a bilingual code slice does not need a
+Russian solution — it needs a Russian question.  `scripts/translate_code_questions.py`
+takes English code tasks, splits every question into prose and non-prose
+(fenced blocks, inline spans, URLs, formulas), sends only the prose through
+MarianMT (`Helsinki-NLP/opus-mt-en-ru`) and puts the code back verbatim.  The
+answer is copied unchanged.
+
+Two things this pipeline learned the hard way: placeholders for code do not
+survive the translator (a bracket gets re-spaced and the round-trip check fails
+on 80 % of questions), so the question is *segmented* rather than masked; and
+the acceptance gate has to look at the Cyrillic share of the translated prose
+only, because a question that is mostly code legitimately has little Russian in
+it.
+
+The third thing it learned is worse.  Translation is batched, and the translated
+prose pieces are scattered back into the questions by index.  The first version
+restarted that index at zero for every question, so a question could receive the
+*first* question's prose while keeping its own answer: 874 of 11,234 pairs were
+such hybrids.  They are fluent, they pass every aggregate counter, and they are
+only visible when the pairs are read.  `scripts/verify_translated_pairs.py` now
+does exactly that — it maps each Russian question back to the English question
+that produced it and checks that the answer carried alongside is that question's
+answer.  It found the 874; the fix was to use absolute offsets in the flattened
+batch; the shard is rebuilt from the translation cache, so re-running the audit
+costs no GPU.
+
+The cache is keyed by the hash of the English question, and the shard is always
+rebuilt from it in candidate order.  A rerun therefore never re-translates what
+it already has, and the file is a function of (raw shards, cache) rather than of
+whichever run happened to write it.
+
+The upstream dataset stays English — if a Russian answer is ever needed, it comes
+from the model, not from a translation of somebody else's solution.
 
 Two source-level details matter for quality: `saiga_scored` labels a role `bot`,
 not `assistant`, and its rows carry model-generated scores — anything below 6 or
@@ -76,27 +122,65 @@ Applied per row, in this order:
 6. **cap** — each source is limited to its share of the cell budget, so the
    first dataset in the list cannot swallow the cell.
 
+### 3.1 The 512-token context, not the catalogue, is the binding constraint
+
+Q10 reads 512 tokens.  An example longer than that cannot be learned as one unit
+— the window would cut the answer in half — so it is dropped at packing time and
+does not count towards its cell's budget.  Sampled at 4,000 rows per cell:
+
+| cell | > 512 tokens | mean tokens | p95 |
+|---|---:|---:|---:|
+| math_en | 49.3 % | 579 | 1,178 |
+| math_ru | 11.3 % | 321 | 624 |
+| qa_en | 38.1 % | 484 | 1,094 |
+| qa_ru | 57.6 % | 699 | 1,969 |
+| qa_sites_en | 41.5 % | 542 | 1,238 |
+| qa_sites_ru | 0.0 % | 60 | 80 |
+| general_en | 11.8 % | 259 | 742 |
+| code_ru | 0.0 % | 60 | 81 |
+| identity | 0.0 % | 110 | 144 |
+
+The consequence is that the reservoir is smaller than the sources suggest: a
+500M-token target is filled to roughly **350M tokens**, and the shortfall is not
+evenly spread.  English math loses half its rows, Russian forum Q/A loses none
+(answers there are one or two sentences by construction), and English code loses
+more than half because the good code instruction sets are long
+chain-of-thought examples.  Padding the context is not an option without
+retraining the position encoding, so the honest response is to report the
+reservoir as it is and to prefer *short* sources when adding more.
+
+That is also the argument for translating code **questions**: a translated
+question keeps its original answer, so it costs one short paragraph of Russian
+and lands entirely inside the context, while an English chain-of-thought example
+mostly does not.
+
 ## 4. Known gaps
 
-- **English code**: no permissively licensed EN code SFT source is registered,
-  so the 6 % code budget for English has nowhere to go.  Its bytes are moved
-  into the English math cell and reported as an absorbed cell rather than
-  silently dropped.
+- **English code** used to be the largest gap.  It is now filled from
+  OpenCodeInstruct, Magicoder-OSS-Instruct, Magicoder-Evol, self-oss-instruct-sc2,
+  CodeAlpaca and python-instructions-18k, plus OpenCodeReasoning for competitive
+  programming.  The cell still stops at about half its budget: the remaining
+  shortfall is the 512-token filter (§3.1), not a missing licence.
 - **Russian general instructions**: Dolly is English-only; the Russian general
-  budget is likewise absorbed into Russian math.
-- **`NelvoraAI/russian-math-dialogues`** cannot be read with `datasets` 3.5
-  (`Feature type 'Json' not found`); it is small (11k rows) and currently
-  contributes nothing.
-- **`Vikhrmodels/russian_math`** is gated; skipped.
-- **No Russian OpenMathInstruct equivalent** exists at the same scale, which is
-  why synthetic arithmetic carries a large share of the Russian math cell — and
-  why the Russian math slice is the least "natural" part of the corpus.
+  budget is absorbed into Russian math.
+- **`squad_v2` and `NelvoraAI/russian-math-dialogues`** cannot be read with
+  `datasets` 3.5 (`List` / `Json` feature types); both contribute nothing.
+  `Vikhrmodels/russian_math` is gated.
+- **`ai-bond/ru-alpaca-math`** answers are bare numbers below the 20-character
+  floor: 191 rows out of 9,231.
+- **The trainer does not mask the prompt yet.**  `sft_index.npy` carries the
+  boundary; the loss is still computed on the whole rendered example.
+- **Translation throughput limits the Russian code slice.**  MarianMT runs at
+  ~2.5 questions/s on the 1660 Ti, so a full night of translation is ~60–70k
+  questions; that is the practical ceiling without a bigger GPU.
 
 ## 5. Reproducing
 
 ```bash
 python scripts/gen_arithmetic_sft.py --per-lang 700000 --out E:/kron_sft/raw
 python scripts/fetch_sft_sources.py --raw E:/kron_sft/raw      # per-source timeout
+python scripts/translate_code_questions.py --per-source 9000   # RU code questions
+python scripts/verify_translated_pairs.py                     # must print PASS
 python scripts/build_sft.py mix --raw E:/kron_sft/raw --target-tokens 500000000
 python scripts/build_sft.py report --raw E:/kron_sft/raw
 ```
@@ -104,4 +188,5 @@ python scripts/build_sft.py report --raw E:/kron_sft/raw
 `fetch` is resumable (`<source>.done.json` marks a finished shard), `mix` is
 deterministic given the raw shards, and the per-source timeouts exist because a
 Hub CDN read can stall for minutes without erroring (MetaMathQA did, then
-succeeded on retry).
+succeeded on retry).  `translate` is resumable through its cache;
+`--rebuild-only` rewrites the shard from the cache without a GPU.

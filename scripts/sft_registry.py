@@ -296,6 +296,43 @@ def map_hotpot(row: Row) -> Optional[dict]:
     return pair(row.get("question"), row.get("answer"))
 
 
+def map_code_reasoning(row: Row) -> Optional[dict]:
+    """Competitive-programming statement, then reasoning with the solution.
+
+    The source wraps its reasoning in `` thinking…</think>``.  Our chat template
+    has no such marker, so the tags are stripped and the reasoning is kept as
+    ordinary text -- otherwise the model learns to *emit* a literal `` thinking``,
+    which is exactly the kind of artefact that ruins a 10M model's output.
+    """
+    answer = clean(row.get("output")) or clean(row.get("solution"))
+    answer = answer.replace(" thinking", "").replace("</think>", "")
+    return pair(row.get("input"), answer)
+
+
+def map_magicoder(row: Row) -> Optional[dict]:
+    return pair(row.get("problem"), row.get("solution"))
+
+
+def map_self_oss(row: Row) -> Optional[dict]:
+    return pair(row.get("instruction"), row.get("response"))
+
+
+def map_codealpaca(row: Row) -> Optional[dict]:
+    return pair(row.get("prompt"), row.get("completion"))
+
+
+def map_code_instruct(row: Row) -> Optional[dict]:
+    """NVIDIA OpenCodeInstruct: instruction plus a fenced Python solution."""
+    output = clean(row.get("output"))
+    if output and not output.lstrip().startswith("```"):
+        output = "```python\n" + output + "\n```"
+    return pair(row.get("input"), output)
+
+
+def map_magicoder_evol(row: Row) -> Optional[dict]:
+    return pair(row.get("instruction"), row.get("response"))
+
+
 # --------------------------------------------------------------------------
 # registry
 # --------------------------------------------------------------------------
@@ -396,6 +433,31 @@ QA_SITES_RU = [
 ]
 
 CODE = [
+    Source("opencodereasoning", "nvidia/OpenCodeReasoning", map_code_reasoning,
+           "CC-BY-4.0", "en", "code", "code_problem", config="split_0",
+           split="split_0",
+           note="competitive programming: statement + reasoning + solution"),
+    Source("opencodeinstruct", "nvidia/OpenCodeInstruct", map_code_instruct,
+           "CC-BY-4.0", "en", "code", "code_problem", config="train",
+           cap_share=0.40,
+           note="1.4M instruction+solution rows with unit tests; best fit "
+                "for a 512-token context after the length filter"),
+    Source("magicoder_evol", "ise-uiuc/Magicoder-Evol-Instruct-110K",
+           map_magicoder_evol, "Apache-2.0", "en", "code", "code_problem",
+           cap_share=0.35),
+    Source("magicoder", "ise-uiuc/Magicoder-OSS-Instruct-75K", map_magicoder,
+           "Apache-2.0", "en", "code", "code_problem", cap_share=0.35),
+    Source("self_oss_instruct", "bigcode/self-oss-instruct-sc2-exec-filter-50k",
+           map_self_oss, "Apache-2.0", "en", "code", "code_problem",
+           cap_share=0.30),
+    Source("codealpaca", "HuggingFaceH4/CodeAlpaca_20K", map_codealpaca,
+           "Apache-2.0", "en", "code", "code_problem"),
+    Source("python_code_18k", "iamtarun/python_code_instructions_18k_alpaca",
+           map_alpaca, "Apache-2.0", "en", "code", "code_problem"),
+    Source("code_ru_translated", "synthetic:translate", lambda row: row,
+           "Apache-2.0", "ru", "code", "code_problem", local=True,
+           note="English code tasks with the question machine-translated to RU; "
+                "the code stays English, as it does in the wild"),
     Source("russian_code_qa", "Den4ikAI/russian_code_qa", map_russian_code_qa,
            "unknown", "ru", "code", "code_snippet"),
 ]
@@ -430,14 +492,17 @@ SOURCES: List[Source] = (MATH_EN + MATH_RU + QA_EN + QA_RU
                          + ARITH + IDENTITY)
 
 # Domain shares of the SFT corpus by bytes.  Mathematics is the point of this
-# stage, so it takes the largest slice; forum Q/A is capped because the answers
-# are short and conversational.
+# stage, but code is what carries the mathematics: a model that has learned to
+# follow a competitive-programming statement and write a loop reasons more
+# reliably than one trained on word problems alone, and code keeps the structure
+# of the answer visible.  Code is therefore 20 % rather than the 6 % the first
+# build had, taken from the discussion of 2026-10-28.
 DOMAIN_SHARE = {
-    "math": 0.45,
-    "qa": 0.30,
-    "qa_sites": 0.15,
-    "code": 0.06,
-    "general": 0.035,
+    "math": 0.42,
+    "code": 0.20,
+    "qa": 0.22,
+    "qa_sites": 0.125,
+    "general": 0.03,
     "identity": 0.005,
 }
 

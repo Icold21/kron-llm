@@ -61,6 +61,7 @@ ASSISTANT = "<|assistant|>"
 MIN_Q, MAX_Q = 12, 4000
 MIN_A, MAX_A = 20, 8000
 MIN_A_FORUM = 120
+MAX_TOKENS = 512       # Q10 context; longer examples are dropped, not cut
 LOOP_RATIO = 0.30
 _CYRILLIC = re.compile(r"[а-яА-ЯёЁ]")
 _LATIN = re.compile(r"[a-zA-Z]")
@@ -358,6 +359,11 @@ def fill_cell(cell: Cell, sources: List[Source], raw: Path) -> Iterator[dict]:
         path = raw_path(raw, src.name)
         if not path.exists():
             continue
+        # A shard without a ``.done.json`` marker is still being written (the
+        # translator appends to it as it goes); reading it mid-write raises
+        # "Compressed file ended before the end-of-stream marker".
+        if not done_path(raw, src.name).exists():
+            continue
         cap = int(src.byte_cap or (src.cap_share * cell.budget if src.cap_share
                                    else share))
         taken = 0
@@ -376,13 +382,19 @@ def fill_cell(cell: Cell, sources: List[Source], raw: Path) -> Iterator[dict]:
             yield record
 
 
-def write_parts(raw: Path, out: Path, target_bytes: int) -> Dict[str, dict]:
+def write_parts(raw: Path, out: Path, target_bytes: int,
+                tok=None) -> Dict[str, dict]:
     """Fill every cell and write one rendered-text part per cell.
 
     A cell with no licensed source (English code, Russian general) would leave
     its budget unused, so its bytes are moved into the same-language math cell
     and the move is recorded.  Mathematics is where the user asked the emphasis
     to be, and arithmetic generation can always absorb the extra.
+
+    The length filter (512 tokens) is applied **before** the byte accounting:
+    a cell whose source is mostly long chain-of-thought would otherwise fill its
+    budget with text that the trainer cannot use, and the reported mix would
+    describe bytes that never reach the model.
     """
     parts_dir = out / "parts"
     parts_dir.mkdir(parents=True, exist_ok=True)
@@ -420,13 +432,23 @@ def write_parts(raw: Path, out: Path, target_bytes: int) -> Dict[str, dict]:
                                     if v == name}}
         started = time.time()
         sink = parts_dir / f"{name}.jsonl.gz"
+        dropped = 0
         with gzip.open(sink, "wt", encoding="utf-8", compresslevel=3) as fh:
             for record in fill_cell(cell, group_sources(domain, lang), raw):
                 full, _ = render(record["messages"])
+                if tok is not None and len(tok.encode(full)) + 1 > MAX_TOKENS:
+                    # Too long for the 512-token context: it cannot be learned
+                    # as one unit, so it does not count towards the budget.
+                    dropped += 1
+                    cell.bytes -= record_bytes(record)
+                    cell.records -= 1
+                    cell.per_source[record["source"]] = \
+                        cell.per_source.get(record["source"], 1) - 1
+                    continue
                 fh.write(json.dumps({"text": full}, ensure_ascii=False) + "\n")
         stats[name].update(bytes=cell.bytes, records=cell.records,
                            per_source=cell.per_source,
-                           shortfall=cell.shortfall)
+                           shortfall=cell.shortfall, dropped_long=dropped)
         print(f"  [part] {name}: {cell.records:,} records, "
               f"{cell.bytes / 1e6:.1f} MB of {cell.budget / 1e6:.1f} MB "
               f"({time.time() - started:.0f}s)", flush=True)
@@ -511,15 +533,23 @@ def write_part_tokens(part: Path, dest: Path, tok,
     n0 = len(index)
     written = 0
     nbytes = 0
+    dropped = 0
     batch: List[str] = []
 
     def flush(fh) -> None:
-        nonlocal written, nbytes
+        nonlocal written, nbytes, dropped
         if not batch:
             return
         nbytes += sum(len(t.encode("utf-8")) for t in batch)
         for seq in tok.encode_batch(batch):
             n = len(seq)
+            # The model reads 512-token windows (Q10 seq_len).  An example longer
+            # than that cannot be learned as one unit: the window would cut the
+            # answer in half.  Dropping it is honest; padding the context is not
+            # an option without retraining the position encoding.
+            if n + 1 > MAX_TOKENS:
+                dropped += 1
+                continue
             cut = -1
             if assistant_id is not None:
                 for i in range(n - 1, -1, -1):
@@ -542,7 +572,7 @@ def write_part_tokens(part: Path, dest: Path, tok,
                 if len(batch) >= 2000:
                     flush(fh)
         flush(fh)
-    return written, len(index) - n0, nbytes
+    return written, len(index) - n0, nbytes, dropped
 
 
 def interleave(sizes, chunk: int = 4096):
@@ -576,14 +606,14 @@ def tokenize_parts(out: Path, tok, val_every: int = 50) -> dict:
         name = path.name.split(".jsonl.gz")[0]
         dest = parts_dir / f"{name}.u16"
         t0 = time.time()
-        tokens, examples, nbytes = write_part_tokens(path, dest, tok, index,
-                                                      total)
+        tokens, examples, nbytes, dropped = write_part_tokens(
+            path, dest, tok, index, total)
         if tokens == 0:
             print(f"  [tok] {name}: empty, skipped", flush=True)
             dest.unlink(missing_ok=True)
             continue
         offsets.append({"name": name, "tokens": tokens, "examples": examples,
-                        "start": total, "bytes": nbytes})
+                        "start": total, "bytes": nbytes, "dropped_long": dropped})
         total += tokens
         print(f"  [tok] {name}: {examples:,} examples, {tokens:,} tokens "
               f"({time.time() - t0:.0f}s)", flush=True)
@@ -773,7 +803,7 @@ def main() -> None:
         from kronllm.tokenizer import BPETokenizer
         tok = BPETokenizer(ROOT / "data/bilingual/tokenizer.json", 8192,
                            3.694, EOT)
-        stats = write_parts(Path(args.raw), out, args.target_bytes)
+        stats = write_parts(Path(args.raw), out, args.target_bytes, tok)
         (out / "parts_stats.json").write_text(json.dumps(stats, indent=1),
                                               encoding="utf-8")
         tokenize_parts(out, tok)
