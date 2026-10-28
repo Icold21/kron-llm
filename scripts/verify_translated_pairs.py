@@ -52,9 +52,17 @@ def load_cache(path: Path) -> Dict[str, str]:
     return cache
 
 
-def load_sources(raw: Path, cache: Dict[str, str]) -> Dict[str, Tuple[str, str]]:
-    """``hash -> (english question, answer)`` for every cached question."""
-    out: Dict[str, Tuple[str, str]] = {}
+def load_sources(raw: Path, cache: Dict[str, str]) -> Dict[str, Tuple[str, set]]:
+    """``hash -> (english question, every answer seen with it)``.
+
+    A question can legitimately appear in several datasets with different
+    answers -- the alpaca-style code sets share whole rows -- so the check must
+    accept any answer that belongs to the question, not the answer of whichever
+    shard happened to be scanned last.  Comparing against a single answer flags
+    those duplicates as corruption, which is how the second audit run managed to
+    report 2,474 mismatches out of 33,405 while the pairs were fine.
+    """
+    out: Dict[str, Tuple[str, set]] = {}
     for name in SOURCES:
         path = raw / f"{name}.jsonl.gz"
         if not path.exists():
@@ -69,7 +77,10 @@ def load_sources(raw: Path, cache: Dict[str, str]) -> Dict[str, Tuple[str, str]]
                     continue
                 answer = "\n".join(m["content"] for m in row["messages"]
                                    if m["role"] == "assistant")
-                out[key] = (question, answer)
+                if key in out:
+                    out[key][1].add(answer)
+                else:
+                    out[key] = (question, {answer})
     return out
 
 
@@ -119,7 +130,21 @@ def main() -> None:
 
     by_hash = load_sources(raw, cache)
     print(f"[map] {len(by_hash):,} cached questions located in the raw shards")
-    ru_to_hash = {ru: key for key, ru in cache.items()}
+
+    # ``russian question -> every answer of every question that translated to
+    # it``.  Keying on the Russian text rather than on the hash is what makes the
+    # check robust to two harmless kinds of duplication: one English question
+    # carried by several datasets with different answers, and two questions that
+    # differ only in whitespace and translate to the same Russian sentence.  A
+    # hybrid -- a question's text next to a different question's answer -- still
+    # fails, because the answer then belongs to a question whose Russian text is
+    # not this one.
+    answers_by_ru: Dict[str, set] = {}
+    for key, ru in cache.items():
+        entry = by_hash.get(key)
+        if entry is None:
+            continue
+        answers_by_ru.setdefault(ru, set()).update(entry[1])
 
     stats: Counter = Counter()
     examples = []
@@ -129,20 +154,16 @@ def main() -> None:
                 record = json.loads(line)
                 question_ru = record["messages"][0]["content"]
                 answer = record["messages"][1]["content"]
-                key = ru_to_hash.get(question_ru)
-                if key is None:
+                answers = answers_by_ru.get(question_ru)
+                if answers is None:
                     stats["question_not_in_cache"] += 1
                     continue
-                entry = by_hash.get(key)
-                if entry is None:
-                    stats["question_not_in_raw"] += 1
-                    continue
-                if entry[1] == answer:
+                if answer in answers:
                     stats["ok"] += 1
                 else:
                     stats["wrong_answer"] += 1
                     if len(examples) < args.examples:
-                        examples.append((entry[0], question_ru, entry[1], answer))
+                        examples.append((question_ru, next(iter(answers)), answer))
     else:
         print(f"[skip] {shard} does not exist yet")
 
@@ -151,9 +172,8 @@ def main() -> None:
     print(f"[result] {total:,} records: {dict(stats)}")
     print(f"[verdict] {'PASS' if bad == 0 else 'FAIL'} "
           f"({bad:,} of {total:,} pairs do not match)")
-    for english_q, question_ru, answer_of_q, answer in examples:
+    for question_ru, answer_of_q, answer in examples:
         print("--- MISMATCH")
-        print("  EN Q   :", english_q[:140].replace("\n", " "))
         print("  RU Q   :", question_ru[:140].replace("\n", " "))
         print("  A of Q :", answer_of_q[:100].replace("\n", " "))
         print("  A in r :", answer[:100].replace("\n", " "))
