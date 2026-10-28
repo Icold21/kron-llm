@@ -1,6 +1,12 @@
 # Distillation from math teachers — design note
 
-Status: design only, nothing here has been trained yet.  Written 2026-10-28
+Status: **deferred on 2026-10-28** by the project owner ("пока отложим").  The
+note stays in the repository so the analysis does not have to be redone: it
+records the measured tokenizer mismatch, the cost accounting and the staged plan
+with its gates.  Nothing here is scheduled; revisit only if the model is scaled
+past ~40M parameters or if the SFT baseline leaves math clearly on the table.
+
+Nothing here has been trained yet.  The note was written 2026-10-28
 while the SFT corpus was being fetched, so that the decision to run (or not run)
 the distillation stage rests on numbers instead of on "the idea sounds good".
 
