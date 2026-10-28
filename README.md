@@ -258,7 +258,8 @@ python -m kronllm.cli train --exp Q8g --steps 13333 --run-dir runs/Q8g_long
 # evaluation, generation, analysis
 python -m kronllm.cli eval --run runs/Q8g_long
 python -m kronllm.cli generate --run runs/Q8g_long \
-    --prompt "Once upon a time" --temperature 1.0 --top-k 8 --samples 2
+    --prompt "Once upon a time" --temperature 1.0 --top-k 8 \
+    --top-p 0.9 --rep-penalty 1.1 --samples 2
 python -m kronllm.cli analyze --run runs/Q8g_long
 python -m kronllm.cli quantize --run runs/Q8g_long --bits 8
 ```
@@ -274,8 +275,16 @@ nothing else in the recipe changes.
 from kronllm.hf import KronLM
 
 model = KronLM.from_run("runs/Q8g_long")
-print(model.generate("Once upon a time", max_new_tokens=100, temperature=1.0, top_k=8))
+print(model.generate("Once upon a time", max_new_tokens=100, temperature=1.0,
+                     top_k=8, top_p=0.9, repetition_penalty=1.1))
 ```
+
+These settings are not folklore: [`docs/decoding.md`](docs/decoding.md) measures
+them against a 31-configuration grid with external judges (GPT-2 for English,
+ruGPT3-small for Russian) and states which differences are real and which are
+seed noise.  The short version: `top_k=8` is what holds the output together at
+26 % of a training epoch, `top_p=0.9` tightens only the confident steps, and
+repetition penalty 1.2 costs English.
 
 ### Dashboard
 
@@ -587,6 +596,7 @@ scripts/            data prep (TinyStories, BPE, WikiText, SFT,
                     dashboard
 tests/              102 tests, CPU-only
 docs/               architecture.md, results.md (full tables),
+                    decoding.md (measured sampling recipe),
                     reproducing.md (one command per claim),
                     data_plan.md (bilingual corpus), roadmap.md
 artifacts/          q8g_int8.pt (shipped), q2_int8.pt (previous),

@@ -22,8 +22,12 @@ Through the CLI:
 
 ```bash
 python -m kronllm.cli generate --run artifacts --checkpoint q8g_int8.pt \
-    --prompt "Once upon a time" --temperature 1.0 --top-k 8
+    --prompt "Once upon a time" --temperature 1.0 --top-k 8 \
+    --top-p 0.9 --rep-penalty 1.1
 ```
+
+`top_p=0.9` and `rep-penalty=1.1` are the measured settings described in
+[`docs/decoding.md`](../docs/decoding.md); both are optional and default to off.
 
 Through the Hugging Face wrapper:
 

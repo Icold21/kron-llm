@@ -20,7 +20,10 @@ def decode(ids: Sequence[int]) -> str:
 @torch.no_grad()
 def generate_texts(model: KronTransformer, prompts: Iterable[str],
                    max_new_tokens: int = 200, temperature: float = 1.0,
-                   top_k: Optional[int] = 8, n_samples: int = 1,
+                   top_k: Optional[int] = 8,
+                   top_p: Optional[float] = None,
+                   repetition_penalty: Optional[float] = None,
+                   n_samples: int = 1,
                    seed: Optional[int] = None,
                    device: torch.device | str | None = None,
                    stop_at_eot: bool = True,
@@ -38,6 +41,8 @@ def generate_texts(model: KronTransformer, prompts: Iterable[str],
         idx = torch.tensor([ids], dtype=torch.long, device=device)
         out = model.generate(idx, max_new_tokens=max_new_tokens,
                              temperature=temperature, top_k=top_k,
+                             top_p=top_p,
+                             repetition_penalty=repetition_penalty,
                              eot_id=tok.eot_id, stop_at_eot=stop_at_eot)
         texts.append(tok.decode(out[0].tolist()))
     return texts

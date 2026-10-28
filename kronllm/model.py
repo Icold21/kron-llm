@@ -1049,6 +1049,9 @@ class KronTransformer(nn.Module):
     @torch.no_grad()
     def generate(self, idx: torch.Tensor, max_new_tokens: int = 200,
                  temperature: float = 1.0, top_k: Optional[int] = 8,
+                 top_p: Optional[float] = None,
+                 repetition_penalty: Optional[float] = None,
+                 rep_window: int = 64,
                  eot_id: Optional[int] = None,
                  stop_at_eot: bool = False,
                  use_cache: bool = True) -> torch.Tensor:
@@ -1057,17 +1060,37 @@ class KronTransformer(nn.Module):
         The cache holds at most ``seq_len`` tokens; once the context is full,
         generation falls back to a full forward on the last ``seq_len`` tokens
         (the behaviour of the uncached path).
+
+        The recipe measured in ``docs/decoding.md`` is ``temperature=1.0,
+        top_k=8, top_p=0.9, repetition_penalty=1.1``; ``top_p`` and
+        ``repetition_penalty`` default to off so that older callers keep their
+        behaviour.  ``top_p`` is applied after ``top_k``: it can only tighten
+        the cap, never widen it.
         """
         was_training = self.training
         eot_id = int(self.eot_id if eot_id is None else eot_id)
         self.eval()
 
         def sample(logits: torch.Tensor) -> torch.Tensor:
-            logits = logits / max(temperature, 1e-5)
+            logits = logits.float() / max(temperature, 1e-5)
+            if repetition_penalty and repetition_penalty != 1.0:
+                recent = torch.unique(idx[0, -rep_window:])
+                target = logits[0, recent]
+                logits[0, recent] = torch.where(
+                    target > 0, target / repetition_penalty,
+                    target * repetition_penalty)
             if top_k is not None and top_k > 0:
                 k = min(top_k, logits.size(-1))
                 thresh = torch.topk(logits, k, dim=-1).values[:, -1:]
                 logits = logits.masked_fill(logits < thresh, float("-inf"))
+            if top_p is not None and 0.0 < top_p < 1.0:
+                ordered, order = torch.sort(logits, dim=-1, descending=True)
+                probs = torch.softmax(ordered, dim=-1)
+                cut = torch.cumsum(probs, dim=-1) > top_p
+                cut[..., 1:] = cut[..., :-1].clone()
+                cut[..., 0] = False
+                ordered = ordered.masked_fill(cut, float("-inf"))
+                logits = torch.empty_like(logits).scatter(-1, order, ordered)
             probs = torch.softmax(logits, dim=-1)
             return torch.multinomial(probs, num_samples=1)
 

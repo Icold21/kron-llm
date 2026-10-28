@@ -94,6 +94,7 @@ def cmd_generate(args: argparse.Namespace) -> None:
     texts = generate_texts(
         model, [args.prompt], max_new_tokens=args.max_new,
         temperature=args.temperature, top_k=args.top_k,
+        top_p=args.top_p, repetition_penalty=args.rep_penalty,
         n_samples=args.samples, seed=args.seed, device=device,
         tokenizer=load_tokenizer(cfg))
     for text in texts:
@@ -237,6 +238,11 @@ def build_parser() -> argparse.ArgumentParser:
     ge.add_argument("--max-new", type=int, default=200)
     ge.add_argument("--temperature", type=float, default=1.0)
     ge.add_argument("--top-k", type=int, default=8)
+    ge.add_argument("--top-p", type=float, default=None,
+                    help="nucleus threshold, applied after --top-k; "
+                         "docs/decoding.md measures 0.9 for the shipped recipe")
+    ge.add_argument("--rep-penalty", type=float, default=None,
+                    help="CTRL-style repetition penalty; 1.1 is the measured value")
     ge.add_argument("--samples", type=int, default=1)
     ge.add_argument("--seed", type=int, default=None)
     ge.add_argument("--device", default=None)

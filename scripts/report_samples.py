@@ -36,7 +36,7 @@ MAX_NEW = 48
 
 @torch.no_grad()
 def stream(model, tok, prompt, device, max_new_tokens=MAX_NEW, temperature=1.0,
-           top_k=8, repetition_penalty=1.1, rep_window=64):
+           top_k=8, top_p=0.9, repetition_penalty=1.1, rep_window=64):
     ids = tok.encode(prompt)
     idx = torch.tensor([ids], dtype=torch.long, device=device)
     past, shown = None, ""
@@ -59,6 +59,14 @@ def stream(model, tok, prompt, device, max_new_tokens=MAX_NEW, temperature=1.0,
             k = min(top_k, logits.size(-1))
             thresh = torch.topk(logits, k, dim=-1).values[:, -1:]
             logits = logits.masked_fill(logits < thresh, float("-inf"))
+        if top_p:
+            ordered, order = torch.sort(logits, dim=-1, descending=True)
+            probs = torch.softmax(ordered, dim=-1)
+            cut = torch.cumsum(probs, dim=-1) > top_p
+            cut[..., 1:] = cut[..., :-1].clone()
+            cut[..., 0] = False
+            ordered = ordered.masked_fill(cut, float("-inf"))
+            logits = torch.empty_like(logits).scatter(-1, order, ordered)
         nxt = torch.multinomial(torch.softmax(logits, dim=-1), 1)
         idx = torch.cat([idx, nxt], dim=1)
         if int(nxt[0, 0]) == tok.eot_id:
@@ -77,6 +85,7 @@ def main() -> None:
     ap.add_argument("--out", default="data/report_samples.md")
     ap.add_argument("--temperature", type=float, default=1.0)
     ap.add_argument("--top-k", type=int, default=8)
+    ap.add_argument("--top-p", type=float, default=0.9)
     ap.add_argument("--rep-penalty", type=float, default=1.1)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
@@ -99,7 +108,7 @@ def main() -> None:
     lines = [
         "## Генерация",
         "",
-        f"Шаг {state.get('step')}, T={args.temperature}, top_k={args.top_k}, "
+        f"Шаг {state.get('step')}, T={args.temperature}, top_k={args.top_k}, top_p={args.top_p}, "
         f"repetition penalty {args.rep_penalty}, {MAX_NEW} токенов. Промпты одни "
         "и те же от отчёта к отчёту, чтобы серии можно было сравнивать.",
         "",
@@ -107,7 +116,7 @@ def main() -> None:
     t0 = time.time()
     for label, prompt in PROMPTS:
         text = "".join(stream(model, tok, prompt, device,
-                              temperature=args.temperature, top_k=args.top_k,
+                              temperature=args.temperature, top_k=args.top_k, top_p=args.top_p,
                               repetition_penalty=args.rep_penalty))
         sample = text.strip().replace("\n", " ⏎ ")
         lines += [f"**{label}** — `{prompt.replace(chr(10), '⏎ ')}`", "",

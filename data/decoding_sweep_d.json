@@ -1,0 +1,137 @@
+[
+ {
+  "temperature": 1.0,
+  "top_k": 8,
+  "top_p": 0.9,
+  "rep": 1.1,
+  "judge_en": 1.5254688699578556,
+  "judge_ru": 0.90184908511503,
+  "self_bpb": 0.934936665630908,
+  "loops": 0.7142857142857143,
+  "distinct3": 0.7604932962173464,
+  "code_ok": 0.5,
+  "arith_ok": 0.0,
+  "identity_ok": 0.0,
+  "seconds": 79.48880362510681,
+  "samples": {
+   "en_prose": [
+    " went to the stairs.\n\nOn the same time he was now a few years later, and he was not to be a faster\n\nand a gaze. In his first place he was in the middle, but he had been in the\n",
+    " was opened, the next morning.\n\nThe next day, after the night, when she had been opened to the door, he\n\nwas closed, and went away from the background of the street and a few minutes,\n\nand then came"
+   ],
+   "en_science": [
+    " 120 kg.\n\nReferences\n\nGeographical in the United States\nGeography of the South Mountain",
+    " 72,640. According to the Salamann-Wangsch theorem and the Dirac-Elliotti equation of the Hamiltonian (1098) and the Hamiltonian (1070).\n"
+   ],
+   "ru_prose": [
+    " был уволен, но уже в 1940 году был выставлен на Востоке.\n\nПосле 2021 года вновь получил своё название, а также в составе Добровольческой Государственной Депар",
+    " в том числе, что, как и в конце концов, он начал «вотмировать» в свою «собственную и сдержанную работу.\nВ течение первых 1680 года на 2000 году он переме"
+   ],
+   "ru_history": [
+    " была образована Майкл Гаррисон, затем основана в 1957 году в Виленском институте математики (в том числе в Вилимской школе, а также в Ленинградском университете).\n\nВ 1",
+    " в Северной Германии было создано 137389 человек (в 1963 г. 5039 человек), но не было 1248 человек. Вскоре после смерти 1964 года 3"
+   ],
+   "code": [
+    " a.group(b)\n\n# Take a subgroup of a group, but this is a group that contains a group of groups. The group of groups in the group is\n    # the groups in which it is the group of groups.\n ",
+    " a.get(b, c)\n    if b:\n        a = b.get(a)\n    assert a[0] + b[1]\n    assert a[1] + b[2]\n\n    def test_package_failure_s"
+   ],
+   "arith": [
+    " 11000 # 41000\n# # 43100 - 4020 = 21010 # 68100\n# # 63000 + 190",
+    " 620 + 620 .\nwe show that for the @xmath40-bound and for the 25-bits , we show the two different types of @xmath38-bit pairs in fig .\n[ fig : b"
+   ],
+   "identity": [
+    " a small family of such that its own, or, if it's not.\n\nThis is a simple example of the following:\n\n• If we don't know what the product is, you have to say, the product of the product and the product of the products",
+    " highly efficient and efficient.\nThe STRP is designed to operate a large system of STRPs. This is only a few years of development in the US and the STRP is designed to operate a large system of STR"
+   ]
+  }
+ },
+ {
+  "temperature": 1.0,
+  "top_k": 20,
+  "top_p": 0.9,
+  "rep": 1.1,
+  "judge_en": 1.694763307566018,
+  "judge_ru": 1.1700159354784807,
+  "self_bpb": 1.197797187595364,
+  "loops": 0.7142857142857143,
+  "distinct3": 0.8631896346526994,
+  "code_ok": 0.0,
+  "arith_ok": 0.0,
+  "identity_ok": 0.0,
+  "seconds": 72.8300850391388,
+  "samples": {
+   "en_prose": [
+    " went to the stairs.\n\nOn the same time he was now out of her face and again at that house. He was still\n\nthe morning of the game. In his first place the house came, and in the game had been\n\nb",
+    " took her back, the pennant of the Muslim,\n\nthen she opened a lot that made her hand with a knock, and went through it:\n\nThey stretched from this wounds of the night. She"
+   ],
+   "en_science": [
+    " 120 degrees and is now unhalfly\n\nof the Law of the West.\n\nBut, in order to see why it has come, I could have a little time when\n\nI went from the windows, but my m",
+    " 72,610. According to the Silver Girls of The America's Days, they had been a very niche story.\n\nDays and a half-hour cars\n\nA"
+   ],
+   "ru_prose": [
+    " переподнялся на лоску. К концу 1945 года он уехал к Лоску, затем работал в качестве внесённого, чтобы отменить её под его карта.\n\nВ конце 1960",
+    " в том числе, что, напротив, он стал бы в том, чтобы защищать от нее и сел.\n\nНиколимо, как бы завладельцы принимали за собой:\nСовременный брат\nЛ"
+   ],
+   "ru_history": [
+    " переименован в ГДР. К концу 1970 года он был вынуждён был отправить его на форуму в ГДР.\n\nС началом ГДР 30-х годов, когда Доб",
+    " в городе был переименован в Тихом.\n\nНазвание\nИмеется в честь его названия «Аль-Тади» (1975) — «Картуя».\nПолный мир (1"
+   ],
+   "code": [
+    " a.id\n  def __init__(self, a, b):\n    return a.__init__(a)",
+    " a.get(b, c)\n    for i, y in range(5):\n        print(b'10.15:39-16241700506853:0.0,\n                          (x,"
+   ],
+   "arith": [
+    " 11000 # 9 = 40 %.015\nDTC_BASE_POINTEDIAPLOWNET_USGINAR_TYPE, 10",
+    " 6 .\nwe use in fig .\n[ [ fig : vi ] ( fig .\n[ fig : vi](c ) ) with respect to the elliptic and antisymmetric part .\nin addition , the elli"
+   ],
+   "identity": [
+    " a tensor product of sets and elements, for each pair of elements that satisfy each pair of elements in the input set.\n\nIn other words, we will write the expression in the first order: $A(x) = 1$ and $A(y)",
+    " highly efficient and mathematical. For example, if the inputs are stable, that can be used to compute an array. This is only a general matrix that can be used to solve the problem of simple functions of a tensor structure.\n\nThe second example is the"
+   ]
+  }
+ },
+ {
+  "temperature": 1.0,
+  "top_k": 8,
+  "top_p": 0.95,
+  "rep": 1.1,
+  "judge_en": 1.6516018920522082,
+  "judge_ru": 0.8782907330380573,
+  "self_bpb": 1.029438289403833,
+  "loops": 0.8571428571428571,
+  "distinct3": 0.8000489104434866,
+  "code_ok": 0.0,
+  "arith_ok": 0.0,
+  "identity_ok": 0.0,
+  "seconds": 73.40688276290894,
+  "samples": {
+   "en_prose": [
+    " went to the stairs.\n\nOn the same time he was now a few years later, and he said.\n\n“I’ll come back with me. I’ll have a little time. I’ll do so,” he added, “and\n",
+    " was opened, the next morning.\n\nThe next day, after the night, when she had been opened to the door, he\n\nwas closed, and went away from the background of the street and a few minutes,\n\nand then came"
+   ],
+   "en_science": [
+    " 120 kg.\n\nReferences\n\nGeographical in the United States\nGeography of the South Mountain",
+    " 72,640. According to the Salamann-Wangsch theorem and the Dirac-Elliße-Schödinger theorem, the Richardson theorem and the Sunworth-"
+   ],
+   "ru_prose": [
+    " был уволён, но уже в 1940 году был атакован и уволён.\n\nПосле смерти Джона Майяра, который, по словам майяра, принимал участие в следующем заговоре:\n",
+    " в том числе, что, как и в конце концов, он начал «вотмировать» в свою «собственную и сдержанную работу.\nИсточник:\n\nМне кажется, что, когда я пошел"
+   ],
+   "ru_history": [
+    " была образована Майкл Гаррисон, затем основана в 1957 году в Виленском институте математики (в том же научной школе, где ищутся профессора в ряде учебных заведений) и",
+    " в Северной Германии было создано 137389 человек (в 1963 г. 5039 человек), однако в 1964 году в Париже 1964 г. была организована"
+   ],
+   "code": [
+    " a.group(b)\n\n# Take a subgroup of a group, but this is a group that contains a group of groups. The group of members can also be used for the groups.\n    def setUp(self, group):\n       ",
+    " a.get(b, c)\n    for i, b in range(5):\n        print(b'{0\\n{1}*i\\n{2}}')\n\n    return a\n\n\ndef test_dict(tests='TestStep"
+   ],
+   "arith": [
+    " 11000 # 91110\n# # 43110 - 402022211111168121630633\n\n### 5110",
+    " 620 + 620 .\nwe show a large scale factor @xmath77 in @xcite that the first order fermi function is @xmath78 and it is not easier to do so to prove a large scale factor .\nthis means"
+   ],
+   "identity": [
+    " a small family of such that its own, so that they are more than one family, but that is why we are not to say, but that the most important thing has come in.\n\nWe have to say, the first term is the only way of thinking that",
+    " highly efficient and efficient. For example, if the inputs is a large range of inputs that can only be used for the inputs, they may have different values in the outputs.\n\nThe outputs of a small range of inputs are often used for the"
+   ]
+  }
+ }
+]
