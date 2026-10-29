@@ -46,6 +46,7 @@ class ByteDataset(Dataset):
         self._rank = 0
         self._world = 1
         self._seed: Optional[int] = None
+        self._skip = 0
 
     def __len__(self) -> int:
         return max(1, (len(self.data) - 1) // self.seq_len)
@@ -58,19 +59,29 @@ class ByteDataset(Dataset):
         return x, y
 
     def set_shard(self, rank: int, world_size: int = 1,
-                  seed: Optional[int] = None) -> None:
+                  seed: Optional[int] = None, skip: int = 0,
+                  epoch: int = 0) -> None:
         """Restrict epoch sampling to one rank's slice of a shared permutation.
 
         All ranks must be given the same ``seed``: they then generate the same
         permutation and take strides ``rank::world_size``, so the slices are
         disjoint *and* together cover every block exactly once per epoch.
+
+        ``skip``/``epoch`` continue a run that was stopped and resumed mid-epoch
+        (Kaggle sessions are capped at 500 minutes).  The permutation is a pure
+        function of ``(seed, epoch)``, so a resumed session that starts at
+        position 0 re-reads exactly the windows the previous session already
+        trained on: with 11-35k steps per session against a 137k-step epoch, the
+        corpus would never advance past the first session's footprint.  Callers
+        pass ``skip = (step % steps_per_epoch) * batch * accum``.
         """
         self._rank = int(rank)
         self._world = max(1, int(world_size))
         self._seed = None if seed is None else int(seed)
         self._perm = None
         self._pos = 0
-        self._epoch = 0
+        self._epoch = int(epoch)
+        self._skip = max(0, int(skip))
 
     def _new_epoch(self, generator: Optional[torch.Generator]) -> None:
         n_starts = len(self.data) - self.seq_len - 1
@@ -86,6 +97,11 @@ class ByteDataset(Dataset):
         self._perm = perm[self._rank::self._world]
         self._pos = 0
         self._epoch += 1
+        if self._skip:
+            # Resume inside this epoch instead of replaying its first steps.
+            # Applied once: the next epoch starts at position 0 on its own.
+            self._pos = min(self._skip, max(0, len(self._perm) - 1))
+            self._skip = 0
 
     def get_batch(self, batch_size: int, device: torch.device | str = "cpu",
                   generator: Optional[torch.Generator] = None

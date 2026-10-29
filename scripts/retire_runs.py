@@ -133,7 +133,7 @@ during the run; keeping all fourteen afterwards does not.
 
 Kept: `kron-corpus-2b` (the training bins), `kron-q10-ckpt` (the live resume
 point, one version per session), `kron-q10a-anneal-bin` (the decay pass),
-`kron-llm-code-v15` (current code) and `kron-llm-code-v12`, which stays only
+`kron-llm-code-v16` (current code) and `kron-llm-code-v12`, which stays only
 until the session that has it mounted finishes — deleting a dataset a running
 kernel has open is not worth the risk for 208 kB.
 """

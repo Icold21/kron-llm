@@ -53,6 +53,9 @@ from sft_registry import (DOMAIN_SHARE, LANG_SHARE, SOURCES,  # noqa: E402
 
 SYSTEM = "You are KronLLM, a compact bilingual model."
 EOT = 8191          # document separator (``vocab_size - 1``)
+# Fixed so the corpus is reproducible byte for byte; changed only when a
+# different physical order is deliberately wanted.
+SHUFFLE_SEED = 20261029
 ASSISTANT = "<|assistant|>"
 
 # Filtering thresholds, in characters.  The minimum answer length is what
@@ -438,6 +441,16 @@ def write_parts(raw: Path, out: Path, target_bytes: int,
              for key, budget in budgets.items() if budget > 0}
 
     stats: Dict[str, dict] = {}
+    # Cross-source deduplication.  Each shard is deduplicated against itself at
+    # fetch time, but not against its neighbours, and the code sources overlap
+    # heavily: of the first 40,000 rows of ``evol_codealpaca``, 39,977 are exact
+    # copies of rows already present in ``opencodeinstruct`` / ``magicoder`` /
+    # ``codefeedback`` (measured 2026-10-29, scripts/dup_probe.py).  Without this
+    # set a quarter of the code cell would be the same questions again, and SFT
+    # only sees 65.5M of the corpus's tokens, so a duplicate is a slot taken
+    # from a record that would have taught something new.
+    seen: set = set()
+
     for (domain, lang), cell in sorted(cells.items()):
         name = f"{domain}_{lang}"
         stats[name] = {"domain": domain, "lang": lang, "records": 0,
@@ -447,11 +460,16 @@ def write_parts(raw: Path, out: Path, target_bytes: int,
         started = time.time()
         sink = parts_dir / f"{name}.jsonl.gz"
 
-        def keep(record: dict) -> bool:
-            if tok is None:
-                return True
-            full, _ = render(record["messages"])
-            return len(tok.encode(full)) + 1 <= MAX_TOKENS
+        def keep(record: dict, _seen=seen) -> bool:
+            key = fingerprint(record["messages"])
+            if key in _seen:
+                return False
+            if tok is not None:
+                full, _ = render(record["messages"])
+                if len(tok.encode(full)) + 1 > MAX_TOKENS:
+                    return False
+            _seen.add(key)
+            return True
 
         with gzip.open(sink, "wt", encoding="utf-8", compresslevel=3) as fh:
             for record in fill_cell(cell, group_sources(domain, lang), raw,
@@ -460,7 +478,8 @@ def write_parts(raw: Path, out: Path, target_bytes: int,
                 fh.write(json.dumps({"text": full}, ensure_ascii=False) + "\n")
         stats[name].update(bytes=cell.bytes, records=cell.records,
                            per_source=cell.per_source,
-                           shortfall=cell.shortfall, dropped_long=cell.dropped)
+                           shortfall=cell.shortfall,
+                           dropped_filter=cell.dropped)
         print(f"  [part] {name}: {cell.records:,} records, "
               f"{cell.bytes / 1e6:.1f} MB of {cell.budget / 1e6:.1f} MB "
               f"({time.time() - started:.0f}s)", flush=True)
@@ -637,43 +656,48 @@ def tokenize_parts(out: Path, tok, val_every: int = 50) -> dict:
                                 for row in index if lo <= row[0] < hi]
     maps = {o["name"]: np.memmap(parts_dir / f"{o['name']}.u16",
                                  dtype=np.uint16, mode="r") for o in offsets}
+    # Global example order.  The parts are written cell by cell, so without a
+    # shuffle the file is a sequence of blocks -- all of maths, then all of the
+    # code, then 2.9M instruction pairs with the dialogue in one contiguous
+    # stretch.  A sampler that walks the file would then feed the model a
+    # thousand steps of maths and a thousand of chat, and the batch composition
+    # would depend on the position in the file.  The index is random-access, so
+    # the physical order is free: examples are emitted in a deterministic
+    # shuffled order and the index records where each one landed.  ``--seed``
+    # keeps the order reproducible.
+    rows_all = []
+    names_all: List[str] = []
+    for info in offsets:
+        rows = np.asarray(bounds[info["name"]], dtype=np.int64)
+        if rows.size:
+            shifted = rows.copy()
+            shifted[:, 0] -= info["start"]
+            rows_all.append(shifted)
+            names_all.extend([info["name"]] * len(rows))
+    allrows = (np.concatenate(rows_all, axis=0) if rows_all
+               else np.zeros((0, 3), dtype=np.int64))
+    order = np.random.default_rng(SHUFFLE_SEED).permutation(len(allrows))
+    print(f"  [shuffle] {len(allrows):,} examples, seed {SHUFFLE_SEED}",
+          flush=True)
+
     train, val = out / "train.bpe.bin", out / "val.bpe.bin"
     n_train = n_val = 0
-    block = 0
     packed = []      # (start, prompt, total, file) with positions in the final files
     with train.open("wb") as ftr, val.open("wb") as fva:
-        for info in offsets:
-            rows, base = bounds[info["name"]], info["start"]
-            i = 0
-            while i < len(rows):
-                # Group whole examples into ~4096-token blocks so an example is
-                # never split across the train/val boundary.
-                j, acc = i, 0
-                while j < len(rows) and acc < 4096:
-                    acc += rows[j][2]
-                    j += 1
-                lo = rows[i][0] - base
-                hi = rows[j - 1][0] + rows[j - 1][2] - base
-                chunk = maps[info["name"]][lo:hi]
-                to_val = block % val_every == val_every - 1
-                if to_val:
-                    fva.write(chunk.tobytes())
-                else:
-                    ftr.write(chunk.tobytes())
-                # The index must describe the *written* file, not the unsplit
-                # concatenation: held-out examples are removed from train, so
-                # every later offset shifts by however much went to val.
-                dst = n_val if to_val else n_train
-                file_id = 1 if to_val else 0
-                for row in rows[i:j]:
-                    packed.append((dst + row[0] - rows[i][0], row[1], row[2],
-                                   file_id))
-                if to_val:
-                    n_val += len(chunk)
-                else:
-                    n_train += len(chunk)
-                i = j
-                block += 1
+        for k, j in enumerate(order):
+            name = names_all[int(j)]
+            lo = int(allrows[j, 0])
+            prompt = int(allrows[j, 1])
+            total = int(allrows[j, 2])
+            chunk = maps[name][lo:lo + total].tobytes()
+            if k % val_every == val_every - 1:
+                fva.write(chunk)
+                packed.append((n_val, prompt, total, 1))
+                n_val += total
+            else:
+                ftr.write(chunk)
+                packed.append((n_train, prompt, total, 0))
+                n_train += total
 
     idx = np.asarray(packed, dtype=np.int64)
     np.save(out / "sft_index.npy", idx)
@@ -683,7 +707,7 @@ def tokenize_parts(out: Path, tok, val_every: int = 50) -> dict:
             "train_tokens": n_train, "val_tokens": n_val,
             "total_tokens": n_train + n_val, "bytes": total_bytes,
             "bytes_per_token": total_bytes / max(1, n_train + n_val),
-            "layout": "sequential parts, examples never split across files",
+            "layout": "examples globally shuffled; index is random-access",
             "index_columns": ["start", "prompt_tokens", "total_tokens", "file"]}
     (out / "meta.json").write_text(json.dumps(meta, indent=1),
                                    encoding="utf-8")
@@ -819,7 +843,8 @@ def cmd_report(args: argparse.Namespace) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("command", choices=["plan", "fetch", "mix", "report", "all"])
+    ap.add_argument("command",
+                    choices=["plan", "fetch", "mix", "tokenize", "report", "all"])
     ap.add_argument("--raw", default="E:/kron_sft/raw")
     ap.add_argument("--out-dir", default=str(ROOT / "data/sft"))
     ap.add_argument("--target-tokens", type=int, default=500_000_000)
@@ -846,15 +871,16 @@ def main() -> None:
         return
     if args.command in ("fetch", "all"):
         cmd_fetch(args)
-    if args.command in ("mix", "all"):
+    if args.command in ("mix", "tokenize", "all"):
         out = Path(args.out_dir)
         out.mkdir(parents=True, exist_ok=True)
         from kronllm.tokenizer import BPETokenizer
         tok = BPETokenizer(ROOT / "data/bilingual/tokenizer.json", 8192,
                            3.694, EOT)
-        stats = write_parts(Path(args.raw), out, args.target_bytes, tok)
-        (out / "parts_stats.json").write_text(json.dumps(stats, indent=1),
-                                              encoding="utf-8")
+        if args.command != "tokenize":
+            stats = write_parts(Path(args.raw), out, args.target_bytes, tok)
+            (out / "parts_stats.json").write_text(json.dumps(stats, indent=1),
+                                                  encoding="utf-8")
         tokenize_parts(out, tok)
     if args.command in ("report", "all"):
         cmd_report(args)

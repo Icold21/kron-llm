@@ -46,7 +46,10 @@ MODEL = "Helsinki-NLP/opus-mt-en-ru"
 
 # Short algorithmic instructions translate best.  Long competitive-programming
 # statements are still fine, but they are slower to generate and noisier.
-SOURCES = ["magicoder", "self_oss_instruct", "codealpaca", "python_code_18k",
+# Order matters: ``--per-source`` caps how many candidates each shard
+# contributes, so the sources with the most usable short questions come first.
+SOURCES = ["magicoder", "magicoder_evol", "self_oss_instruct", "evol_codealpaca",
+           "codefeedback", "codealpaca", "python_code_18k", "opencodeinstruct",
            "opencodereasoning"]
 
 SEGMENT = re.compile(r"(```.*?```|`[^`\n]+`|https?://\S+|\$[^$]+\$)", re.S)
@@ -237,6 +240,13 @@ def main() -> None:
     todo = collect(raw, SOURCES, args.per_source, cache, args.max_chars)
     if args.limit:
         todo = todo[:args.limit]
+    # Sort by length *after* the limit, so ``--limit`` still picks a
+    # source-balanced slice, but each batch is then made of similarly sized
+    # questions.  Marian pads every sequence in a batch to the longest one, so
+    # an unsorted batch of 96 mixes 20-token questions with 400-token
+    # statements and pays for the long one 96 times; sorting took the rate from
+    # 1.6 to about 5 questions per second on the 1660 Ti.
+    todo.sort(key=lambda item: len(item[1]))
     print(f"[translate] {len(todo):,} questions", flush=True)
 
     written = 0

@@ -200,6 +200,92 @@ def map_q_a(row: Row) -> Optional[dict]:
     return pair(row.get("question"), row.get("answer"))
 
 
+def map_ultrachat(row: Row) -> Optional[dict]:
+    """UltraChat: keep the whole thread, so the corpus gets real multi-turn data.
+
+    ``openhermes`` and ``openorca`` are instruction-shaped: one question, one
+    answer.  Every SFT example we have is single-turn, which is the wrong shape
+    for a model that will be used in a chat, so this source exists to add
+    threads of two or more turns.
+    """
+    messages: List[dict] = []
+    for turn in row.get("messages") or []:
+        role = str(turn.get("role") or "")
+        content = clean(turn.get("content"))
+        if not content or role not in ("user", "assistant"):
+            continue
+        messages.append({"role": role, "content": content})
+    if len(messages) < 2 or messages[-1]["role"] != "assistant":
+        return None
+    if messages[0]["role"] != "user":
+        messages = messages[1:]
+    if len(messages) < 2:
+        return None
+    return {"messages": messages}
+
+
+_OASST: Dict[str, dict] = {}
+
+
+def _oasst_index() -> Dict[str, dict]:
+    """Load oasst1 once and index it by message id.
+
+    oasst1 is a flat tree: every row is one message and ``parent_id`` points at
+    the message it answers.  Pairing therefore needs the whole table in memory
+    (84k short rows); the alternative -- assuming parents stream before their
+    children -- silently drops about half the pairs.
+    """
+    if not _OASST:
+        from datasets import load_dataset
+        for item in load_dataset("OpenAssistant/oasst1", split="train"):
+            _OASST[str(item["message_id"])] = item
+    return _OASST
+
+
+def _map_oasst(row: Row, lang: str) -> Optional[dict]:
+    if str(row.get("role")) != "assistant":
+        return None
+    if str(row.get("lang")) != lang:
+        return None
+    if str(row.get("deleted")).lower() == "true":
+        return None
+    parent = _oasst_index().get(str(row.get("parent_id") or ""))
+    if not parent or parent.get("role") != "prompter":
+        return None
+    if str(parent.get("deleted")).lower() == "true":
+        return None
+    return pair(parent.get("text"), row.get("text"))
+
+
+def map_oasst_en(row: Row) -> Optional[dict]:
+    return _map_oasst(row, "en")
+
+
+def map_oasst_ru(row: Row) -> Optional[dict]:
+    return _map_oasst(row, "ru")
+
+
+def map_counsel(row: Row) -> Optional[dict]:
+    """counsel-chat: a forum question and a therapist's answer.
+
+    The uploader declares no licence, so the registry records ``unknown``.  It
+    is a 2.8k-row slice kept for the *register* of the answers -- how a
+    counsellor opens, reflects and reassures -- not for its volume.
+    """
+    return pair(row.get("questionText"), row.get("answerText"))
+
+
+def map_psychology(row: Row) -> Optional[dict]:
+    """samhog/psychology-10k: a patient concern and a psychologist's reply.
+
+    Kept for the record but *not* registered: the shard is CP1251-encoded JSON,
+    which ``datasets`` refuses to parse (``ArrowInvalid``), and the uploader
+    declares no licence.  Reading it would need a bespoke loader for a 9.8k-row
+    slice that duplicates what oasst1 and counsel-chat already give.
+    """
+    return pair(row.get("input"), row.get("output"))
+
+
 def map_openhermes(row: Row) -> Optional[dict]:
     """Multi-turn conversations; keep the whole thread, not just the last turn."""
     messages: List[dict] = []
@@ -333,6 +419,20 @@ def map_magicoder_evol(row: Row) -> Optional[dict]:
     return pair(row.get("instruction"), row.get("response"))
 
 
+def map_codefeedback(row: Row) -> Optional[dict]:
+    return pair(row.get("query"), row.get("answer"))
+
+
+def map_evol_codealpaca(row: Row) -> Optional[dict]:
+    """theblackcat102/evol-codealpaca-v1: ``instruction``/``output``.
+
+    It is *not* the Magicoder schema (``response``): wiring the Magicoder mapper
+    to it silently kept 0 of 111,183 rows, and the shard's ``.done.json`` said
+    "0 records, 0.0 MB" only after the whole download had run.
+    """
+    return pair(row.get("instruction"), row.get("output"))
+
+
 # --------------------------------------------------------------------------
 # registry
 # --------------------------------------------------------------------------
@@ -403,6 +503,21 @@ QA_EN = [
            "CC-BY-SA-4.0", "en", "qa", "qa_extractive", config="squad_v2"),
     Source("hotpotqa", "hotpotqa/hotpot_qa", map_hotpot,
            "CC-BY-SA-4.0", "en", "qa", "qa_extractive", config="distractor"),
+    Source("ultrachat", "HuggingFaceH4/ultrachat_200k", map_ultrachat,
+           "MIT", "en", "qa", "qa_chat", config="default", split="train_sft",
+           note="207k multi-turn threads; the only source of real dialogue "
+                "shape in the corpus"),
+    Source("oasst_en", "OpenAssistant/oasst1", map_oasst_en,
+           "Apache-2.0", "en", "qa", "qa_chat",
+           note="human-written assistant threads, paired with the prompter "
+                "message each answer replies to"),
+    Source("counsel", "nbertagnolli/counsel-chat", map_counsel,
+           "unknown", "en", "qa", "qa_counsel",
+           note="2.8k forum questions answered by licensed therapists"),
+    Source("slimorca", "Open-Orca/SlimOrca", map_openhermes,
+           "MIT", "en", "qa", "qa_chat",
+           note="518k GPT-4 conversations; supplies the assistant register "
+                "the model is expected to copy at inference time"),
 ]
 
 QA_RU = [
@@ -410,7 +525,16 @@ QA_RU = [
            "Apache-2.0", "ru", "qa", "qa_open",
            note="41.6k scored dialogues; the builder keeps opus_score >= 6"),
     Source("russian_instructions2", "Den4ikAI/russian_instructions_2",
-           map_q_a, "unknown", "ru", "qa", "qa_open"),
+           map_q_a, "MIT", "ru", "qa", "qa_open", cap_share=0.70,
+           note="237k rows; the Hub card declares MIT (the registry said "
+                "'unknown' until 2026-10-29, which was a reading error, not a "
+                "missing licence).  It carries cap_share 0.70 because it is "
+                "the only Russian source with real volume: without the larger "
+                "share the RU cell runs ~50 MB short and the 60/40 contract "
+                "drifts towards English"),
+    Source("oasst_ru", "OpenAssistant/oasst1", map_oasst_ru,
+           "Apache-2.0", "ru", "qa", "qa_chat",
+           note="the first genuine Russian dialogue in the corpus"),
 ]
 
 QA_SITES_EN = [
@@ -454,6 +578,20 @@ CODE = [
            "Apache-2.0", "en", "code", "code_problem"),
     Source("python_code_18k", "iamtarun/python_code_instructions_18k_alpaca",
            map_alpaca, "Apache-2.0", "en", "code", "code_problem"),
+    # Two more instruction sets, added when the code cell turned out to be
+    # limited by the fetch cap rather than by the catalogue: ``fill_cell``
+    # allows each source 1.8x an even share, so a cell only fills when enough
+    # sources can reach their share.  Three of the seven original sources are
+    # exhausted (magicoder 75k rows, codealpaca 20k, python 18k), and
+    # OpenCodeReasoning is unusable without chunking (12 of 11,618 rows fit in
+    # 512 tokens), so the cell needed breadth, not more rows from the same
+    # datasets.
+    Source("evol_codealpaca", "theblackcat102/evol-codealpaca-v1",
+           map_evol_codealpaca, "Apache-2.0", "en", "code", "code_problem",
+           note="110k Evol-Instruct code tasks; instruction/output"),
+    Source("codefeedback", "m-a-p/CodeFeedback-Filtered-Instruction",
+           map_codefeedback, "Apache-2.0", "en", "code", "code_problem",
+           note="156k filtered CodeFeedback instructions; query/answer"),
     Source("code_ru_translated", "synthetic:translate", lambda row: row,
            "Apache-2.0", "ru", "code", "code_problem", local=True,
            note="English code tasks with the question machine-translated to RU; "
@@ -498,10 +636,10 @@ SOURCES: List[Source] = (MATH_EN + MATH_RU + QA_EN + QA_RU
 # of the answer visible.  Code is therefore 20 % rather than the 6 % the first
 # build had, taken from the discussion of 2026-10-28.
 DOMAIN_SHARE = {
-    "math": 0.42,
+    "math": 0.385,
     "code": 0.20,
-    "qa": 0.22,
-    "qa_sites": 0.125,
+    "qa": 0.28,
+    "qa_sites": 0.10,
     "general": 0.03,
     "identity": 0.005,
 }

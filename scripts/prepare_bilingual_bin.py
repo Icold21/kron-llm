@@ -75,6 +75,35 @@ def stratified_sample(docs: list[dict], per_language_bytes: int) -> list[str]:
     return out
 
 
+def interleave_domains(train: list[dict], domains: set[str]) -> list[dict]:
+    """Spread one domain's documents evenly through the rest of the stream.
+
+    ``split_docs`` groups the corpus by (language, domain), so a mix file is a
+    contiguous block: the chat slice of the decay pass would arrive as ~600
+    consecutive steps at the very start and then never be seen again, and the
+    last 40,000 steps -- the ones at the lowest learning rate, where what the
+    model keeps is decided -- would contain no dialogue at all.  Spreading the
+    block evenly keeps the format in every window instead.  Deterministic, so
+    the same mix still produces the same bin.
+    """
+    if not domains:
+        return train
+    special = [d for d in train if d["domain"] in domains]
+    rest = [d for d in train if d["domain"] not in domains]
+    if not special or not rest:
+        return train
+    step = len(rest) / len(special)
+    out: list[dict] = []
+    idx = 0
+    for i, doc in enumerate(rest):
+        while idx < len(special) and i >= idx * step:
+            out.append(special[idx])
+            idx += 1
+        out.append(doc)
+    out.extend(special[idx:])
+    return out
+
+
 def split_docs(docs: list[dict], val_fraction: float) -> tuple[list, list]:
     """Deterministic train/val split, stratified by language and domain."""
     train: list[dict] = []
@@ -108,6 +137,10 @@ def main() -> None:
                     help="copy val.bpe.bin and tokenizer_meta.json from this "
                          "directory instead of building a new split, so the "
                          "decay pass is measured on the epoch-1 held-out set")
+    ap.add_argument("--interleave", default="",
+                    help="comma-separated domains to spread evenly through the "
+                         "stream instead of leaving them as one contiguous "
+                         "block (the decay pass uses this for chat)")
     args = ap.parse_args()
 
     t0 = time.time()
@@ -116,6 +149,8 @@ def main() -> None:
     if not docs:
         raise SystemExit("no mixed shards found; run `build` first")
     train, val = split_docs(docs, args.val_fraction)
+    train = interleave_domains(
+        train, {d for d in (args.interleave or "").split(",") if d})
     print(f"[split] {len(train):,} train docs, {len(val):,} val docs")
 
     tok_path = Path(args.out_dir) / "tokenizer.json"

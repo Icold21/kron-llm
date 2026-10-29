@@ -4,7 +4,7 @@ $root = "C:\Users\Icold\Desktop\kron_llm"
 Set-Location $root
 $log = Join-Path $root "data\q10_chain.log"
 $kernel = "icold21/kron-q10-10m-bilingual-pretraining"
-$code = "icold21/kron-llm-code-v15"
+$code = "icold21/kron-llm-code-v16"
 $mail = "$env:USERPROFILE\.config\opencode\skills\email-control\scripts\mail.py"
 # The mailer refuses to send without a session label (the client update made it
 # mandatory).  The chain has no OpenCode session of its own, so it labels its
@@ -148,6 +148,11 @@ $stalled = 0
     #    can hand back the previous version's files, and stale weights are worse
     #    than no weights.
     $out = Join-Path $root "data\kaggle_out"
+    # Keep the previous session's best weights before the directory is cleared:
+    # the soup averages *neighbouring* checkpoints (best of session n-1 plus
+    # best of session n), so the older one has to survive this download.
+    python scripts\archive_ckpt.py --ckpt (Join-Path $out "q10\best.pt") |
+        Out-File -Encoding utf8 -Append $log
     Remove-Item (Join-Path $out "q10") -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $out | Out-Null
     Run 1800 @('-m','kaggle','kernels','output',$kernel,'-p',$out) |

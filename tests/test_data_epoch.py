@@ -79,3 +79,33 @@ def test_batches_are_contiguous_windows(ds):
     assert x.shape == (4, ds.seq_len) and y.shape == (4, ds.seq_len)
     # y is x shifted by one token
     assert torch.equal(x[:, 1:], y[:, :-1])
+
+
+def test_resume_continues_the_epoch_instead_of_replaying_it(ds):
+    """A 500-minute session must not start over from the first window.
+
+    Sessions cover 11-35k of a 137k-step epoch, so a resumed run that restarts
+    at position 0 sees exactly the windows the previous session already trained
+    on and the corpus never advances.  ``skip`` is the step offset (times batch
+    times accumulation) and must land on that window of the same permutation.
+    """
+    ds.set_shard(0, 1, seed=11)
+    ds._new_epoch(None)
+    perm = ds._perm.tolist()
+
+    ds.set_shard(0, 1, seed=11, skip=25 * 8)
+    x, _ = ds.get_batch(8)
+    assert ds._pos == 25 * 8 + 8
+    assert perm[25 * 8:25 * 8 + 8] == ds._perm[25 * 8:25 * 8 + 8].tolist()
+
+    # Without the skip the same call returns the very first windows instead.
+    ds.set_shard(0, 1, seed=11)
+    ds.get_batch(8)
+    assert ds._pos == 8
+
+    # The skip is consumed once: the next epoch starts at position 0.
+    ds.set_shard(0, 1, seed=11, skip=5)
+    ds._new_epoch(None)
+    ds._new_epoch(None)
+    assert ds._pos == 0
+

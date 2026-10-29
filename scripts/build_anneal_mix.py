@@ -47,23 +47,34 @@ BYTES_PER_TOKEN = {"en": 2.917, "ru": 4.964}
 # points a 10M model can still improve on.  A minority of general text stays in
 # on purpose: a purely encyclopedic diet narrows a small model, and narrowing
 # shows up as worse bpb on the epoch-1 held-out set.
+#
+# ``chat`` is new (2026-10-29).  The four chat tokens are cold at the end of the
+# epoch -- a scan of the 2.25B-token bin finds 0/5/6/0 occurrences of
+# <|system|>/<|user|>/<|assistant|>/<|eot|> -- so the pass carries dialogue
+# rendered with the SFT template.  The owner set the slice at 5 % (2026-10-29):
+# below that the format is learned but thin, and the decay pass is the last
+# place where the model can meet real dialogue before SFT freezes it.  The
+# weight comes out of literature and encyclopedics, not out of math or code --
+# those keep the enlarged shares they were given in the same round.
 SHARES = {
-    "en/literature": 0.112,
-    "ru/literature": 0.195,
-    "en/encyclopedic": 0.130,
-    "ru/encyclopedic": 0.090,
-    "en/science": 0.120,
-    "ru/science": 0.040,
-    "en/math": 0.095,
-    "ru/math": 0.050,
-    "en/ml": 0.060,
-    "ru/ml": 0.004,
-    "en/code": 0.052,
-    "ru/cs": 0.007,
-    "en/logic": 0.015,
-    "ru/logic": 0.005,
-    "en/identity": 0.012,
-    "ru/identity": 0.013,
+    "en/literature": 0.0800,
+    "ru/literature": 0.1599,
+    "en/encyclopedic": 0.1030,
+    "ru/encyclopedic": 0.0856,
+    "en/science": 0.0985,
+    "ru/science": 0.0378,
+    "en/math": 0.1250,
+    "ru/math": 0.0608,
+    "en/ml": 0.0620,
+    "ru/ml": 0.0040,
+    "en/code": 0.0750,
+    "ru/cs": 0.0100,
+    "en/logic": 0.0180,
+    "ru/logic": 0.0060,
+    "en/identity": 0.0117,
+    "ru/identity": 0.0127,
+    "en/chat": 0.0300,
+    "ru/chat": 0.0200,
 }
 
 # If a pool cannot fill its share, the shortfall goes here, in this order, so

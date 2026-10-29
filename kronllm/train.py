@@ -401,8 +401,10 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     data_dir = Path(dc.get("data_dir", "data"))
     train_ds = open_dataset(cfg, "train")
     # Epoch sampler: every rank takes a disjoint stride of the same shuffled
-    # permutation, so one epoch is one full pass over the corpus.
-    train_ds.set_shard(rank, world_size, seed=seed)
+    # permutation, so one epoch is one full pass over the corpus.  The call that
+    # positions the session inside the epoch happens after the checkpoint is
+    # read (see ``[data] session starts at ...``), because only then is
+    # ``start_step`` known.
     val_ds = open_dataset(cfg, "val")
     tok = load_tokenizer(cfg)
     bpt = tok.bytes_per_token
@@ -525,6 +527,11 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
 
     gen = torch.Generator(device="cpu").manual_seed(seed + 1000 * rank)
     start_step = 0
+    same_corpus = True
+    # A WSD decay pass has its own step counter, which starts where the pass
+    # started rather than where the epoch it resumes stopped.
+    run_steps = int(tc.get("run_steps", 0) or 0)
+    pass_origin = 0
     best_ppl = float("inf")
     bad_evals = 0
     history: List[Dict[str, Any]] = []
@@ -532,8 +539,8 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     if resume:
         ck = torch.load(resume, map_location="cpu")
         saved_key = ck.get("data_key")
-        if (saved_key and data_key and saved_key != data_key
-                and not tc.get("allow_data_change")):
+        same_corpus = not (saved_key and data_key and saved_key != data_key)
+        if not same_corpus and not tc.get("allow_data_change"):
             raise SystemExit(
                 f"[resume] checkpoint was trained on a different corpus "
                 f"(data_key {saved_key} != {data_key}); resuming would mix two "
@@ -543,19 +550,45 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
         opt.load_state_dict(ck["optimizer"])
         start_step = int(ck.get("step", 0))
         best_ppl = float(ck.get("val_ppl", float("inf")))
+        # A decay pass counts steps from its own origin, not from the epoch it
+        # resumed; the origin travels in the checkpoint so that a pass cut short
+        # at 500 minutes resumes on the same curve instead of starting a new
+        # one from the current step.  ``or start_step`` also covers checkpoints
+        # written before the field existed (and the epoch's own, which carry 0).
+        pass_origin = int(ck.get("pass_origin", 0) or start_step) if run_steps else 0
         if is_main:
             print(f"[resume] step {start_step}, best ppl {best_ppl:.3f}")
 
-    # WSD decay pass: a run that resumes the epoch-1 weights but has its own
-    # length and its own cosine.  ``run_steps`` counts from the resume point,
-    # so the pass does not have to know the absolute step it starts at.
-    run_steps = int(tc.get("run_steps", 0) or 0)
+    # Continue the epoch where the previous session stopped.  The permutation is
+    # a pure function of (seed, epoch), so starting at position 0 would re-read
+    # exactly the windows the previous session trained on -- and since a 500-min
+    # session covers 11-35k of the epoch's 137k steps, the run would never get
+    # past the first session's footprint.  A decay pass resumes the *weights*
+    # from a different corpus and owns its own counter, so its data position is
+    # relative to the pass origin -- and relative to nothing when the corpus
+    # changed, because that bin has never been read.
+    if not same_corpus:
+        data_step = 0
+    elif run_steps:
+        data_step = start_step - pass_origin
+    else:
+        data_step = start_step
+    data_step = max(0, data_step)
+    steps_per_epoch = max(1, steps_per_epoch)
+    train_ds.set_shard(rank, world_size, seed=seed,
+                       skip=(data_step % steps_per_epoch) * accum * bs,
+                       epoch=data_step // steps_per_epoch)
+    if is_main:
+        print(f"[data] session starts at {data_step % steps_per_epoch:,} of "
+              f"{steps_per_epoch:,} steps in epoch "
+              f"{data_step // steps_per_epoch}")
+
     if run_steps:
-        total_steps = start_step + run_steps
+        total_steps = pass_origin + run_steps
     sched_steps = int(tc.get("schedule_steps", 0) or 0) or (run_steps or total_steps)
-    sched_from = start_step if run_steps else 0
+    sched_from = pass_origin if run_steps else 0
     if is_main and run_steps:
-        print(f"[wsd] decay pass: {run_steps} steps from {start_step}, "
+        print(f"[wsd] decay pass: {run_steps} steps from {pass_origin}, "
               f"lr {float(tc['lr']):.1e} -> {float(tc['min_lr']):.1e}")
 
     if device.type == "cuda":
@@ -604,6 +637,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
             # restarting.
             torch.save({"model": raw_model.state_dict(), "cfg": dict(cfg),
                         "optimizer": opt.state_dict(), "step": step,
+                        "pass_origin": pass_origin,
                         "val_ppl": best_ppl, "data_key": data_key},
                        run_dir / "last.pt")
 

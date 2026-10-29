@@ -69,7 +69,7 @@ the next one resumes from `last.pt`.
         "enable_gpu": True,
         "enable_internet": True,
         "dataset_sources": [
-            "icold21/kron-llm-code-v15",
+            "icold21/kron-llm-code-v16",
             "icold21/kron-q10a-anneal-bin",
             "icold21/kron-q10-ckpt",
         ],
