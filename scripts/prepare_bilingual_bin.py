@@ -92,6 +92,14 @@ def interleave_domains(train: list[dict], domains: set[str]) -> list[dict]:
     rest = [d for d in train if d["domain"] not in domains]
     if not special or not rest:
         return train
+    # ``train`` is grouped by (language, domain), so the block is ``en/chat``
+    # followed by ``ru/chat``.  Spreading it in that order puts every English
+    # turn in the first half of the stream and every Russian turn in the
+    # second, and the second half is trained at the lower end of the decay --
+    # measured 2026-10-30: segment 0 of the anneal bin was 0 % Cyrillic, segment
+    # 4 was 60 %.  Sorting by sha256 mixes the languages and keeps the order
+    # reproducible.
+    special.sort(key=lambda d: d.get("sha256", ""))
     step = len(rest) / len(special)
     out: list[dict] = []
     idx = 0

@@ -13,10 +13,10 @@ filtered out, and where the gaps are.  The generated numbers live in
 | | value | why |
 |---|---|---|
 | language split | 60 % EN / 40 % RU **by bytes** | same ratio as pretraining, so SFT does not silently re-balance the model |
-| math | 42 % of bytes | the stage's purpose: structured task→solution pairs |
+| math | 38.5 % of bytes | the stage's purpose: structured task→solution pairs |
 | code | 20 % of bytes | code is what carries the mathematics: following a statement and writing a loop is closer to algebra than a word problem is, and the structure of the answer stays visible |
-| open Q/A | 22 % | instruction following, translation, definitions |
-| forum Q/A (Stack Exchange, mail.ru, ELI5, Reddit) | 12.5 % | real questions with real answers, including technical threads |
+| open Q/A | 28 % | instruction following, definitions, and — since 2026-10-30 — dialogue: the chat sources live here |
+| forum Q/A (Stack Exchange, mail.ru, ELI5, Reddit) | 10 % | real questions with real answers, including technical threads |
 | general instructions | 3 % | Dolly-style tasks that are neither math nor forum |
 | identity | 0.5 % | 100–300 examples, guarded (see `docs/roadmap.md` §6) |
 
@@ -46,34 +46,55 @@ position encoding.  How much is dropped is recorded per part in `meta.json`
 The mix is built by filling each (domain, language) cell up to its byte budget
 from whatever the sources can supply.  Where a cell cannot fill its budget, the
 other cells keep theirs and the realised mix drifts.  The full build on
-2026-10-28 produced **358,374,942 tokens** (351.2 M train / 7.2 M val),
-2,625,058 examples, and this is the drift:
+2026-10-30 produced **517,239,848 tokens** (506.9 M train / 10.4 M val),
+3,111,653 examples, and this is the drift:
 
 | | realised (bytes) | contract | note |
 |---|---:|---:|---|
-| English | 51.2 % | 60 % | every EN cell except `qa_ru` fell short |
-| Russian | 48.8 % | 40 % | RU cells were the ones with slack, so RU gained |
-| math | 53.2 % | 42 % | absorbs whatever the other domains cannot fill |
-| code | **13.0 %** | 20 % | capped by the 512-token filter, not by the catalogue |
-| open Q/A | 18.1 % | 22 % | 138 MB of EN Q/A is longer than 512 tokens |
-| forum Q/A | 14.9 % | 12.5 % | the only cell over its budget, mail.ru is short by design |
-| general | 0.7 % | 3 % | Dolly is the only licensed source; 20 MB short |
+| English | **60.5 %** | 60 % | the ratio now holds |
+| Russian | **39.5 %** | 40 % | |
+| math | 46.4 % | 38.5 % | the only large domain that fills its budget, so its share rises |
+| code | 16.9 % | 20 % | 234.3 MB; `code_en` stops at 166.3/194.9 |
+| open Q/A | 24.5 % | 28 % | chat now fills most of it (see below) |
+| forum Q/A | 11.7 % | 10 % | over budget, both cells full |
+| general | 0.4 % | 3 % | Dolly is the only licensed source; 23 MB short |
 | identity | 0.1 % | 0.5 % | 800 examples per language by design |
 
-Two independent constraints cause it, and they need different fixes:
+Three things changed on 2026-10-30 and they are the reason the numbers moved:
 
-* **Code is capped by length.**  `code_en` has 174 MB of candidate text and
-  keeps 80.4 MB; 83,948 rows are dropped for being longer than 512 tokens.
-  Raising the code share therefore needs **answer chunking** (split a long
-  solution into ≤512-token windows, keep the question with the first window and
-  a continuation marker with the rest), not more sources.
-* **The language ratio drifts because EN cells are short.**  Restoring 60/40
-  exactly means trimming Russian, and the arithmetic is unforgiving: the largest
-  corpus that satisfies it is 795.6 MB (EN 471.8 + RU 323.8), i.e. 126 MB of
-  Russian text — mostly `math_ru` and `qa_ru` — would be thrown away to fix a
-  ratio, while the model would see less data overall.  That is why the build
-  leaves the ratio at 51/49 and reports it instead of silently enforcing it; the
-  decision belongs to whoever owns the SFT run.
+* **Dialogue.**  `qa` is 28 % of the budget and the chat sources fill most of
+  it: SlimOrca 68k rows, OpenHermes 77k (multi-turn), oasst1-en 18k, counsel
+  2.1k, UltraChat 3k.  The Russian cell has the first genuine dialogue it has
+  ever had aside from Saiga: 3,069 oasst1-ru pairs.
+* **Cross-source deduplication.**  Each shard was deduplicated against itself at
+  download time but not against its neighbours, and the code sources overlap
+  heavily: 99.9 % of `evol_codealpaca` was already present in
+  `opencodeinstruct`/`magicoder`/`codefeedback` (measured with
+  `scripts/dup_probe.py`).  `write_parts` now drops exact duplicates across the
+  whole corpus, which is why `code_en` stops at 166.3 MB: 43 MB of what used to
+  fill that cell was the same records a second time.
+* **The stream is shuffled.**  Examples used to be written in cell order — all
+  of the code, then all of the maths, then 2.9 M instruction pairs with the
+  dialogue in one contiguous stretch.  They are now emitted in a deterministic
+  global order (seed 20261029) and `sft_index.npy` records where each one
+  landed, so a batch is a mix of domains regardless of how the trainer samples.
+
+Two constraints still cause the drift:
+
+* **Code is capped by length and by the per-source ceiling.**  The 512-token
+  filter keeps 176k of the code rows, and each source may contribute at most
+  1.8× its even share of the cell.  Raising the code share needs **answer
+  chunking** (split a long solution into ≤512-token windows), not more sources.
+* **The same filter costs most of UltraChat.**  Multi-turn threads are long:
+  of 86k records only 3,067 fit 512 tokens.  Splitting a thread into per-turn
+  examples is the natural fix and is the next change to this builder; it matters
+  because that is the only source of deep multi-turn dialogue in the corpus.
+
+The language ratio holds at 60.5/39.5 because `russian_instructions_2` carries
+`cap_share 0.70` in `qa_ru` (it is the only Russian source with real volume,
+and its licence turned out to be MIT), so the Russian cell fills instead of
+leaving the corpus English-heavy.
+
 
 ## 2. Sources
 

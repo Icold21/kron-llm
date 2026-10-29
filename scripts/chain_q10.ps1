@@ -214,6 +214,23 @@ $stalled = 0
                   '--out','data\report_samples.md') |
             Out-File -Encoding utf8 -Append $log
         Say "generation samples refreshed"
+
+        # 3c. SWA soup: average the two neighbouring best checkpoints and, if
+        #     that pair is not better, best+last.  Only neighbouring weights
+        #     inside the constant-LR phase are averaged -- the anneal pass is
+        #     final and is never mixed with anything.  The winner is kept as
+        #     soup.pt next to the raw weights, and both are published.
+        $prevBest = Join-Path $root "data\kaggle_out\archive"
+        $prevFile = Get-ChildItem $prevBest -Filter "best_*.pt" -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime | Select-Object -Last 1
+        $soupArgs = @('scripts\session_soup.py',
+                      '--best', (Join-Path $root "data\kaggle_out\q10\best.pt"),
+                      '--last', $ckptNow,
+                      '--save-best', (Join-Path $root "data\kaggle_out\q10\soup.pt"),
+                      '--out', 'data\session_soup.json')
+        if ($prevFile) { $soupArgs += @('--prev', $prevFile.FullName) }
+        Say "averaging neighbouring checkpoints"
+        Run 5400 $soupArgs | Out-File -Encoding utf8 -Append $log
     }
 
     # 4. report the curve and mail it
