@@ -1,10 +1,19 @@
+param(
+    # One session and stop, instead of pushing the next one.  Used by the 03:05
+    # guard: the owner wants exactly one run, then the results and the machine
+    # off -- not an unattended chain that keeps spending quota.
+    [switch]$Once,
+    # Do not mail from the chain: the caller assembles one report carrying the
+    # curve, the metrics, the samples and the last-vs-soup comparison.
+    [switch]$NoMail
+)
 $ErrorActionPreference = "Continue"
 $env:PYTHONIOENCODING = "utf-8"
 $root = "C:\Users\Icold\Desktop\kron_llm"
 Set-Location $root
 $log = Join-Path $root "data\q10_chain.log"
 $kernel = "icold21/kron-q10-10m-bilingual-pretraining"
-$code = "icold21/kron-llm-code-v16"
+$code = "icold21/kron-llm-code-v18"
 $mail = "$env:USERPROFILE\.config\opencode\skills\email-control\scripts\mail.py"
 # The mailer refuses to send without a session label (the client update made it
 # mandatory).  The chain has no OpenCode session of its own, so it labels its
@@ -248,7 +257,9 @@ $stalled = 0
         $suffix = '<hr><h3>Log tail</h3><pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;font-size:12px;overflow-x:auto">' + $encoded + '</pre>'
         Add-Content -Encoding utf8 $html $suffix
     }
-    if ($errored) { SendReport $subject $md $html } else { QueueReport $subject $html }
+    if ($NoMail) {
+        Say "chain ran with -NoMail; the caller reports"
+    } elseif ($errored) { SendReport $subject $md $html } else { QueueReport $subject $html }
 
     # 5. publish the checkpoint so the next session can attach it
     if (-not (Test-Path $ckptNow)) {
@@ -273,6 +284,13 @@ $stalled = 0
     if (Test-Path "data\q10_epoch_done.flag") {
         Say "EPOCH COMPLETE: checkpoint published, waiting for the decay pass"
         Say "NEXT: launch Q10A (decay, 29.6% of an epoch, LR 3e-4 -> 1e-6)"
+        exit 0
+    }
+
+    # 6b. -Once: one session was asked for.  The checkpoint is published and
+    #     the report is written, so stop here rather than pushing the next run.
+    if ($Once) {
+        Say "ONE SESSION MODE: checkpoint published at step $nowStep, not pushing again"
         exit 0
     }
 

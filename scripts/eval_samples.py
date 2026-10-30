@@ -119,8 +119,10 @@ def ranking(model, data, starts: list[int], seq: int, device: str,
                                    dtype=np.int64))
         losses = []
         for c in cons:
+            # x[t] predicts x[t+1]: the context feeds the first continuation
+            # token, so the targets are ctx[1:] followed by the continuation.
             x = torch.from_numpy(np.concatenate([ctx, c[:-1]]))[None].to(device)
-            y = torch.from_numpy(np.concatenate([[ctx[-1]], c]))[None].to(device)
+            y = torch.from_numpy(np.concatenate([ctx[1:], c]))[None].to(device)
             per = token_loss(model, x, y)[0, half - 1:]
             losses.append(float(per.mean()))
         order = sorted(range(len(losses)), key=lambda i: losses[i])
