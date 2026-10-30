@@ -571,22 +571,27 @@ EXPERIMENTS["E22"] = {
 # L1-L4: at a fixed compute budget, what should it buy -- depth or tokens?
 #
 # E19/E20/E22 compared arms at *matched tokens*, which is the wrong axis here:
-# the wall for this project is GPU-hours, not wall clock on an idle card.  These
-# four arms hold layer-executions x tokens constant at 12 x 8,000 steps (E8's
-# 131M tokens doubled), so the only thing that differs is how the budget is
-# spent:
+# the wall for this project is GPU-hours, not wall clock on an idle card.  All
+# four arms hold layer-executions x tokens constant at 12 x 131M (E8's budget),
+# so the only thing that differs is how that budget is spent:
 #
-#   arm  executions  steps  what the budget buys
-#   L1   12          8000   tokens, at E8's depth              (control)
-#   L2   24          4000   depth, looped over the whole stack (= E20)
-#   L3   20          4800   depth, looped over the middle band
-#   L4   20          4800   L3 + two-lane mHC
+#   arm  executions  steps  tokens  what the budget buys
+#   L1   12          8000   131M    tokens, at E8's depth            (control)
+#   L2   24          4000   65.5M   depth, looped over the whole stack (= E20)
+#   L3   20          4800   78.6M   depth, looped over the middle band
+#   L4   20          4800   78.6M   L3 + two-lane mHC
 #
 # The middle band leaves blocks 0-1 and 10-11 unshared.  The first layers turn
 # tokens into features and the last ones turn features into logits; neither is
 # iterative work, and sharing them forces one block to be both.
+#
+# Batch is 64, not E8's 128: on the 6 GB card a 20-execution arm with two
+# residual lanes at batch 128 does not fit (the 256-token attention scores alone
+# are 134 MB per execution slot).  All four arms share it, so the comparison
+# stays internal; the bpb numbers are not comparable to the historical E8=1.479
+# because the batch differs.
 _L_BASE = {**EXPERIMENTS["E8"]["overrides"],
-           "training.batch_size": 128,
+           "training.batch_size": 64,
            "training.schedule_steps": 0}
 EXPERIMENTS["L1"] = {
     "desc": "compute A/B: 12 executions x 8,000 steps (tokens, no depth)",

@@ -61,6 +61,10 @@ def cmd_train(args: argparse.Namespace) -> None:
 
     if args.steps is not None:
         cfg["training"]["max_steps"] = args.steps
+        # An experiment that pins `run_steps` (the L arms, the decay passes)
+        # would otherwise ignore --steps, which is the more specific
+        # instruction: it is what a smoke test passes.
+        cfg["training"]["run_steps"] = args.steps
     if args.epochs is not None:
         cfg["training"]["epochs"] = args.epochs
     if args.batch_size is not None:
