@@ -30,9 +30,15 @@ def load_json(path: str | Path) -> dict:
 
 
 def curve_rows(limit: int = 16) -> list[str]:
-    """Validation points, thinned so the table stays readable."""
-    path = Path("runs/q10/log.csv")
-    if not path.exists():
+    """Validation points, thinned so the table stays readable.
+
+    The chain downloads the Kaggle session output into ``data/kaggle_out/q10``;
+    a local run would live in ``runs/q10``.  Looking only in the second place
+    would have left the curve -- the centrepiece of the report -- empty.
+    """
+    candidates = [Path("data/kaggle_out/q10/log.csv"), Path("runs/q10/log.csv")]
+    path = next((p for p in candidates if p.exists()), None)
+    if path is None:
         return []
     rows = [r for r in csv.DictReader(path.open(encoding="utf-8"))
             if r.get("split") == "val" and r.get("val_bpb_mixed")]
@@ -128,10 +134,10 @@ def main() -> None:
 
     md += ["", "## Метрики на страйд-выборке held-out", ""]
     if latest:
-        def mean(d):
-            vals = [v.get("bpb") for v in (d.get("rows") or []) if v.get("bpb")]
-            return sum(vals) / len(vals) if vals else None
-        cur, base = mean(latest), mean(gpt2) if gpt2 else None
+        # eval_reference.py writes one summary row per source, not a list of
+        # blocks: {"source", "blocks", "span", "bytes", "nats", "bpb"}.
+        cur = latest.get("bpb")
+        base = gpt2.get("bpb") if gpt2 else None
         md.append("| модель | bpb (страйд, 1024 блока) |")
         md.append("|---|---:|")
         if cur is not None:
@@ -141,7 +147,9 @@ def main() -> None:
         if cur is not None and base is not None:
             md.append("")
             md.append(f"Разница: {base - cur:+.4f} bpb "
-                      f"({(base - cur) / base:+.1%} к GPT-2).")
+                      f"({(base - cur) / base:+.1%} к GPT-2) на "
+                      f"{latest.get('blocks', 0)} блоках по "
+                      f"{latest.get('span', 0)} токенов.")
     else:
         md.append("Страйд-оценка не считалась.")
 

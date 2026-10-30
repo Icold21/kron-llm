@@ -62,11 +62,11 @@ if (Test-Path $html) {
     }
     $subject = "Q10 session: step $step, curve and samples (last + soup)"
     Say "mailing: $subject"
-    1..3 | ForEach-Object {
+    1..5 | ForEach-Object {
         python $mail send --model "DeepSeek V4.1 Flash" --project "kron_llm" `
             --session "kron_chain" --subject $subject --body-file $html --html 2>&1 |
             Select-Object -Last 1 | ForEach-Object { Say ("  " + $_) }
-        Start-Sleep -Seconds 20
+        Start-Sleep -Seconds 60
     }
 } else {
     Say "no HTML report to mail"
