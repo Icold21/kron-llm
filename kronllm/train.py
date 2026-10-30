@@ -363,6 +363,70 @@ def _init_process_group(rank: int, world_size: int) -> None:
                             world_size=world_size)
 
 
+def prompt_probe(model: nn.Module, ds: ByteDataset, batch: int,
+                 device: torch.device, gen: Optional[torch.Generator],
+                 span: int = 24, window: int = 32,
+                 system_id: int = 8187) -> Dict[str, float]:
+    """Loss on the prompt tokens, against loss on text that has none.
+
+    Switching a corpus on mid-run breaks the training curve: documents now open
+    with ``<|system|>`` plus an instruction the model has never seen, so those
+    tokens are expensive until it learns the tag.  That break is not a
+    regression, and the report should not have to apologise for it -- measuring
+    it separately turns it into evidence, because this series *falls* exactly
+    when the model learns what the tag means.
+
+    The validation bin stays bare, so ``val_bpb`` remains one continuous series
+    comparable with every earlier session; this is its counterpart on the
+    training stream.
+
+    It draws one batch and puts the sampler position back, so it costs one
+    forward pass per log interval and consumes no data.  If the log interval
+    would cross an epoch boundary it does nothing, because ``get_batch`` there
+    would reshuffle the permutation and the restore would be a lie.
+    """
+    try:
+        perm = getattr(ds, "_perm", None)
+        if perm is not None and ds._pos + batch > len(perm):
+            return {}
+        pos = ds._pos
+        x, y = ds.get_batch(batch, device, gen)
+        ds._pos = pos
+        with torch.no_grad():
+            with torch.amp.autocast("cuda", dtype=torch.float16,
+                                    enabled=device.type == "cuda"):
+                out = model(x)
+        logits = out.get("logits")
+        if logits is None:            # chunked-loss path keeps no logits
+            return {}
+        per = torch.nn.functional.cross_entropy(
+            logits.transpose(1, 2).float(), y, reduction="none")
+        # A window starts at a random point inside a document, so a prompt lands
+        # in its first 32 tokens about once in fifty windows -- too rare to
+        # measure.  Scan the whole window and mask the ``span`` tokens that
+        # follow each marker, wherever they fall.
+        found = torch.zeros_like(x, dtype=torch.bool)
+        hits = 0
+        seq = x.shape[1]
+        for b in range(x.shape[0]):
+            idx = (x[b] == system_id).nonzero(as_tuple=False)
+            if idx.numel():
+                start = int(idx[0])
+                found[b, start:min(start + span, seq)] = True
+                hits += 1
+        res: Dict[str, float] = {"share_prompt": hits / max(1, x.shape[0])}
+        if hits:
+            res["nats_prompt"] = float(per[found].mean())
+        bare = ~found
+        if bare.any():
+            res["nats_bare"] = float(per[bare].mean())
+        return res
+    except Exception:                 # a diagnostic must never stop a session
+        if os.environ.get("KRON_PROBE_DEBUG"):
+            raise
+        return {}
+
+
 def train(cfg: Mapping[str, Any], run_dir: str | Path,
           resume: Optional[str] = None) -> Dict[str, Any]:
     tc = cfg["training"]
@@ -601,6 +665,18 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
         data_step = start_step - pass_origin
     else:
         data_step = start_step
+    # Where in the corpus this session starts.  ``data_step`` counts training
+    # steps since the corpus was first read, and the sampler turns it into a
+    # position in that corpus's permutation.  When the corpus is *replaced* --
+    # shards merged, the bin rebuilt -- the same number points somewhere else,
+    # because the permutation is over a different, longer stream: session 4
+    # would skip 12.7 % of the new corpus and never see it this epoch.
+    # ``data_restart_step`` says "from this step on, the stream begins at
+    # position 0 of the new corpus", and keeps saying it for every later
+    # session, so the position stays correct instead of drifting.
+    data_restart_step = int(tc.get("data_restart_step", 0) or 0)
+    if not run_steps and data_restart_step:
+        data_step = max(0, data_step - data_restart_step)
     data_step = max(0, data_step)
     steps_per_epoch = max(1, steps_per_epoch)
     train_ds.set_shard(rank, world_size, seed=seed,
@@ -675,6 +751,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
             last_log = time.time()
             train_loss = running / max(1, running_n)
             named = named_lrs(opt)
+            probe = prompt_probe(raw_model, train_ds, bs, device, gen)
             row = {
                 "step": step,
                 "split": "train",
@@ -687,6 +764,7 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                 "lr_theta": named.get("theta", float(tc["lr_theta"])),
                 "sec_per_step": dt / max(1, log_every),
             }
+            row.update(probe)
             row.update({k: v for k, v in grads.items()})
             if is_main:
                 logger.log(row)
