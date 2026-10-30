@@ -47,6 +47,11 @@ DEFAULTS: Dict[str, Any] = {
         # n_unique + (loop_end - loop_start) * (recurse - 1).
         "loop_start": 0,
         "loop_end": None,            # None -> n_unique_blocks
+        # Manifold-constrained hyper-connections inside the looped band: two
+        # residual lanes with Sinkhorn-normalised mixing, so a repeated block
+        # can behave differently on its second pass and the lane sum cannot
+        # grow across the repetition.  None keeps the plain residual.
+        "mhc": None,
         "n_heads": 8,
         "n_kv_heads": None,          # None -> MHA
         "rope_theta": 10000.0,
@@ -561,6 +566,47 @@ EXPERIMENTS["E22"] = {
     "desc": "6 unique blocks x4 (24 effective, ~111K params)",
     "overrides": {"model.n_unique_blocks": 6, "model.recurse": 4,
                   "training.batch_size": 64},
+}
+
+# L1-L4: at a fixed compute budget, what should it buy -- depth or tokens?
+#
+# E19/E20/E22 compared arms at *matched tokens*, which is the wrong axis here:
+# the wall for this project is GPU-hours, not wall clock on an idle card.  These
+# four arms hold layer-executions x tokens constant at 12 x 8,000 steps (E8's
+# 131M tokens doubled), so the only thing that differs is how the budget is
+# spent:
+#
+#   arm  executions  steps  what the budget buys
+#   L1   12          8000   tokens, at E8's depth              (control)
+#   L2   24          4000   depth, looped over the whole stack (= E20)
+#   L3   20          4800   depth, looped over the middle band
+#   L4   20          4800   L3 + two-lane mHC
+#
+# The middle band leaves blocks 0-1 and 10-11 unshared.  The first layers turn
+# tokens into features and the last ones turn features into logits; neither is
+# iterative work, and sharing them forces one block to be both.
+_L_BASE = {**EXPERIMENTS["E8"]["overrides"],
+           "training.batch_size": 128,
+           "training.schedule_steps": 0}
+EXPERIMENTS["L1"] = {
+    "desc": "compute A/B: 12 executions x 8,000 steps (tokens, no depth)",
+    "overrides": {**_L_BASE, "training.run_steps": 8000},
+}
+EXPERIMENTS["L2"] = {
+    "desc": "compute A/B: 24 executions x 4,000 steps (whole-stack loop)",
+    "overrides": {**_L_BASE, "model.n_unique_blocks": 12,
+                  "model.recurse": 2, "training.run_steps": 4000},
+}
+EXPERIMENTS["L3"] = {
+    "desc": "compute A/B: 20 executions x 4,800 steps (middle band loop)",
+    "overrides": {**_L_BASE, "model.n_unique_blocks": 12,
+                  "model.recurse": 2, "model.loop_start": 2,
+                  "model.loop_end": 10, "training.run_steps": 4800},
+}
+EXPERIMENTS["L4"] = {
+    "desc": "compute A/B: L3 + two-lane mHC",
+    "overrides": {**EXPERIMENTS["L3"]["overrides"],
+                  "model.mhc": {"streams": 2, "iterations": 20}},
 }
 
 # E23/E24: nonlinear composition at the E2 geometry.

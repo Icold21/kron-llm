@@ -246,6 +246,127 @@ def _kron_out_dims(d_out: int, n2: int) -> Tuple[int, int]:
     return d_out, 1
 
 
+class MHCRouter(nn.Module):
+    """Manifold-constrained hyper-connections between residual streams.
+
+    An ordinary block does ``x = x + branch``.  mHC keeps ``S`` parallel
+    residual lanes instead and puts three learned mappings between them and the
+    block::
+
+        branch = pre · lanes                 # which lane the block reads
+        lanes  = mix @ lanes + post ⊗ branch  # how the output is written back
+
+    ``mix`` is pushed onto the Birkhoff polytope -- doubly stochastic, rows and
+    columns summing to one -- by Sinkhorn normalisation in log space.  That is
+    the "manifold constraint": a doubly stochastic map preserves the sum of the
+    lanes, so twenty-four repeated applications of one weight-tied block cannot
+    multiply the residual norm, which is the failure mode a plain loop has.
+
+    At initialisation the router *is* an ordinary residual connection: ``pre``
+    starts at 0.25/0.75, ``post`` at 1.0 and ``mix`` near the identity.  mHC
+    therefore starts as the baseline it is meant to beat and only learns to use
+    the extra lane if that helps; it never has to unlearn a random mixing.
+
+    SenseNova-Loop-9B uses ``S=2``, 20 Sinkhorn iterations, and keeps the
+    routing parameters in FP32 while the backbone runs in BF16 -- the Sinkhorn
+    recursion loses too much to bf16.
+    """
+
+    def __init__(self, d: int, streams: int = 2, iterations: int = 20,
+                 fixed_identity: bool = False, pre_scale: float = 1.0) -> None:
+        super().__init__()
+        if streams < 2:
+            raise ValueError("mHC needs at least two residual streams")
+        self.d = int(d)
+        self.streams = int(streams)
+        self.iterations = int(iterations)
+        self.fixed_identity = bool(fixed_identity)
+        self.pre_scale = float(pre_scale)
+        s = self.streams
+        out = 2 * s + (0 if self.fixed_identity else s * s)
+        self.weight = nn.Parameter(
+            torch.zeros(out, s * self.d, dtype=torch.float32),
+            requires_grad=not self.fixed_identity)
+        self.bias = nn.Parameter(torch.zeros(out, dtype=torch.float32))
+        with torch.no_grad():
+            starts = {2: (0.25, 0.75), 4: (0.0625, 0.1875, 0.25, 0.5)}[s]
+            self.bias[:s].copy_(torch.logit(torch.tensor(starts)))
+            if not self.fixed_identity:
+                diag = math.log((1 - (s - 1) / 16) * 16)
+                self.bias[2 * s:].copy_(
+                    (torch.eye(s) * diag).flatten())
+
+    def _apply(self, fn, recurse: bool = True):
+        """Keep the routing parameters FP32 when the model is cast to half.
+
+        The Sinkhorn recursion runs 20 normalisations; in bf16 the row and
+        column sums drift enough that ``mix`` stops being doubly stochastic,
+        which is the one property the constraint exists to guarantee.
+        """
+        def convert(tensor):
+            result = fn(tensor)
+            if tensor.is_floating_point() and result.dtype != torch.float32:
+                return tensor.to(device=result.device, dtype=torch.float32)
+            return result
+        return super()._apply(convert, recurse=recurse)
+
+    @staticmethod
+    def sinkhorn(logits: torch.Tensor, iterations: int) -> torch.Tensor:
+        """Project square logits onto doubly stochastic matrices, in log space.
+
+        Sinkhorn converges slowly for extreme logits: at ``S=2`` twenty
+        iterations leave the row sums off by up to 2.5 %, and a 24-layer block
+        applied twice would multiply the lane norm by ``1.025**48 ≈ 3``.  The
+        final row normalisation makes every output lane an exact convex
+        combination of the input lanes, so the mixing cannot grow the residual
+        even where the Sinkhorn limit has not been reached; the column sums
+        then stay within ~2 % of one, which is the part that is approximate.
+        Boundedness is the property the loop needs; sum preservation is the
+        part that can afford to be approximate.
+        """
+        logits = logits.float()
+        for _ in range(iterations):
+            logits = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
+            logits = logits - torch.logsumexp(logits, dim=-2, keepdim=True)
+        mix = logits.exp()
+        return mix / mix.sum(-1, keepdim=True).clamp_min(1e-12)
+
+    def _route(self, lanes: torch.Tensor):
+        # Autocast off: the routing is eight numbers per position, and bf16/fp16
+        # loses enough in the twenty Sinkhorn normalisations that ``mix`` stops
+        # summing to one -- the property the constraint exists to guarantee.
+        with torch.autocast(device_type=lanes.device.type, enabled=False):
+            flat = lanes.flatten(-2).float()
+            normed = flat * torch.rsqrt(flat.square().mean(-1, keepdim=True)
+                                        + 1e-6)
+            logits = torch.nn.functional.linear(normed, self.weight, self.bias)
+            s = self.streams
+            pre = logits[..., :s].sigmoid()
+            post = 2 * logits[..., s:2 * s].sigmoid()
+            if self.fixed_identity:
+                mix = torch.eye(s, device=flat.device).expand(
+                    *flat.shape[:-1], s, s)
+            else:
+                mix = self.sinkhorn(
+                    logits[..., 2 * s:].unflatten(-1, (s, s)), self.iterations)
+        return pre, post, mix
+
+    def read(self, lanes: torch.Tensor) -> torch.Tensor:
+        """The branch input the block sees: a learned mix over the lanes."""
+        pre, _, _ = self._route(lanes)
+        branch = torch.matmul(pre.unsqueeze(-2), lanes.float()).squeeze(-2)
+        if self.pre_scale != 1.0:
+            branch = branch * self.pre_scale
+        return branch.to(lanes.dtype)
+
+    def merge(self, lanes: torch.Tensor, branch: torch.Tensor) -> torch.Tensor:
+        """Mix the lanes and write the branch output into each of them."""
+        _, post, mix = self._route(lanes)
+        mixed = torch.matmul(mix.to(lanes.dtype), lanes)
+        update = post.unsqueeze(-1) * branch.float().unsqueeze(-2)
+        return (mixed.float() + update).to(lanes.dtype)
+
+
 class KronBlock(nn.Module):
     def __init__(self, cfg: Mapping[str, Any]) -> None:
         super().__init__()
@@ -402,6 +523,21 @@ class KronBlock(nn.Module):
     def ffn_module(self) -> nn.Module:
         return self.ffn
 
+    def _make_apply(self, state, layer_idx: int, mode: str,
+                    P: Optional[Dict[str, torch.Tensor]]):
+        """Return ``(y, D_or_None)`` for one Kronecker map.
+
+        ``P`` carries a precomputed ``(d_out, d_in)`` composition (gate
+        included), so a fused layer is one GEMM instead of ``L`` matvecs.
+        """
+        def apply(mod: nn.Module, role: str, inp: torch.Tensor):
+            if not isinstance(mod, KronCompose):
+                return mod(inp), None
+            if P is not None and P.get(role) is not None:
+                return torch.matmul(inp, P[role].transpose(0, 1)), None
+            return mod(inp, state.get(role), layer_idx, mode=mode)
+        return apply
+
     # ------------------------------------------------------------------
     def forward(self, x: torch.Tensor, state: Dict[str, Optional[torch.Tensor]],
                 layer_idx: int, cos: torch.Tensor, sin: torch.Tensor,
@@ -409,6 +545,7 @@ class KronBlock(nn.Module):
                 P: Optional[Dict[str, torch.Tensor]] = None,
                 past_kv: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
                 use_cache: bool = False,
+                branch_only: bool = False,
                 ) -> Tuple[torch.Tensor, Dict[str, Optional[torch.Tensor]],
                            Dict[str, Any], Optional[Tuple[torch.Tensor,
                                                            torch.Tensor]]]:
@@ -420,20 +557,17 @@ class KronBlock(nn.Module):
         ``past_kv`` is the cached ``(k, v)`` of the previous tokens (already
         RoPE-rotated); the returned 4th value is the updated cache when
         ``use_cache`` is set, else ``None``.
+
+        ``branch_only`` stops after the attention branch and returns it as the
+        first value, for the mHC band where the residual streams live outside
+        the block (see :meth:`forward_mhc`).
         """
         B, T, _ = x.shape
         dh, nh = self.d_head, self.n_heads
         cache: Dict[str, Any] = {}
 
         h = self.norm1(x)
-
-        def apply(mod: nn.Module, role: str, inp: torch.Tensor):
-            """Return ``(y, D_or_None)``."""
-            if not isinstance(mod, KronCompose):
-                return mod(inp), None
-            if P is not None and P.get(role) is not None:
-                return torch.matmul(inp, P[role].transpose(0, 1)), None
-            return mod(inp, state.get(role), layer_idx, mode=mode)
+        apply = self._make_apply(state, layer_idx, mode, P)
 
         q, Dq = apply(self.q, "q", h)
         k, Dk = apply(self.k, "k", h)
@@ -491,8 +625,20 @@ class KronBlock(nn.Module):
         o, Do = apply(self.o, "o", out)
         if Do is not None:
             state["o"] = Do
+        if branch_only:
+            # mHC band: the attention half is returned as a branch and the
+            # caller merges it into its residual streams, so the block must not
+            # add it to ``x`` itself.
+            return o, state, cache, ((k_cache, v_cache) if use_cache else None)
         x = x + o
+        x = x + self._ffn_half(x, state, apply)
+        new_kv = (k_cache, v_cache) if use_cache else None
+        return x, state, cache, new_kv
 
+    def _ffn_half(self, x: torch.Tensor,
+                  state: Dict[str, Optional[torch.Tensor]],
+                  apply) -> torch.Tensor:
+        """The FFN branch, taken from the residual stream ``x``."""
         h2 = self.norm2(x)
         if self.ffn_mix == "glu":
             # Bilinear feature interaction: act(W_a x) * (W_b x).
@@ -518,9 +664,36 @@ class KronBlock(nn.Module):
                 state["f"] = Df
             if self.ffn_silu:
                 f = F.silu(f)
-        x = x + f
-        new_kv = (k_cache, v_cache) if use_cache else None
-        return x, state, cache, new_kv
+        return f
+
+    def forward_mhc(self, streams: torch.Tensor, router_attn, router_ffn,
+                    state: Dict[str, Optional[torch.Tensor]],
+                    layer_idx: int, cos: torch.Tensor, sin: torch.Tensor,
+                    collect: bool = False, mode: str = "auto",
+                    P: Optional[Dict[str, torch.Tensor]] = None,
+                    past_kv: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+                    use_cache: bool = False,
+                    ):
+        """One block inside an mHC band.
+
+        Reads a branch input from the residual *streams*, computes the attention
+        branch, mixes it back into the streams, then does the same for the FFN.
+        Two routers per block, exactly as in SenseNova's ``MHCDecoderLayer``:
+        the residual never enters the block, it is read and written through the
+        routing matrices, which is what lets a weight-tied block behave
+        differently on its second pass.
+        """
+        cache: Dict[str, Any] = {}
+        branch = router_attn.read(streams)
+        o, state, cache, new_kv = self.forward(
+            branch, state, layer_idx, cos, sin, collect=collect, mode=mode,
+            P=P, past_kv=past_kv, use_cache=use_cache, branch_only=True)
+        streams = router_attn.merge(streams, o)
+        branch = router_ffn.read(streams)
+        f = self._ffn_half(branch, state, self._make_apply(state, layer_idx,
+                                                          mode, P))
+        streams = router_ffn.merge(streams, f)
+        return streams, state, cache, new_kv
 
     def _attend(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor,
                 n_past: int = 0) -> torch.Tensor:
@@ -673,6 +846,31 @@ class KronTransformer(nn.Module):
         self.pass_bias = (nn.Parameter(torch.zeros(self.max_recurse, self.d))
                           if bool(mc.get("pass_embedding"))
                           and self.max_recurse > 1 else None)
+        # Manifold-constrained hyper-connections inside the looped band.  One
+        # router per physical block in the band, shared by every pass, because
+        # the lanes are what carry the difference between passes: the block and
+        # its routing are the same function each time, only the incoming state
+        # differs.  That is also what keeps the parameter cost at ~2 % of a 10M
+        # model (8.2k per router, two per layer).
+        mhc_cfg = mc.get("mhc")
+        self.mhc: Optional[nn.ModuleList] = None
+        self.mhc_streams = 0
+        if mhc_cfg:
+            if self.recurse < 2:
+                raise ValueError(
+                    "mhc needs recurse >= 2: it exists to make a repeated "
+                    "block behave differently on its second pass")
+            options = mhc_cfg if isinstance(mhc_cfg, dict) else {}
+            self.mhc_streams = int(options.get("streams", 2))
+            if self.mhc_streams < 2:
+                raise ValueError("mhc needs at least two residual streams")
+            self.mhc = nn.ModuleList([
+                MHCRouter(self.d, streams=self.mhc_streams,
+                          iterations=int(options.get("iterations", 20)),
+                          fixed_identity=bool(options.get("fixed_identity",
+                                                          False)),
+                          pre_scale=float(options.get("pre_scale", 1.0)))
+                for _ in range(self.loop_end - self.loop_start)])
         self._banks: List[KronBank] = self._build_banks() if self.use_bank else []
         # >0: compute the training loss in row chunks of this size (through
         # torch.utils.checkpoint) so that a wide vocabulary never materialises
@@ -885,7 +1083,11 @@ class KronTransformer(nn.Module):
         h_norms = [x.detach().norm().item()]
         new_kv: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = (
             [] if use_cache else None)
+        # Residual lanes for the mHC band.  ``lanes`` is None outside the band
+        # and ``x`` is None inside it, so exactly one of the two is live.
+        lanes: Optional[torch.Tensor] = None
         for i, block in enumerate(self.blocks):
+            phys = self.plan[i]
             if self.pass_bias is not None:
                 # Add the step signal where the pass changes.  The old form
                 # (`i % n_unique == 0`) assumed the loop covered the whole
@@ -894,18 +1096,41 @@ class KronTransformer(nn.Module):
                 here = self.pass_index[i]
                 before = self.pass_index[i - 1] if i else -1
                 if here != before:
-                    x = x + self.pass_bias[here]
+                    bias = self.pass_bias[here]
+                    if lanes is None:
+                        x = x + bias
+                    else:
+                        lanes = lanes + bias.view(1, 1, 1, -1)
             if D_map:
                 for role in ROLES:
                     if (i, role) in D_map:
                         state[role] = D_map[(i, role)]
             P = ({role: P_map.get((i, role)) for role in ROLES}
                  if P_map else None)
-            x, state, cache, kv = block(
-                x, state, i, cos, sin, collect=collect,
-                mode=self.force_mode or "auto", P=P,
-                past_kv=past_kv[i] if past_kv is not None else None,
-                use_cache=use_cache)
+            if self.mhc is not None and self.loop_start <= phys < self.loop_end:
+                if lanes is None:
+                    # Enter the band: one lane for everything the stack has
+                    # produced so far.
+                    lanes = x.unsqueeze(-2).expand(
+                        *x.shape[:-1], self.mhc_streams, x.shape[-1]
+                    ).contiguous()
+                    x = None
+                router = self.mhc[phys - self.loop_start]
+                lanes, state, cache, kv = block.forward_mhc(
+                    lanes, router, router, state, i, cos, sin,
+                    collect=collect, mode=self.force_mode or "auto", P=P,
+                    past_kv=past_kv[i] if past_kv is not None else None,
+                    use_cache=use_cache)
+            else:
+                if lanes is not None:
+                    # Leave the band: collapse the lanes back into one stream.
+                    x = lanes.mean(-2)
+                    lanes = None
+                x, state, cache, kv = block(
+                    x, state, i, cos, sin, collect=collect,
+                    mode=self.force_mode or "auto", P=P,
+                    past_kv=past_kv[i] if past_kv is not None else None,
+                    use_cache=use_cache)
             if new_kv is not None:
                 new_kv.append(kv)
             if collect:
@@ -915,7 +1140,10 @@ class KronTransformer(nn.Module):
                           if v is not None},
                     "s": dict(block.s_values),
                 })
-            h_norms.append(x.detach().norm().item())
+            live = x if lanes is None else lanes
+            h_norms.append(live.detach().norm().item())
+        if lanes is not None:
+            x = lanes.mean(-2)
 
         x = self.norm_f(x)
         emb = self.embed_table() if self.kron_embed is not None else None
