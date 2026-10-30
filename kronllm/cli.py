@@ -67,6 +67,8 @@ def cmd_train(args: argparse.Namespace) -> None:
         cfg["training"]["run_steps"] = args.steps
     if args.epochs is not None:
         cfg["training"]["epochs"] = args.epochs
+    if getattr(args, "minutes", None) is not None:
+        cfg["training"]["max_minutes"] = args.minutes
     if args.batch_size is not None:
         cfg["training"]["batch_size"] = args.batch_size
     if args.lr is not None:
@@ -225,6 +227,10 @@ def build_parser() -> argparse.ArgumentParser:
     tr.add_argument("--run-dir", default=None)
     tr.add_argument("--resume", default=None)
     tr.add_argument("--steps", type=int, default=None)
+    tr.add_argument("--minutes", type=float, default=None,
+                    help="stop cleanly after this many minutes and write "
+                         "last.pt; Kaggle kills a session at 500 minutes and "
+                         "Colab free at 240, both without warning")
     tr.add_argument("--epochs", type=int, default=None)
     tr.add_argument("--batch-size", type=int, default=None)
     tr.add_argument("--lr", type=float, default=None)

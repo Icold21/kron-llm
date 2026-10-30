@@ -408,13 +408,26 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     val_ds = open_dataset(cfg, "val")
     tok = load_tokenizer(cfg)
     bpt = tok.bytes_per_token
-    # Fingerprint of the token space: tokenizer file + train bin size.  A
-    # checkpoint saved against a different tokenizer cannot be resumed safely,
-    # and the failure mode is silent (ids mean different strings), so the run
-    # refuses instead of trusting the file name.
+    # Two different things were being conflated here.
+    #
+    # ``tok_key`` fingerprints the *token space*: the tokenizer file.  If it
+    # changes, ids mean different strings and a resume would silently train on
+    # nonsense -- that is the failure this guard exists for, and it must refuse
+    # even when the caller asked to allow a corpus change.
+    #
+    # ``data_key`` fingerprints the *corpus*: metadata plus bin size.  It also
+    # changes when documents are added or the bin is rebuilt with a new mix,
+    # which is a deliberate act, not an accident: ``training.allow_data_change``
+    # permits it, and a resumed epoch then simply continues on the new stream.
     data_key = ""
+    tok_key = ""
     meta_path = data_dir / str(dc.get("meta_file", "tokenizer_meta.json"))
     bin_path = data_dir / str(dc.get("train_bin", "train.bpe.bin"))
+    try:
+        tok_file = data_dir / "tokenizer.json"
+        tok_key = hashlib.sha256(tok_file.read_bytes()).hexdigest()[:16]
+    except OSError:
+        tok_key = ""
     try:
         h = hashlib.sha256(meta_path.read_bytes())
         h.update(str(bin_path.stat().st_size).encode())
@@ -539,13 +552,28 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     if resume:
         ck = torch.load(resume, map_location="cpu")
         saved_key = ck.get("data_key")
+        saved_tok = ck.get("tok_key")
+        # A changed tokenizer is never resumable: the same ids would mean
+        # different strings.  Older checkpoints predate ``tok_key`` and fall
+        # back to the corpus fingerprint alone.
+        if saved_tok and tok_key and saved_tok != tok_key:
+            raise SystemExit(
+                f"[resume] the tokenizer changed (tok_key {saved_tok} != "
+                f"{tok_key}); the token ids would mean different strings. "
+                f"Restart from scratch.")
         same_corpus = not (saved_key and data_key and saved_key != data_key)
         if not same_corpus and not tc.get("allow_data_change"):
             raise SystemExit(
                 f"[resume] checkpoint was trained on a different corpus "
-                f"(data_key {saved_key} != {data_key}); resuming would mix two "
-                f"token id spaces.  Restart, or set training.allow_data_change "
-                f"for an intentional decay pass on a curated subset.")
+                f"(data_key {saved_key} != {data_key}); resuming would train "
+                f"on a different stream than the one the run started on.  "
+                f"Set training.allow_data_change if that is intended (an added "
+                f"shard, a rebuilt mix), or restart.")
+        if not same_corpus:
+            if is_main:
+                print(f"[resume] corpus changed on purpose "
+                      f"({saved_key} -> {data_key}); continuing on the new "
+                      f"stream, tokenizer identical ({tok_key})")
         raw_model.load_state_dict(ck["model"])
         opt.load_state_dict(ck["optimizer"])
         start_step = int(ck.get("step", 0))
@@ -638,7 +666,8 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
             torch.save({"model": raw_model.state_dict(), "cfg": dict(cfg),
                         "optimizer": opt.state_dict(), "step": step,
                         "pass_origin": pass_origin,
-                        "val_ppl": best_ppl, "data_key": data_key},
+                        "val_ppl": best_ppl, "data_key": data_key,
+                        "tok_key": tok_key},
                        run_dir / "last.pt")
 
         if step % log_every == 0 or step == 1:
@@ -688,6 +717,17 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
             if is_main:
                 print(f"[budget] {max_minutes:.0f} min reached at step {step}; "
                       "stopping so the next session can resume")
+                # Write the checkpoint here, not only on the save_every grid:
+                # a session that stops on the budget would otherwise lose up to
+                # save_every steps of work, and on Colab/Kaggle the budget exit
+                # is the normal way a session ends.
+                torch.save({"model": raw_model.state_dict(), "cfg": dict(cfg),
+                            "optimizer": opt.state_dict(), "step": step,
+                            "pass_origin": pass_origin,
+                            "val_ppl": best_ppl, "data_key": data_key,
+                        "tok_key": tok_key},
+                           run_dir / "last.pt")
+                print(f"[budget] wrote last.pt at step {step}")
             break
 
         if step % eval_every == 0 or step == total_steps:
@@ -748,7 +788,9 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                 bad_evals = 0
                 if is_main:
                     torch.save({"model": raw_model.state_dict(), "cfg": dict(cfg),
-                                "step": step, "val_ppl": best_ppl},
+                                "step": step, "val_ppl": best_ppl,
+                                "pass_origin": pass_origin,
+                                "data_key": data_key, "tok_key": tok_key},
                                run_dir / "best.pt")
             else:
                 bad_evals += 1
@@ -774,9 +816,16 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
     if random_recurse:
         raw_model.set_recurse(raw_model.max_recurse)
     if is_main:
+        # Same fields as the periodic save.  This is the checkpoint that gets
+        # published and resumed, so dropping ``pass_origin`` here would reset a
+        # decay pass to step 0, and dropping the fingerprints would let the next
+        # session resume onto a different corpus without a word.
         torch.save({"model": raw_model.state_dict(), "cfg": dict(cfg),
                     "optimizer": opt.state_dict(),
-                    "step": step, "val_ppl": best_ppl}, run_dir / "last.pt")
+                    "step": step, "val_ppl": best_ppl,
+                    "pass_origin": pass_origin,
+                    "data_key": data_key, "tok_key": tok_key},
+                   run_dir / "last.pt")
 
     elapsed = time.time() - t_start
     peak_vram = 0.0

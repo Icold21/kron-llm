@@ -184,6 +184,11 @@ DEFAULTS: Dict[str, Any] = {
         "save_every": 1000,
         "eval_batches": 64,
         "early_stop_patience": 4,
+        # Stop cleanly after this many minutes and write ``last.pt``.  0 means
+        # no budget.  Kaggle kills a session at 500 minutes and Colab free at
+        # 240, both without warning; stopping ourselves leaves a checkpoint on
+        # the step we actually reached instead of the previous grid point.
+        "max_minutes": 0,
         # Recursive weight sharing: sample r ~ U{1..recurse} per training step
         # so one model works at several depths (adaptive compute).
         "recurse_random": False,
@@ -721,6 +726,12 @@ EXPERIMENTS["Q10"] = {
         # old ``training.spectral_every: 0`` was inert, so every 2000 steps the
         # run still paid for 250 SVDs and, at batch 32, died in cusolver.
         "metrics.spectral_every": 0,
+        # The epoch bin is rebuilt mid-run (2026-10-30): chemistry, textbooks
+        # and DIY shards were merged into the mix and the domain system prompts
+        # were switched on.  The tokenizer is reused unchanged, so the token id
+        # space is identical and continuing on the new stream is safe and
+        # deliberate -- hence the explicit opt-in rather than a silent resume.
+        "training.allow_data_change": True,
         "training.seq_len": 512,
         "training.lr": 3e-4,
         # Constant LR through the epoch: WSD keeps the whole first pass at one
