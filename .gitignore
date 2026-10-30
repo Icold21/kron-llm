@@ -12,6 +12,13 @@ data/bilingual/shards/
 data/bilingual/mix/
 data/bilingual/raw/
 data/bilingual/*.bin
+data/bilingual/anneal_bin/*.bin
+data/bilingual/anneal_bin/tokenizer.json
+data/bilingual/anneal_mix/
+data/bilingual/tokenizer_probe/
+data/prompt_probe/
+data/prompt_probe_mix/
+data/kaggle_anneal_bin/
 data/bilingual/tokenizer.json
 data/bilingual/tokenizer_sample.txt
 data/bilingual/heldout_*.txt

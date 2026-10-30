@@ -80,7 +80,15 @@ CATEGORIES: dict[str, dict[str, list[str]]] = {
 }
 
 WIKI_HOST = {"wikipedia": "{lang}.wikipedia.org",
-             "wikisource": "{lang}.wikisource.org"}
+             "wikisource": "{lang}.wikisource.org",
+             "wikibooks": "{lang}.wikibooks.org",
+             "wikiversity": "{lang}.wikiversity.org"}
+
+#: Wikibooks shelves pages under ``Category:Subject:<name>`` rather than a
+#: plain topic category, so ``--category Chemistry`` becomes
+#: ``Category:Subject:Chemistry`` on that site.  Wikiversity uses ordinary
+#: categories and does not need the prefix.
+SUBJECT_SITES = {"wikibooks"}
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +229,9 @@ def cmd_fetch_wiki(args: argparse.Namespace) -> None:
     site = args.site
     suffix = getattr(args, "suffix", "") or ""
     out = SHARDS / f"{site}_{args.lang}_{args.domain}{suffix}.jsonl"
-    source = {"wikipedia": "Wikipedia", "wikisource": "Wikisource"}[site]
+    source = {"wikipedia": "Wikipedia", "wikisource": "Wikisource",
+              "wikibooks": "Wikibooks",
+              "wikiversity": "Wikiversity"}[site]
     licence = "CC-BY-SA-4.0"
     url = f"https://{args.lang}.{site}.org/"
 
@@ -233,8 +243,14 @@ def cmd_fetch_wiki(args: argparse.Namespace) -> None:
 
     if args.category:
         roots = [c.strip() for c in args.category.split(",") if c.strip()]
+    elif site in ("wikibooks", "wikiversity"):
+        raise SystemExit(f"--category is required for {site}: its shelves are "
+                         f"not in CATEGORIES")
     else:
         roots = CATEGORIES[args.lang][args.domain]
+    if site in SUBJECT_SITES:
+        roots = [r if r.startswith("Subject:") else f"Subject:{r}"
+                 for r in roots]
     # 20 KB per article is the observed average after cleaning; 1.7x headroom
     # covers the quality filter.  Capping the crawl matters: walking a whole
     # top-level category at depth 2 takes minutes and we only need a few
@@ -929,6 +945,22 @@ GUT_FILTERS: dict[str, tuple[str, ...]] = {
                "nonsense", "parody"),
     "science": ("astronomy", "astrophysics", "cosmology", "physics",
                 "relativity"),
+    # Chemistry and the other natural sciences.  Public-domain textbooks from
+    # 1850-1930 are not current research, but they are *textbook* prose: a
+    # definition, a reaction, a worked example, in that order, which is the
+    # register a small model can actually learn from.  Modern open-access
+    # chemistry papers come from the peS2o route instead.
+    "chemistry": ("chemistry", "chemical", "metallurgy", "inorganic",
+                  "organic chemistry", "pharmacopoeia", "alchemy"),
+    "biology": ("biology", "botany", "zoology", "natural history",
+                "physiology", "anatomy", "horticulture", "agriculture"),
+    # "Handicraft", "manual training" and "workshop" are how the Gutenberg
+    # catalog labels the DIY shelf: how to build, wire, solder and repair.
+    "engineering": ("engineering", "mechanics", "machinery", "electricity",
+                    "steam engine", "telegraph", "handicraft", "woodwork",
+                    "carpentry", "manual training", "workshop", "metal work"),
+    "cookery": ("cookery", "cooking", "recipes", "housekeeping",
+                "domestic economy", "canning", "preserving", "baking"),
 }
 #: Popular/quality authors first for the science slice.
 GUT_FAMOUS = ("einstein", "flammarion", "ball, r", "jeans", "eddington",
@@ -963,6 +995,15 @@ def cmd_fetch_gutenberg_catalog(args: argparse.Namespace) -> None:
         return
 
     keys = GUT_FILTERS[args.domain]
+    # The filter name selects candidates; ``--corpus-domain`` is where the
+    # books land in the mix.  "chemistry" is a filter, not a mix domain: the
+    # mix has one ``science`` bucket, and a shard tagged "chemistry" would be
+    # dropped by the quota mixer because no quota matches it.
+    corpus = args.corpus_domain or args.domain
+    if corpus not in DOMAIN_QUOTAS:
+        raise SystemExit(f"--domain {args.domain} is a catalog filter, not a "
+                         f"mix domain: pass --corpus-domain "
+                         f"{{{','.join(DOMAIN_QUOTAS)}}}")
     rows: list[tuple[int, int, str]] = []
     for r in _gut_catalog():
         if (r.get("Language") or "").strip() != args.lang:
@@ -998,7 +1039,7 @@ def cmd_fetch_gutenberg_catalog(args: argparse.Namespace) -> None:
             if not quality(text, args.lang, min_chars=args.min_chars).ok:
                 continue
             doc = {"title": title, "text": text, "language": args.lang,
-                   "domain": args.domain,
+                   "domain": corpus,
                    "source": "Project Gutenberg (pglaf mirror)",
                    "licence": "public-domain",
                    "url": f"https://www.gutenberg.org/ebooks/{book_id}"}
@@ -1018,7 +1059,7 @@ def cmd_fetch_gutenberg_catalog(args: argparse.Namespace) -> None:
                          source="Project Gutenberg (pglaf mirror)",
                          licence="public-domain",
                          url="https://gutenberg.pglaf.org/",
-                         language=args.lang, domain=args.domain, docs=kept,
+                         language=args.lang, domain=corpus, docs=kept,
                          note=f"catalog keywords {keys[:3]}")
     print(f"[done] {kept} books, {shard.bytes/1e6:.1f} MB -> {out.name}")
 
@@ -1282,7 +1323,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    for name in ("fetch-wiki", "fetch-wikisource"):
+    for name, site in (("fetch-wiki", "wikipedia"),
+                       ("fetch-wikisource", "wikisource"),
+                       ("fetch-wikibooks", "wikibooks"),
+                       ("fetch-wikiversity", "wikiversity")):
         p = sub.add_parser(name)
         p.add_argument("--lang", choices=["en", "ru"], required=True)
         p.add_argument("--domain", choices=list(DOMAIN_QUOTAS), required=True)
@@ -1296,8 +1340,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         p.add_argument("--max-titles", type=int, default=0,
                        help="cap the category crawl (0 = derive from target)")
         p.add_argument("--force", action="store_true")
-        p.set_defaults(func=cmd_fetch_wiki,
-                       site="wikipedia" if name == "fetch-wiki" else "wikisource")
+        p.set_defaults(func=cmd_fetch_wiki, site=site)
 
     p = sub.add_parser("fetch-gutenberg")
     p.add_argument("--lang", default="en", choices=["en", "ru"])
@@ -1354,7 +1397,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     p = sub.add_parser("fetch-gutenberg-catalog")
     p.add_argument("--domain", required=True,
-                   choices=sorted(GUT_FILTERS))
+                   choices=sorted(GUT_FILTERS),
+                   help="catalog filter (chemistry, engineering, cookery, ...)")
+    p.add_argument("--corpus-domain", default=None,
+                   choices=list(DOMAIN_QUOTAS),
+                   help="mix domain for the shard; defaults to --domain")
     p.add_argument("--lang", default="en")
     p.add_argument("--target-mb", type=float, default=12.0)
     p.add_argument("--max-books", type=int, default=60)

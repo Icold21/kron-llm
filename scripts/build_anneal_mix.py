@@ -57,15 +57,20 @@ BYTES_PER_TOKEN = {"en": 2.917, "ru": 4.964}
 # weight comes out of literature and encyclopedics, not out of math or code --
 # those keep the enlarged shares they were given in the same round.
 SHARES = {
-    "en/literature": 0.0800,
-    "ru/literature": 0.1599,
-    "en/encyclopedic": 0.1030,
-    "ru/encyclopedic": 0.0856,
-    "en/science": 0.0985,
-    "ru/science": 0.0378,
+    "en/literature": 0.0700,
+    "ru/literature": 0.1450,
+    "en/encyclopedic": 0.0950,
+    "ru/encyclopedic": 0.0774,
+    # Science grew on 2026-10-30: chemistry and physics textbooks (Wikibooks,
+    # Wikiversity), public-domain chemistry and workshop manuals (Gutenberg),
+    # chemistry articles (Wikipedia) and open-access papers.  The weight comes
+    # out of literature and encyclopedics, which had slack, and out of en/ml,
+    # which the decay pass had over-fed relative to the code slice.
+    "en/science": 0.1250,
+    "ru/science": 0.0550,
     "en/math": 0.1250,
     "ru/math": 0.0608,
-    "en/ml": 0.0620,
+    "en/ml": 0.0594,
     "ru/ml": 0.0040,
     "en/code": 0.0750,
     "ru/cs": 0.0100,

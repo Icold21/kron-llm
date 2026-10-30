@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from kronllm.domain_prompts import DEFAULT_RATE, annotate, VARIANTS
 from kronllm.tokenizer import BPETokenizer, encode_docs, train_bpe_merges
 
 ROOT = Path("data/bilingual")
@@ -149,6 +150,16 @@ def main() -> None:
                     help="comma-separated domains to spread evenly through the "
                          "stream instead of leaving them as one contiguous "
                          "block (the decay pass uses this for chat)")
+    ap.add_argument("--no-domain-prompts", dest="domain_prompts",
+                    action="store_false",
+                    help="do not prefix documents with a domain system prompt")
+    ap.add_argument("--prompt-rate", type=float, default=DEFAULT_RATE,
+                    help="share of training documents that get a system "
+                         "prompt; the rest stay bare so the promptless mode "
+                         "also stays in distribution")
+    ap.add_argument("--phase", default="epoch", choices=["epoch", "anneal"],
+                    help="recorded in tokenizer_meta.json; the epoch and the "
+                         "decay pass reuse the same held-out bin")
     args = ap.parse_args()
 
     t0 = time.time()
@@ -160,6 +171,27 @@ def main() -> None:
     train = interleave_domains(
         train, {d for d in (args.interleave or "").split(",") if d})
     print(f"[split] {len(train):,} train docs, {len(val):,} val docs")
+    # Domain system prompts: a share of the training documents is prefixed with
+    # <|system|>...<|eot|> so the tag that SFT and the sampler always emit is
+    # already warm, and the model learns which register follows which prompt.
+    # Applied after the split, so the held-out bin keeps the exact text the
+    # earlier checkpoints were scored on.
+    if args.domain_prompts:
+        stats = annotate(train, rate=args.prompt_rate)
+        coverage = ", ".join(f"{k} {v:,}"
+                             for k, v in sorted(stats["by_domain"].items()))
+        print(f"[prompt] {stats['prompted']:,} of {stats['docs']:,} train docs "
+              f"({stats['prompted']/max(1,stats['docs']):.0%}) carry a system "
+              f"prompt; {coverage}")
+    else:
+        stats = {"docs": len(train), "prompted": 0, "by_domain": {}}
+    prompt_meta = {
+        "enabled": bool(args.domain_prompts),
+        "rate": args.prompt_rate,
+        "prompted_docs": stats["prompted"],
+        "variants": {f"{lang}/{dom}": len(v)
+                     for lang, d in VARIANTS.items() for dom, v in d.items()},
+    }
 
     tok_path = Path(args.out_dir) / "tokenizer.json"
     if args.reuse_tokenizer:
@@ -212,8 +244,10 @@ def main() -> None:
         meta = dict(meta_src)
         meta["train_tokens"] = tr["tokens"]
         meta["train_bytes"] = tr["bytes"]
-        meta["anneal"] = True
+        meta["anneal"] = args.phase == "anneal"
+        meta["phase"] = args.phase
         meta["anneal_source"] = str(src).replace("\\", "/")
+        meta["domain_prompts"] = prompt_meta
         out_meta = Path(args.out_dir) / "tokenizer_meta.json"
         out_meta.write_text(json.dumps(meta, indent=2), encoding="utf-8")
         print(f"[bin] train {tr['tokens']:,} tokens ({tr['bytes_per_token']:.2f} B/t)")
@@ -265,6 +299,7 @@ def main() -> None:
         "token_share": token_share,
         "byte_share": byte_share,
         "val_fraction": args.val_fraction,
+        "domain_prompts": prompt_meta,
     }
     out_meta = Path(args.out_dir) / "tokenizer_meta.json"
     out_meta.write_text(json.dumps(meta, indent=2), encoding="utf-8")

@@ -44,13 +44,43 @@ Only public-domain or permissively licensed material. Every shard records
 
 | domain | English | Russian | licence notes |
 |---|---|---|---|
-| mathematics | OpenStax, ProofWiki, public-domain textbooks | public-domain textbooks, open lecture notes | check each item; prefer CC-BY / CC-BY-SA / public domain |
-| science | arXiv (CC-BY subset), PubMed Central OA | CyberLeninka (item-level check), open university repositories | arXiv licences vary per paper; only CC-BY or explicit permission |
+| mathematics | OpenStax, ProofWiki, public-domain textbooks, Wikibooks/Wikiversity mathematics shelves | public-domain textbooks, open lecture notes, ru Wikibooks/Wikiversity | check each item; prefer CC-BY / CC-BY-SA / public domain |
+| science | arXiv (CC-BY subset), PubMed Central OA, peS2o (S2ORC open-access, ODC-By), Wikibooks/Wikiversity chemistry/physics/biology textbooks, Wikipedia chemistry categories, public-domain chemistry manuals (Gutenberg) | CyberLeninka (item-level check), open university repositories, ru Wikibooks/Wikiversity, ru Wikipedia chemistry | arXiv licences vary per paper; only CC-BY or explicit permission; peS2o is ODC-By and is *papers*, not textbooks |
+| practical / DIY | Wikibooks Cookbook, Do It Yourself, Electronics, Engineering; Gutenberg handicraft, woodwork, cookery | ru Wikibooks Кулинария / Электроника / Ремонт, ru Wikisource | public domain or CC-BY-SA; Gutenberg manuals are 1850–1930 and are *procedure* prose, not current practice |
 | logic | Lean/Coq docs, public-domain logic texts | public-domain logic textbooks | documentation under permissive licences |
 | code | permissively licensed repositories (MIT/Apache/BSD), Python docs and exercises | same, plus Russian-language programming tutorials with a clear licence | licence detection per file; no copyleft-only or unlicensed code |
 | literature | Project Gutenberg, Wikisource | public-domain classics (Tolstoy, Dostoevsky, Chekhov), Wikisource | author died >70 years / US public domain |
 | encyclopedic | Wikipedia dumps (CC-BY-SA) | Wikipedia RU dumps (CC-BY-SA) | attribution required |
 | instructions (SFT only) | Dolly-15k, open instruct sets | Saiga / open Russian instruct sets | never used for pretraining |
+
+**Science expansion, 2026-10-30.**  A keyword scan of the science pools found
+chemistry at 7.4 % of `en/science` (47 MB of 634 MB) and 11.5 % of `ru/science`
+(37 MB of 318 MB) — enough to be present, not enough to answer a chemistry
+question.  The plan adds three kinds of text, all inside the existing `science`
+bucket so the quota mixer needs no new domain:
+
+* **textbooks** — `scripts/fetch_textbooks.py` crawls `Category:Subject:<name>`
+  on Wikibooks (the plain `Category:Chemistry` there is empty; books live under
+  `Category:Subject:Chemistry`, 60 books, and `Category:Book:<name>`, e.g. 116
+  chapters for *General Chemistry*) and ordinary categories on Wikiversity;
+* **reference** — Wikipedia chemistry categories at scale, threaded, because a
+  depth-2 category walk is thousands of requests;
+* **procedure** — Gutenberg `chemistry` / `engineering` / `cookery` filters
+  (`--corpus-domain science`): soldering, carpentry, preserving, laboratory
+  manuals.  Old, but textbook-shaped: definition, reaction, worked example.
+
+Journals are covered by arXiv and peS2o rather than by scraping publisher sites:
+both are open-access-only and both carry a licence we can attribute.  New shards
+are appended to `mix/` with `scripts/add_bulk_to_mix.py`, which dedups by title
+against the target bucket — no full MinHash rebuild for a few hundred MB.
+
+**Status of the fetch (2026-10-30): blocked.**  The link died mid-crawl: HTTPS to
+Wikimedia, Hugging Face, Gutenberg, GitHub and Kaggle times out ~90 % of the time
+(1/10 sequential requests to `en.wikipedia.org/w/api.php` succeeded).  The only
+shard that landed is `wikipedia_ru_science_chem.jsonl` (47 docs, 0.4 MB) out of
+310 titles — not worth adding.  The fetchers, the filters, the `--corpus-domain`
+flag and the rebalanced `SHARES` are written and tested; the crawl itself runs
+when the link returns, and the decay bin is rebuilt after it.
 
 Explicitly rejected: pirated book collections, sites with unclear terms,
 scraped textbooks without a licence, and any source that cannot be attributed.
@@ -167,17 +197,26 @@ standard library:
 | stage | where |
 |---|---|
 | MediaWiki cleaning, filters, MinHash dedup, mixing | `kronllm/bilingual.py` |
-| fetch (Wikipedia, Wikisource, Gutenberg, CPython stdlib) | `scripts/build_bilingual.py` |
+| domain system prompts for pretraining | `kronllm/domain_prompts.py` (see `docs/prompts.md`) |
+| fetch (Wikipedia, Wikisource, Wikibooks, Wikiversity, Gutenberg, CPython stdlib) | `scripts/build_bilingual.py` |
+| threaded textbook / category crawl | `scripts/fetch_textbooks.py` |
+| append a bulk shard to an existing mix bucket | `scripts/add_bulk_to_mix.py` |
 | tokenisation into uint16 memmaps | `scripts/prepare_bilingual_bin.py` |
-| tests | `tests/test_bilingual.py` (9 tests) |
+| tests | `tests/test_bilingual.py`, `tests/test_domain_prompts.py` |
 
 ```bash
 python scripts/build_bilingual.py fetch-wiki --lang ru --domain math --target-mb 40
 python scripts/build_bilingual.py fetch-wikisource --lang ru --domain literature
 python scripts/build_bilingual.py fetch-gutenberg --lang en --domain literature
+python scripts/build_bilingual.py fetch-gutenberg-catalog --lang en \
+    --domain chemistry --corpus-domain science
 python scripts/build_bilingual.py fetch-code --target-mb 12
+python scripts/fetch_textbooks.py --site wikibooks --lang en --domain science \
+    --category "Chemistry,Physics,Biology" --suffix _textbooks
+python scripts/add_bulk_to_mix.py --shard data/bilingual/shards/wikibooks_en_science_textbooks.jsonl \
+    --lang en --domain science
 python scripts/build_bilingual.py build --target-mb 250
-python scripts/prepare_bilingual_bin.py --vocab 8192
+python scripts/prepare_bilingual_bin.py --vocab 8192 --phase anneal --interleave chat
 ```
 
 Every fetcher writes one JSONL shard and one manifest row with `source`,

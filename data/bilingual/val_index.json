@@ -1,0 +1,132 @@
+{
+ "val_bin": "data/bilingual/val.bpe.bin",
+ "total_tokens": 46197636,
+ "buckets": [
+  {
+   "lang": "en",
+   "domain": "code",
+   "docs": 1329,
+   "start": 0,
+   "end": 5195863
+  },
+  {
+   "lang": "en",
+   "domain": "cs",
+   "docs": 272,
+   "start": 5195863,
+   "end": 6693892
+  },
+  {
+   "lang": "en",
+   "domain": "encyclopedic",
+   "docs": 1955,
+   "start": 6693892,
+   "end": 9499236
+  },
+  {
+   "lang": "en",
+   "domain": "humour",
+   "docs": 1,
+   "start": 9499236,
+   "end": 9506664
+  },
+  {
+   "lang": "en",
+   "domain": "identity",
+   "docs": 264,
+   "start": 9506664,
+   "end": 9534000
+  },
+  {
+   "lang": "en",
+   "domain": "literature",
+   "docs": 124,
+   "start": 9534000,
+   "end": 12741146
+  },
+  {
+   "lang": "en",
+   "domain": "logic",
+   "docs": 229,
+   "start": 12741146,
+   "end": 13752885
+  },
+  {
+   "lang": "en",
+   "domain": "math",
+   "docs": 3479,
+   "start": 13752885,
+   "end": 21286649
+  },
+  {
+   "lang": "en",
+   "domain": "ml",
+   "docs": 3887,
+   "start": 21286649,
+   "end": 24156555
+  },
+  {
+   "lang": "en",
+   "domain": "science",
+   "docs": 650,
+   "start": 24156555,
+   "end": 28616434
+  },
+  {
+   "lang": "ru",
+   "domain": "cs",
+   "docs": 40,
+   "start": 28616434,
+   "end": 28709273
+  },
+  {
+   "lang": "ru",
+   "domain": "encyclopedic",
+   "docs": 4140,
+   "start": 28709273,
+   "end": 37906409
+  },
+  {
+   "lang": "ru",
+   "domain": "identity",
+   "docs": 264,
+   "start": 37906409,
+   "end": 37930241
+  },
+  {
+   "lang": "ru",
+   "domain": "literature",
+   "docs": 2154,
+   "start": 37930241,
+   "end": 42879163
+  },
+  {
+   "lang": "ru",
+   "domain": "logic",
+   "docs": 65,
+   "start": 42879163,
+   "end": 43235996
+  },
+  {
+   "lang": "ru",
+   "domain": "math",
+   "docs": 301,
+   "start": 43235996,
+   "end": 45156239
+  },
+  {
+   "lang": "ru",
+   "domain": "ml",
+   "docs": 18,
+   "start": 45156239,
+   "end": 45193930
+  },
+  {
+   "lang": "ru",
+   "domain": "science",
+   "docs": 186,
+   "start": 45193930,
+   "end": 46197636
+  }
+ ]
+}
