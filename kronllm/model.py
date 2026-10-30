@@ -561,6 +561,19 @@ class KronTransformer(nn.Module):
         self.recurse = int(mc.get("recurse") or 1)
         if self.n_unique < 1 or self.recurse < 1:
             raise ValueError("n_unique_blocks and recurse must be >= 1")
+        # Which part of the stack repeats.  Repeating the whole stack (the
+        # default) makes every shared block serve as both "tokens -> features"
+        # and "features -> logits"; repeating only the middle band leaves the
+        # first layers free to read the input and the last ones free to write
+        # the output, which is the arrangement a looped transformer wants
+        # (SenseNova-Loop-9B repeats layers [4,28) of 32, 2026-10-30).
+        self.loop_start = int(mc.get("loop_start") or 0)
+        loop_end = mc.get("loop_end")
+        self.loop_end = int(loop_end) if loop_end is not None else self.n_unique
+        if not 0 <= self.loop_start < self.loop_end <= self.n_unique:
+            raise ValueError(
+                f"need 0 <= loop_start < loop_end <= n_unique, got "
+                f"{self.loop_start}, {self.loop_end}, {self.n_unique}")
         self.n_layers = self.n_unique * self.recurse
         self.n_heads = int(mc["n_heads"])
         self.d_head = self.d // self.n_heads
@@ -640,15 +653,23 @@ class KronTransformer(nn.Module):
         self.apply(self._init_weights)
         if self.routed is not None:
             self.routed.reset_parameters()
+        self._unique_blocks = list(self.blocks)
+        # Execution slot -> physical block index.  With the whole stack
+        # repeated this is the familiar ``i % n_unique``; with loop_start /
+        # loop_end only the middle band repeats.  ``blocks`` is rebuilt as a
+        # list of *references*, so ``parameters()`` still deduplicates and the
+        # parameter count does not change -- only the number of executions.
+        self.plan = tuple(self._build_plan())
+        self.pass_index = self._pass_index(self.plan)
+        self.n_layers = len(self.plan)
         if self.recurse > 1:
-            # Reference the same blocks again instead of duplicating weights;
-            # `parameters()` deduplicates, so the parameter count is unchanged.
-            unique = list(self.blocks)
             self.blocks = nn.ModuleList(
-                [unique[i % self.n_unique] for i in range(self.n_layers)])
+                [self._unique_blocks[i] for i in self.plan])
         self.max_recurse = self.recurse
         # Optional per-pass learned bias, so a shared block can tell which
-        # pass it is in (Universal-Transformer-style step signal).
+        # pass it is in (Universal-Transformer-style step signal).  Added when
+        # the pass number changes, not at a fixed stride: with a middle band
+        # the loop starts at loop_start, not at 0.
         self.pass_bias = (nn.Parameter(torch.zeros(self.max_recurse, self.d))
                           if bool(mc.get("pass_embedding"))
                           and self.max_recurse > 1 else None)
@@ -865,8 +886,15 @@ class KronTransformer(nn.Module):
         new_kv: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = (
             [] if use_cache else None)
         for i, block in enumerate(self.blocks):
-            if self.pass_bias is not None and i % self.n_unique == 0:
-                x = x + self.pass_bias[i // self.n_unique]
+            if self.pass_bias is not None:
+                # Add the step signal where the pass changes.  The old form
+                # (`i % n_unique == 0`) assumed the loop covered the whole
+                # stack starting at 0; with a middle band the boundary is at
+                # ``loop_start`` plus one stride per pass.
+                here = self.pass_index[i]
+                before = self.pass_index[i - 1] if i else -1
+                if here != before:
+                    x = x + self.pass_bias[here]
             if D_map:
                 for role in ROLES:
                     if (i, role) in D_map:
@@ -918,6 +946,38 @@ class KronTransformer(nn.Module):
             out["past_kv"] = new_kv
         return out
 
+    def _build_plan(self) -> List[int]:
+        """Physical block index for each execution slot.
+
+        ``loop_start=0, loop_end=n_unique`` gives the whole stack repeated
+        ``recurse`` times, which is what the modulo scheme did.  Anything else
+        repeats only the middle band and executes the head and tail once.
+        """
+        start, end = self.loop_start, self.loop_end
+        return (list(range(start))
+                + list(range(start, end)) * self.recurse
+                + list(range(end, self.n_unique)))
+
+    def _pass_index(self, plan: Sequence[int]) -> tuple:
+        """Pass number per execution slot, for the per-pass bias.
+
+        Layers before the loop belong to the first pass and layers after it to
+        the last one, so the bias changes exactly when the loop starts a new
+        pass and never flips back at the tail.
+        """
+        seen: Dict[int, int] = {}
+        out: List[int] = []
+        for i in plan:
+            if i < self.loop_start:
+                out.append(0)
+            elif i >= self.loop_end:
+                out.append(max(0, self.recurse - 1))
+            else:
+                k = seen.get(i, 0)
+                out.append(k)
+                seen[i] = k + 1
+        return tuple(out)
+
     def set_recurse(self, recurse: int) -> None:
         """Change the number of block passes at inference time.
 
@@ -929,11 +989,12 @@ class KronTransformer(nn.Module):
         recurse = int(recurse)
         if recurse < 1:
             raise ValueError("recurse must be >= 1")
-        unique = list(self.blocks[:self.n_unique])
         self.recurse = recurse
-        self.n_layers = self.n_unique * recurse
+        self.plan = tuple(self._build_plan())
+        self.pass_index = self._pass_index(self.plan)
+        self.n_layers = len(self.plan)
         self.blocks = nn.ModuleList(
-            [unique[i % self.n_unique] for i in range(self.n_layers)])
+            [self._unique_blocks[i] for i in self.plan])
         self._prelude_cache = None
         self._banks = self._build_banks() if self.use_bank else []
 

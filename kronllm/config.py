@@ -38,6 +38,15 @@ DEFAULTS: Dict[str, Any] = {
         # n_unique_blocks * recurse; parameters are counted once.
         "n_unique_blocks": None,
         "recurse": 1,
+        # Which part of the stack repeats: layers [loop_start, loop_end) are
+        # the looped band, executed `recurse` times; everything outside it
+        # runs once.  The whole stack by default, which is the
+        # Universal-Transformer scheme.  A middle band keeps the reading and
+        # writing layers unshared, which is what SenseNova-Loop-9B does
+        # (layers [4,28) of 32, 2026-10-30).  Effective depth becomes
+        # n_unique + (loop_end - loop_start) * (recurse - 1).
+        "loop_start": 0,
+        "loop_end": None,            # None -> n_unique_blocks
         "n_heads": 8,
         "n_kv_heads": None,          # None -> MHA
         "rope_theta": 10000.0,
