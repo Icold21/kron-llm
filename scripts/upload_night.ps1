@@ -95,23 +95,14 @@ if ($out2 -match "not found|does not exist|404") {
 }
 
 # ---------------------------------------------------------------- 4. verify ready
-$wait = 0
-while ($wait -lt 1800) {
-    $s1 = Kaggle @("datasets", "status", "icold21/kron-corpus-2b") 1
-    $s2 = Kaggle @("datasets", "status", "icold21/kron-q10a-anneal-bin") 1
-    $r1 = ($s1 -match "ready")
-    $r2 = ($s2 -match "ready")
-    Say ("status: corpus=" + (($s1 -split "`n")[-1]) + " | anneal=" + (($s2 -split "`n")[-1]))
-    if ($r1 -and $r2) {
-        ("epoch corpus and anneal bin uploaded and ready at {0}`n{1}" -f
-            (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $s1) |
-            Out-File -Encoding utf8 $flag
-        Say "corpus_ready.flag written"
-        exit 0
-    }
-    Start-Sleep -Seconds 120
-    $wait += 120
+# Each dataset only has to be seen ready once: on this link the API fails about
+# half the calls, so requiring a single poll where both answer ready never
+# happens even when both have finished.
+Say "verifying both datasets"
+python scripts\verify_datasets.py 2>&1 | ForEach-Object { Say ("  " + $_) }
+if (Test-Path $flag) {
+    Say "corpus_ready.flag written"
+    exit 0
 }
-
-Say "datasets did not report ready; no flag, the 03:05 guard will refuse to start"
+Say "datasets did not verify as ready; no flag, the 03:05 guard will refuse to start"
 exit 1

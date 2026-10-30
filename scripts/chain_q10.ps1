@@ -103,12 +103,25 @@ function PushSession() {
     # goes through -- the alternative was the chain seeing the previous version's
     # COMPLETE, downloading the same checkpoint, deciding "no progress" and
     # mailing a false failure every five minutes.
+    $attempts = 0
     while ($true) {
         $push = Run 600 @('-m','kaggle','kernels','push','-p','kaggle/q10')
         $push | Out-File -Encoding utf8 -Append $log
         $line = (($push | Select-Object -Last 1) -join " ").Trim()
         Say ("push: " + $line)
         if ($line -match "quota|Quota|QUOTA") {
+            $attempts += 1
+            if ($Once) {
+                # One session was asked for and the deadline is the owner's
+                # morning: wait an hour in ten-minute steps, then report.
+                if ($attempts -ge 6) {
+                    Say "GPU QUOTA WALL: still refused after an hour, giving up"
+                    return "error"
+                }
+                Say ("GPU QUOTA WALL: retrying in 10 minutes (attempt {0}/6)" -f $attempts)
+                Start-Sleep -Seconds 600
+                continue
+            }
             Say "GPU QUOTA WALL: retrying the push in 3 hours"
             Start-Sleep -Seconds 10800
             continue
