@@ -30,10 +30,10 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-STAGE = Path(r"E:\kron_bins\kaggle_corpus")
+STAGE = Path(r"E:\kron_bins\epoch_np")
 SLUG = "icold21/kron-corpus-2b"
-LOCAL_META = Path(r"E:\kron_bins\epoch\tokenizer_meta.json")
-NOTE = "epoch bin: system prompt in every document (rate 1.0)"
+LOCAL_META = STAGE / "tokenizer_meta.json"
+NOTE = "epoch bin: prompt-free rebuild (sciences kept, no inserted prompts)"
 
 
 def say(msg: str) -> None:
@@ -55,12 +55,14 @@ def status() -> str:
     return tail[-1].strip() if tail else "unreachable"
 
 
-def expected() -> tuple[float, int]:
+def expected() -> dict:
     meta = json.loads(LOCAL_META.read_text(encoding="utf-8"))
-    return meta["domain_prompts"]["rate"], meta["train_tokens"]
+    dp = meta["domain_prompts"]
+    return {"tokens": meta["train_tokens"], "docs": dp["docs"],
+            "enabled": dp["enabled"], "prompted": dp["prompted_docs"]}
 
 
-def verify(expected_rate: float, expected_tokens: int) -> bool:
+def verify(want: dict) -> bool:
     """Read the metadata back from Kaggle; the dataset must be the new bin."""
     d = ROOT / "data" / "corpus_check"
     shutil.rmtree(d, ignore_errors=True)
@@ -73,11 +75,10 @@ def verify(expected_rate: float, expected_tokens: int) -> bool:
         return False
     meta = json.loads(f.read_text(encoding="utf-8"))
     dp = meta.get("domain_prompts") or {}
-    rate, tokens = dp.get("rate"), meta.get("train_tokens")
-    ok = (rate == expected_rate and tokens == expected_tokens)
-    say(f"  remote meta: rate {rate} tokens {tokens:,} "
-        f"(want {expected_rate} / {expected_tokens:,}) -> "
-        f"{'match' if ok else 'STALE'}")
+    got = {"tokens": meta.get("train_tokens"), "docs": dp.get("docs"),
+           "enabled": dp.get("enabled"), "prompted": dp.get("prompted_docs")}
+    ok = got == want
+    say(f"  remote meta: {got} (want {want}) -> {'match' if ok else 'STALE'}")
     return ok
 
 
@@ -91,8 +92,8 @@ def main() -> None:
         say("stage is missing train.bpe.bin")
         raise SystemExit(1)
     size = (STAGE / "train.bpe.bin").stat().st_size
-    rate, tokens = expected()
-    say(f"staged {size:,} bytes; want rate {rate}, {tokens:,} tokens")
+    want = expected()
+    say(f"staged {size:,} bytes; want {want}")
     deadline = time.time() + args.minutes * 60
 
     for attempt in range(1, args.attempts + 1):
@@ -122,7 +123,7 @@ def main() -> None:
                     say(f"  dataset failed: {s}")
                     break
                 time.sleep(30)
-            if verify(rate, tokens):
+            if verify(want):
                 say("DONE: the fully-prompted corpus is live on Kaggle")
                 return
             say("  uploaded but the metadata is still the old bin; retrying")

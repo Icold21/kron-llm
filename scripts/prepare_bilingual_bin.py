@@ -189,7 +189,10 @@ def main() -> None:
                  "by_domain": {}}
     prompt_meta = {
         "enabled": bool(args.domain_prompts),
-        "rate": args.prompt_rate,
+        # A disabled prompt pass must not advertise a rate: the meta is read by
+        # the upload and Colab guards, and "rate 0.85" on a bare corpus is a
+        # contradiction waiting to be believed.
+        "rate": args.prompt_rate if args.domain_prompts else 0.0,
         "prompted_docs": stats["prompted"],
         # Chat documents open with <|system|> already, so they are covered but
         # not "prompted"; the two together must equal the document count, and

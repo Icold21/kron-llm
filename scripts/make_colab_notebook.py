@@ -34,8 +34,9 @@ HEADER = """# KronLLM — одна сессия на Colab (T4)
 Токен даёт и чтение датасетов, и запись чекпоинта; больше ничего не нужно.
 
 **Бюджет.** Бесплатный Colab обрывает сессию на 4 часах без предупреждения,
-поэтому по умолчанию `MINUTES = 200`: остаётся запас на скачивание и загрузку.
-Для Colab Pro поставь 660.
+поэтому `MINUTES` ставится с запасом на загрузку корпуса и заливку чекпоинта;
+сейчас он рассчитан так, чтобы сессия закончилась до полуночи. Для Colab Pro
+можно поставить 660.
 
 **Важно:** пока вкладка открыта — обучение идёт; закрыл вкладку — сессия
 умерла. Чекпоинт пишется каждые 1000 шагов и на выходе по бюджету, так что
@@ -43,13 +44,14 @@ HEADER = """# KronLLM — одна сессия на Colab (T4)
 
 Этот ноутбук стартует с шага **35 115** (усреднённый `soup_035115`): сессия,
 ушедшая до 43 895, отброшена, потому что училась считать лосс и на нашем же
-вставленном системном промпте. Теперь такие позиции вырезаны маской
-(`kronllm/loss_mask.py`, код v19), поэтому тренировочный лосс на первом шаге
-подскочит примерно на 0.012 нат — это ожидаемо и честно.
+вставленном системном промпте. Теперь промптов в корпусе **нет совсем**, так что
+цель непрерывна с сессиями 1–3. Маска (`kronllm/loss_mask.py`) остаётся: часть
+документов приходит со своим `<|system|>` (чат), и его текст по-прежнему не
+попадает в лосс.
 
 Запуск: `Runtime → Change runtime type → T4 GPU`, затем `Runtime → Run all`.
 Первая ячейка-проверка качает только мету (1.5 КБ) и отказывается стартовать,
-если корпус на Kaggle ещё старый или чекпоинт не тот.
+если корпус на Kaggle ещё с промптами или чекпоинт не тот.
 """
 
 ENV = '''import shutil, subprocess, sys
@@ -128,7 +130,7 @@ def fetch_all(slug, dest_dir):
 '''
 
 PREFLIGHT = '''# Ask Kaggle two file-sized questions before pulling 4.5 GB: is the corpus
-# the fully-prompted one, and does the checkpoint sit where we expect?
+# the prompt-free one, and does the checkpoint sit where we expect?
 from pathlib import Path
 
 PRE = Path('/content/pre')
@@ -137,17 +139,21 @@ fetch_file('icold21/kron-q10-ckpt', 'last.pt', PRE / 'last.pt')
 
 meta = json.loads((PRE / 'tokenizer_meta.json').read_text())
 dp = meta.get('domain_prompts') or {}
-covered = dp.get('prompted_docs', 0) + dp.get('already_prompted_docs', 0)
 print('phase        ', meta.get('phase'))
 print('train tokens ', f"{meta.get('train_tokens', 0):,}")
-print('prompted     ', f"{dp.get('prompted_docs', 0):,} added +",
-      f"{dp.get('already_prompted_docs', 0):,} already chat =",
-      f"{covered:,} of {dp.get('docs', 0):,} at rate", dp.get('rate'))
+print('documents    ', f"{dp.get('docs', 0):,}")
+print('prompts      ', 'enabled' if dp.get('enabled') else 'none',
+      '| rate', dp.get('rate'),
+      '| inserted in', f"{dp.get('prompted_docs', 0):,} docs")
+print('chat docs    ', f"{dp.get('already_prompted_docs', 0):,}",
+      '(carry their own <|system|> turn; still masked from the loss)')
 
 assert meta.get('phase') == 'epoch', 'wrong bin: this is the decay pass'
-assert dp.get('rate') == 1.0, ('the corpus dataset is not the fully-prompted '
-                              'rebuild; upload it before running this')
-assert covered == dp.get('docs'), 'not every document carries a system prompt'
+# Step 35,115 was trained on a corpus with no inserted prompt, and the run
+# resumes there, so the objective must match: a prompted corpus would change
+# what the model is asked to predict without changing the step count.
+assert dp.get('enabled') is False, 'the corpus still carries inserted prompts'
+assert dp.get('prompted_docs', 0) == 0, 'some documents were prefixed anyway'
 
 state = torch.load(PRE / 'last.pt', map_location='cpu', weights_only=False)
 print('resume step  ', state.get('step'))
@@ -210,22 +216,22 @@ print('bins:', sorted(p.name for p in (WORK / 'data').iterdir()))
 
 # The corpus is 4.5 GB and the dataset slug does not change between rebuilds, so
 # a stale or half-uploaded download looks fine until the loss is wrong.  Read
-# the metadata and refuse a corpus that is not the fully-prompted one.
+# the metadata and refuse a corpus that still carries the inserted prompts:
+# the run resumes at step 35,115, which was trained without them.
 meta = json.loads((WORK / 'data' / 'tokenizer_meta.json').read_text())
 dp = meta.get('domain_prompts') or {}
 print('phase        ', meta.get('phase'))
 print('train tokens ', f"{meta.get('train_tokens', 0):,}")
-print('prompted docs', f"{dp.get('prompted_docs', 0):,}", 'added,',
-      f"{dp.get('already_prompted_docs', 0):,}", 'already chat, of',
-      f"{dp.get('docs', 0):,}", 'at rate', dp.get('rate'))
+print('prompts      ', 'enabled' if dp.get('enabled') else 'none',
+      '| inserted in', f"{dp.get('prompted_docs', 0):,} docs of",
+      f"{dp.get('docs', 0):,}")
 assert meta.get('phase') == 'epoch', 'wrong bin: this is the decay pass'
-assert dp.get('rate') == 1.0, 'corpus predates the full-prompt rebuild'
-covered = dp.get('prompted_docs', 0) + dp.get('already_prompted_docs', 0)
-assert covered == dp.get('docs'), 'not every document carries a system prompt'
-print('corpus is the fully-prompted epoch bin')
+assert dp.get('enabled') is False, 'corpus still carries inserted prompts'
+assert dp.get('prompted_docs', 0) == 0, 'some documents were prefixed anyway'
+print('corpus is the prompt-free epoch bin')
 '''
 
-TRAIN = '''MINUTES = 200          # a free T4 is cut near 240; Pro allows 660
+TRAIN = '''MINUTES = 135          # sized to end before midnight; Pro allows 660
 CKPT = find('last.pt')
 cmd = [sys.executable, '-u', '-m', 'kronllm.cli', 'train', '--exp', 'Q10',
        '--device', 'cuda',
