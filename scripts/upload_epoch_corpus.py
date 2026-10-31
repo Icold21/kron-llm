@@ -43,7 +43,12 @@ def say(msg: str) -> None:
         fh.write(line + "\n")
 
 
-def kaggle(*argv: str) -> subprocess.CompletedProcess:
+def kaggle(*argv: str, stream: bool = False) -> subprocess.CompletedProcess:
+    """Run the CLI.  ``stream=True`` inherits stdout/stderr so the progress bar
+    lands in the log: the previous attempt sat for an hour with nothing to read
+    because the output was captured and only shown when the call returned."""
+    if stream:
+        return subprocess.run([sys.executable, "-m", "kaggle", *argv])
     return subprocess.run([sys.executable, "-m", "kaggle", *argv],
                           capture_output=True, text=True, encoding="utf-8",
                           errors="replace")
@@ -102,18 +107,13 @@ def main() -> None:
             break
         say(f"attempt {attempt}/{args.attempts}")
         r = kaggle("datasets", "version", "-p", str(STAGE), "-m", NOTE,
-                   "--dir-mode", "zip")
-        out = ((r.stdout or "") + (r.stderr or "")).strip()
-        tail = " | ".join(out.splitlines()[-3:])
-        say("  " + tail)
+                   "--dir-mode", "zip", stream=True)
+        say(f"  cli exit {r.returncode}")
 
-        dropped = any(k in out for k in
-                      ("SSLError", "Max retries", "ConnectionError",
-                       "Read timed out", "EOF occurred"))
-        accepted = any(k in out for k in
-                       ("Dataset version is being created", "successfully"))
-
-        if accepted and not dropped:
+        # Success is decided by the data, not by the CLI's wording: read the
+        # metadata back from Kaggle.  A kill mid-upload leaves the old version
+        # serving, which is exactly what this check catches.
+        if r.returncode == 0:
             say("  version accepted; waiting for ready")
             for _ in range(60):
                 s = status()
@@ -124,9 +124,9 @@ def main() -> None:
                     break
                 time.sleep(30)
             if verify(want):
-                say("DONE: the fully-prompted corpus is live on Kaggle")
+                say("DONE: the prompt-free corpus is live on Kaggle")
                 return
-            say("  uploaded but the metadata is still the old bin; retrying")
+            say("  uploaded but the metadata does not match the new bin")
 
         wait = min(300, 30 * attempt)
         say(f"  sleeping {wait}s")
