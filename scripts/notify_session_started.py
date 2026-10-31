@@ -24,11 +24,62 @@ MD = ROOT / "data" / "session_started.md"
 HTML = ROOT / "data" / "session_started.html"
 
 
+def failed(reason: str, dry_run: bool = False) -> None:
+    """Say plainly that no session was queued, and why."""
+    body = f"""# Сессия Q10 не поставлена
+
+{reason}
+
+## Что готово и ждёт
+
+| шаг | состояние |
+|---|---|
+| код v19 с маской лосса | собран в `data/kaggle_code_v19` (18 файлов) |
+| точка возобновления | `soup_035115.pt` в `data/kaggle_ckpt/last.pt` |
+| epoch-корпус, 4.5 ГБ | собран в `E:\\kron_bins\\kaggle_corpus` |
+| `MINUTES` в ноутбуке | ставится драйвером от текущего времени |
+
+Ничего не потеряно: как только `api.kaggle.com` начнёт отвечать, те же шаги
+повторяются одной командой, и сессия уходит.
+
+## Почему не вышло
+
+Канал до Kaggle лежит: TCP и DNS в порядке, TLS обрывается на handshake
+(`SSLEOFError`), при этом `yandex.ru` и `mail.ru` отвечают. То есть это не
+наш фаервол и не ключ Kaggle, а выход за границу через Outline, который сейчас
+не пропускает трафик. Подробности — в `data/start_session.log`.
+"""
+    MD.write_text(body, encoding="utf-8")
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "md_to_html.py"),
+                    str(MD), str(HTML)], check=True)
+    cmd = [sys.executable, str(MAIL), "send",
+           "--subject", "Q10: сессию поставить не удалось — канал до Kaggle лежит",
+           "--model", "DeepSeek V4.1 Flash Free", "--session", "kron_chain",
+           "--html", "--body-file", str(HTML)]
+    if dry_run:
+        cmd.append("--dry-run")
+    for attempt in range(1, 4):
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+        if r.returncode == 0:
+            print(f"[mail] sent on attempt {attempt}")
+            return
+        print(f"[mail] attempt {attempt} failed: {(r.stderr or r.stdout).strip()[-300:]}")
+    print("[mail] all attempts failed; the body is in data/session_started.html")
+    raise SystemExit(1)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--minutes", type=int, required=True)
+    ap.add_argument("--minutes", type=int, default=0)
+    ap.add_argument("--failed", metavar="REASON",
+                    help="no session was queued; mail this reason instead")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
+    if args.failed:
+        failed(args.failed, args.dry_run)
+        return
+    if not args.minutes:
+        ap.error("--minutes is required unless --failed is given")
 
     meta_path = Path(r"E:\kron_bins\epoch\tokenizer_meta.json")
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
