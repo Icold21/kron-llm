@@ -180,15 +180,23 @@ def main() -> None:
         stats = annotate(train, rate=args.prompt_rate)
         coverage = ", ".join(f"{k} {v:,}"
                              for k, v in sorted(stats["by_domain"].items()))
+        already = stats.get("already", 0)
         print(f"[prompt] {stats['prompted']:,} of {stats['docs']:,} train docs "
               f"({stats['prompted']/max(1,stats['docs']):.0%}) carry a system "
-              f"prompt; {coverage}")
+              f"prompt; {already:,} already had one (chat); {coverage}")
     else:
-        stats = {"docs": len(train), "prompted": 0, "by_domain": {}}
+        stats = {"docs": len(train), "prompted": 0, "already": 0,
+                 "by_domain": {}}
     prompt_meta = {
         "enabled": bool(args.domain_prompts),
         "rate": args.prompt_rate,
         "prompted_docs": stats["prompted"],
+        # Chat documents open with <|system|> already, so they are covered but
+        # not "prompted"; the two together must equal the document count, and
+        # that is what the upload and Colab checks assert.
+        "already_prompted_docs": stats.get("already", 0),
+        "docs": stats["docs"],
+        "by_domain": stats["by_domain"],
         "variants": {f"{lang}/{dom}": len(v)
                      for lang, d in VARIANTS.items() for dom, v in d.items()},
     }

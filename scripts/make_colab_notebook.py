@@ -76,7 +76,7 @@ subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'kaggle'], check=T
 
 DOWNLOAD = '''from pathlib import Path
 DL = Path('/content/dl'); DL.mkdir(exist_ok=True)
-SLUGS = ['icold21/kron-llm-code-v16', 'icold21/kron-corpus-2b',
+SLUGS = ['icold21/kron-llm-code-v18', 'icold21/kron-corpus-2b',
          'icold21/kron-q10-ckpt']
 for slug in SLUGS:
     print('[dl]', slug, flush=True)
@@ -110,9 +110,25 @@ pkg = find('kronllm')
 CODE_ROOT = pkg.parent
 print('code root', CODE_ROOT)
 print('bins:', sorted(p.name for p in (WORK / 'data').iterdir()))
+
+# The corpus is 4.5 GB and the dataset slug does not change between rebuilds, so
+# a stale or half-uploaded download looks fine until the loss is wrong.  Read
+# the metadata and refuse a corpus that is not the fully-prompted one.
+meta = json.loads((WORK / 'data' / 'tokenizer_meta.json').read_text())
+dp = meta.get('domain_prompts') or {}
+print('phase        ', meta.get('phase'))
+print('train tokens ', f"{meta.get('train_tokens', 0):,}")
+print('prompted docs', f"{dp.get('prompted_docs', 0):,}", 'added,',
+      f"{dp.get('already_prompted_docs', 0):,}", 'already chat, of',
+      f"{dp.get('docs', 0):,}", 'at rate', dp.get('rate'))
+assert meta.get('phase') == 'epoch', 'wrong bin: this is the decay pass'
+assert dp.get('rate') == 1.0, 'corpus predates the full-prompt rebuild'
+covered = dp.get('prompted_docs', 0) + dp.get('already_prompted_docs', 0)
+assert covered == dp.get('docs'), 'not every document carries a system prompt'
+print('corpus is the fully-prompted epoch bin')
 '''
 
-TRAIN = '''MINUTES = 200          # free Colab gives ~240; Pro can use 660
+TRAIN = '''MINUTES = 200          # a free T4 is cut near 240; Pro allows 660
 CKPT = find('last.pt')
 cmd = [sys.executable, '-u', '-m', 'kronllm.cli', 'train', '--exp', 'Q10',
        '--device', 'cuda', '--run-dir', str(WORK / 'run'),
@@ -136,6 +152,11 @@ else:
     step = torch.load(ck, map_location='cpu', weights_only=False).get('step')
     stage = WORK / 'push'
     shutil.copyfile(ck, stage / 'last.pt')
+    # best.pt is weights-only and is what the next session averages with; the
+    # soup needs neighbouring checkpoints, so it goes up too.
+    best = WORK / 'run' / 'best.pt'
+    if best.exists():
+        shutil.copyfile(best, stage / 'best.pt')
     (stage / 'dataset-metadata.json').write_text(json.dumps({
         'title': 'Kron Q10 checkpoint', 'id': 'icold21/kron-q10-ckpt',
         'licenses': [{'name': 'other'}]}))

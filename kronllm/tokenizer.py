@@ -53,6 +53,19 @@ class ByteTokenizer:
 # ---------------------------------------------------------------------------
 # byte-level BPE
 # ---------------------------------------------------------------------------
+#: The five reserved ids at the top of the 8K vocabulary, in the order
+#: ``prepare_bilingual_bin.py`` writes them.  ``BPETokenizer.eot_id`` is the
+#: *document* separator (8191, "<|endoftext|>"), which is not the end of a chat
+#: turn: a turn ends with ``TURN_EOT_ID`` (8190, "<|eot|>").  Passing the former
+#: where the latter is meant makes generation run straight through the end of
+#: the answer and into the next turn, which looks like a model defect and is not.
+SYSTEM_ID = 8187
+USER_ID = 8188
+ASSISTANT_ID = 8189
+TURN_EOT_ID = 8190
+DOC_EOT_ID = 8191
+
+
 class BPETokenizer:
     name = "bpe"
 

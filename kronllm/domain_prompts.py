@@ -16,10 +16,17 @@ tag announces a **register**, which is what has to survive into SFT, where the
 system prompt is written by a user and never matches the pretraining wording.
 
 The prompt is chosen deterministically from the document's SHA-256, so a
-rebuild produces the same bin byte for byte.  A fraction of documents keeps no
-prompt at all (``rate``): with every document annotated, the model would never
-see a bare continuation, and the promptless mode is what the held-out bin --
-and therefore every bpb number we have -- looks like.
+rebuild produces the same bin byte for byte.
+
+Every document is annotated (``rate`` = 1.0).  The first version kept a sixth of
+them bare on the theory that the promptless mode has to stay in distribution,
+because the held-out bin has no prompts and every bpb number is measured on it.
+That was defensive and unnecessary: a training window is cut at a random offset
+inside a document, so the model meets a *document start* -- the only place the
+tag appears -- in a small fraction of windows either way.  Leaving a sixth of
+the starts bare bought nothing measurable and left a second distribution to
+explain; the tag is now on every sample.  The held-out bin stays bare, so bpb
+stays comparable with the whole history.
 """
 from __future__ import annotations
 
@@ -28,10 +35,10 @@ import hashlib
 SYSTEM = "<|system|>"
 EOT = "<|eot|>"
 
-#: How many documents carry a prompt, when nothing else is asked for.  Most of
-#: the stream is annotated, but a sixth of it stays bare so that both modes
-#: remain in distribution.
-DEFAULT_RATE = 0.85
+#: How many documents carry a prompt, when nothing else is asked for.  All of
+#: them: the tag is what separates "answer in this register" from "continue this
+#: text", and a second bare distribution is a cost with no measured benefit.
+DEFAULT_RATE = 1.0
 
 #: Prompt variants per language and domain.  Written by hand, not templated:
 #: a template with a slot would give the model one sentence to memorise, which
@@ -351,16 +358,23 @@ def render(doc: dict, rate: float = DEFAULT_RATE) -> bool:
 def annotate(docs, rate: float = DEFAULT_RATE) -> dict:
     """Apply :func:`render` to a sequence of documents and count by domain.
 
-    Returns ``{"docs": n, "prompted": n, "by_domain": {...}}`` for the build
-    log: the point of the pass is coverage per domain, and a domain that
-    silently gets no prompt is a bug that only a counter would catch.
+    Returns ``{"docs", "prompted", "already", "by_domain"}`` for the build log
+    and for the checks that guard the upload.  The distinction matters: with
+    ``rate`` = 1.0 every document must carry a system prompt, but a chat document
+    already opens with one, so it is counted in ``already`` rather than
+    ``prompted`` and ``prompted`` alone is legitimately below ``docs``.  Coverage
+    is ``prompted + already == docs``; a domain that silently gets no prompt is
+    a bug that only a counter catches.
     """
     by_domain: dict[str, int] = {}
     prompted = 0
+    already = 0
     for doc in docs:
         if render(doc, rate):
             prompted += 1
             name = f"{doc.get('language', '?')}/{doc.get('domain', '?')}"
             by_domain[name] = by_domain.get(name, 0) + 1
-    return {"docs": len(docs), "prompted": prompted,
+        elif already_rendered(doc.get("text") or ""):
+            already += 1
+    return {"docs": len(docs), "prompted": prompted, "already": already,
             "by_domain": by_domain}

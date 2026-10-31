@@ -4,8 +4,9 @@ from __future__ import annotations
 import hashlib
 
 from kronllm.bilingual import DOMAIN_QUOTAS
-from kronllm.domain_prompts import (EOT, SYSTEM, VARIANTS, already_rendered,
-                                    annotate, prompt_for, render, should_prompt)
+from kronllm.domain_prompts import (DEFAULT_RATE, EOT, SYSTEM, VARIANTS,
+                                    already_rendered, annotate, prompt_for,
+                                    render, should_prompt)
 
 
 def test_every_mix_domain_has_prompts_in_both_languages():
@@ -45,9 +46,30 @@ def test_unknown_domain_or_language_gets_no_prompt():
 def test_rate_bounds():
     assert all(should_prompt(f"{i}", 1.0) for i in range(50))
     assert not any(should_prompt(f"{i}", 0.0) for i in range(50))
-    # A rate of 0.85 should land near 85 %, not at 0 or 100.
+    # The knob still works, for a deliberate partial run.
     hits = sum(should_prompt(f"{i}", 0.85) for i in range(4000))
     assert 0.82 < hits / 4000 < 0.88
+
+
+def test_every_sample_gets_a_prompt_by_default():
+    """The default is "annotate everything", not "most of it".
+
+    A sixth of the documents used to stay bare so that the promptless mode would
+    remain in distribution -- but a training window starts at a random offset
+    inside a document, so a bare *document start* is rare either way.  The owner
+    asked for the system prompt in every pretraining sample, and the measured
+    cost of the partial rate was zero.
+    """
+    assert DEFAULT_RATE == 1.0
+    docs = [
+        {"text": f"text {i}", "language": "en" if i % 2 else "ru",
+         "domain": "math" if i % 3 else "science",
+         "sha256": hashlib.sha256(str(i).encode()).hexdigest()}
+        for i in range(500)
+    ]
+    stats = annotate(docs)
+    assert stats["prompted"] == stats["docs"] == 500
+    assert all(d["text"].startswith(SYSTEM) for d in docs)
 
 
 def test_render_prefixes_and_keeps_the_text():

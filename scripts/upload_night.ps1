@@ -53,6 +53,22 @@ while ($true) {
 }
 Say ("build finished: {0:N0} bytes" -f (Get-Item $bin).Length)
 
+# The metadata is what says *which* corpus this is.  A stale bin has a plausible
+# size and the same name, so the build is not trusted until the metadata records
+# the full-prompt rebuild.
+$meta = "E:\kron_bins\epoch\tokenizer_meta.json"
+# phase rate prompted already docs tokens -- one line, easy to check in a log.
+$check = python -c "import json; m=json.load(open(r'$meta')); d=m.get('domain_prompts') or {}; print(m.get('phase'), d.get('rate'), d.get('prompted_docs'), d.get('already_prompted_docs'), d.get('docs'), m.get('train_tokens'))" 2>&1 | Select-Object -Last 1
+Say ("epoch metadata: " + $check)
+$parts = ($check -split '\s+')
+if ($parts.Count -lt 6) { Say "cannot read the metadata; not uploading"; exit 1 }
+$covered = [int64]$parts[2] + [int64]$parts[3]
+if ($parts[0] -ne "epoch" -or [double]$parts[1] -ne 1.0 -or $covered -ne [int64]$parts[4]) {
+    Say ("corpus is not fully prompted: {0} prompted + {1} already = {2} of {3}" -f $parts[2], $parts[3], $covered, $parts[4])
+    exit 1
+}
+Say ("corpus verified: all {0} documents carry a system prompt ({1} added, {2} already chat)" -f $parts[4], $parts[2], $parts[3])
+
 # ---------------------------------------------------------------- 2. stage + upload the epoch corpus
 $stage = "E:\kron_bins\kaggle_corpus"
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
