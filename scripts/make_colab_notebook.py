@@ -41,7 +41,15 @@ HEADER = """# KronLLM — одна сессия на Colab (T4)
 умерла. Чекпоинт пишется каждые 1000 шагов и на выходе по бюджету, так что
 потеря ограничена.
 
+Этот ноутбук стартует с шага **35 115** (усреднённый `soup_035115`): сессия,
+ушедшая до 43 895, отброшена, потому что училась считать лосс и на нашем же
+вставленном системном промпте. Теперь такие позиции вырезаны маской
+(`kronllm/loss_mask.py`, код v19), поэтому тренировочный лосс на первом шаге
+подскочит примерно на 0.012 нат — это ожидаемо и честно.
+
 Запуск: `Runtime → Change runtime type → T4 GPU`, затем `Runtime → Run all`.
+Первая ячейка-проверка качает только мету (1.5 КБ) и отказывается стартовать,
+если корпус на Kaggle ещё старый или чекпоинт не тот.
 """
 
 ENV = '''import shutil, subprocess, sys
@@ -74,9 +82,41 @@ kaggle_auth()
 subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'kaggle'], check=True)
 '''
 
+PREFLIGHT = '''# Ask Kaggle two file-sized questions before pulling 4.5 GB: is the corpus
+# the fully-prompted one, and does the checkpoint sit where we expect?
+from pathlib import Path
+PRE = Path('/content/pre'); PRE.mkdir(exist_ok=True)
+
+for slug, name in (('icold21/kron-corpus-2b', 'tokenizer_meta.json'),
+                   ('icold21/kron-q10-ckpt', 'last.pt')):
+    subprocess.run([sys.executable, '-m', 'kaggle', 'datasets', 'download',
+                    '-d', slug, '-f', name, '-p', str(PRE)], check=True)
+
+meta = json.loads((PRE / 'tokenizer_meta.json').read_text())
+dp = meta.get('domain_prompts') or {}
+covered = dp.get('prompted_docs', 0) + dp.get('already_prompted_docs', 0)
+print('phase        ', meta.get('phase'))
+print('train tokens ', f"{meta.get('train_tokens', 0):,}")
+print('prompted     ', f"{dp.get('prompted_docs', 0):,} added +",
+      f"{dp.get('already_prompted_docs', 0):,} already chat =",
+      f"{covered:,} of {dp.get('docs', 0):,} at rate", dp.get('rate'))
+
+assert meta.get('phase') == 'epoch', 'wrong bin: this is the decay pass'
+assert dp.get('rate') == 1.0, ('the corpus dataset is not the fully-prompted '
+                              'rebuild; upload it before running this')
+assert covered == dp.get('docs'), 'not every document carries a system prompt'
+
+state = torch.load(PRE / 'last.pt', map_location='cpu', weights_only=False)
+print('resume step  ', state.get('step'))
+if state.get('soup'):
+    print('resume source', 'averaged checkpoint (soup), no optimizer state')
+assert state.get('step') == 35115, 'unexpected resume point: ' + str(state.get('step'))
+print('preflight OK')
+'''
+
 DOWNLOAD = '''from pathlib import Path
 DL = Path('/content/dl'); DL.mkdir(exist_ok=True)
-SLUGS = ['icold21/kron-llm-code-v18', 'icold21/kron-corpus-2b',
+SLUGS = ['icold21/kron-llm-code-v19', 'icold21/kron-corpus-2b',
          'icold21/kron-q10-ckpt']
 for slug in SLUGS:
     print('[dl]', slug, flush=True)
@@ -192,9 +232,10 @@ def main() -> None:
         md(HEADER),
         code(ENV),
         code(AUTH),
+        code("import torch"),
+        code(PREFLIGHT),
         code(DOWNLOAD),
         code(ASSEMBLE),
-        code("import torch"),
         code(TRAIN),
         code(PUSH),
         md(FOOTER),
