@@ -159,10 +159,26 @@ print('preflight OK')
 
 DOWNLOAD = '''from pathlib import Path
 DL = Path('/content/dl'); DL.mkdir(exist_ok=True)
+
+# The whole-dataset endpoint serves a zip only while the dataset is small: for
+# the 4.5 GB corpus it answers 404 "No gcs url found", while every individual
+# file comes back with the right content-length.  So a failed zip falls back to
+# the file list the trainer actually needs, rather than failing the session.
+CORPUS_FILES = ('train.bpe.bin', 'val.bpe.bin', 'tokenizer.json',
+                'tokenizer_meta.json', 'val_index.json')
+FALLBACK = {'icold21/kron-corpus-2b': CORPUS_FILES,
+            'icold21/kron-q10-ckpt': ('last.pt', 'best.pt')}
+
 for slug in ['icold21/kron-llm-code-v19', 'icold21/kron-corpus-2b',
              'icold21/kron-q10-ckpt']:
     print('[dl]', slug, flush=True)
-    fetch_all(slug, DL)
+    try:
+        fetch_all(slug, DL)
+    except RuntimeError as exc:
+        print('   zip unavailable:', str(exc)[:120], flush=True)
+        print('   downloading file by file', flush=True)
+        for name in FALLBACK.get(slug, CORPUS_FILES):
+            fetch_file(slug, name, DL / name)
 
 def find(name):
     hits = sorted(p for p in DL.rglob(name))
@@ -212,14 +228,18 @@ print('corpus is the fully-prompted epoch bin')
 TRAIN = '''MINUTES = 200          # a free T4 is cut near 240; Pro allows 660
 CKPT = find('last.pt')
 cmd = [sys.executable, '-u', '-m', 'kronllm.cli', 'train', '--exp', 'Q10',
-       '--device', 'cuda', '--run-dir', str(WORK / 'run'),
-       '--minutes', str(MINUTES)]
-if CKPT:
-    cmd += ['--resume', str(CKPT)]
-    step = torch.load(CKPT, map_location='cpu', weights_only=False).get('step')
-    print('resuming from step', step)
-else:
-    print('no checkpoint found: starting from scratch')
+       '--device', 'cuda',
+       '--data-dir', str(WORK / 'data'),      # train.bpe.bin, tokenizer_meta.json
+       '--run-dir', str(WORK / 'run'),
+       '--minutes', str(MINUTES),
+       '--override', 'training.log_every=50']
+assert CKPT is not None, ('no checkpoint in /content/dl: refusing to start a '
+                          'fresh run by accident, the session resumes from '
+                          'step 35,115')
+cmd += ['--resume', str(CKPT)]
+step = torch.load(CKPT, map_location='cpu', weights_only=False).get('step')
+assert step == 35115, 'unexpected resume point: ' + str(step)
+print('resuming from step', step)
 print(' '.join(cmd))
 subprocess.run(cmd, cwd=WORK, check=True,
                env=dict(os.environ, PYTHONPATH=str(CODE_ROOT),
