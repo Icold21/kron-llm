@@ -79,18 +79,61 @@ def kaggle_auth():
     print('kaggle auth for', user)
 
 kaggle_auth()
-subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'kaggle'], check=True)
+# Pinned: kaggle 1.x signs the v1 API with basic auth, which it now answers
+# with 403, and its failure is silent (exit 1, empty stderr).  The push at the
+# end of the session is the one step that still needs this CLI.
+subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'kaggle>=2.2.5'],
+               check=True)
+print('kaggle cli', subprocess.run([sys.executable, '-m', 'kaggle', '--version'],
+                                  capture_output=True, text=True).stdout.strip())
+'''
+
+# Downloads go straight to the REST API with requests.  Two reasons the kaggle
+# CLI is not used here: it failed silently in Colab (exit 1, no stderr), and the
+# cause is the auth scheme -- the v1 API answers 403 "Permission 'datasets.get'
+# was denied" to HTTP basic auth (username + key) and 200 to the same key sent
+# as a bearer token.  Older CLI versions sign with basic auth, so the download
+# path does not depend on which one pip happened to install.
+API = '''import io, json, pathlib, zipfile, requests
+
+KJ = json.loads(pathlib.Path('/root/.kaggle/kaggle.json').read_text())
+BASE = 'https://www.kaggle.com/api/v1/datasets/download'
+HEAD = {'Authorization': 'Bearer ' + KJ['key']}
+
+def _stream(url, dest):
+    r = requests.get(url, headers=HEAD, stream=True, timeout=1800)
+    if r.status_code != 200:
+        raise RuntimeError(f'GET {url} -> HTTP {r.status_code}: {r.text[:300]}')
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    done = 0
+    with open(dest, 'wb') as fh:
+        for chunk in r.iter_content(1 << 20):
+            fh.write(chunk)
+            done += len(chunk)
+    print(f'   {dest.name}: {done/1e6:.1f} MB', flush=True)
+    return dest
+
+def fetch_file(slug, name, dest):
+    return _stream(f'{BASE}/{slug}/{name}', pathlib.Path(dest))
+
+def fetch_all(slug, dest_dir):
+    """Whole dataset: the API returns one zip, so unzip it in place."""
+    dest_dir = pathlib.Path(dest_dir); dest_dir.mkdir(parents=True, exist_ok=True)
+    zpath = _stream(f'{BASE}/{slug}', dest_dir / (slug.split('/')[1] + '.zip'))
+    with zipfile.ZipFile(zpath) as zf:
+        zf.extractall(dest_dir)
+    zpath.unlink()
+    print('   unzipped into', dest_dir, flush=True)
+    return dest_dir
 '''
 
 PREFLIGHT = '''# Ask Kaggle two file-sized questions before pulling 4.5 GB: is the corpus
 # the fully-prompted one, and does the checkpoint sit where we expect?
 from pathlib import Path
-PRE = Path('/content/pre'); PRE.mkdir(exist_ok=True)
 
-for slug, name in (('icold21/kron-corpus-2b', 'tokenizer_meta.json'),
-                   ('icold21/kron-q10-ckpt', 'last.pt')):
-    subprocess.run([sys.executable, '-m', 'kaggle', 'datasets', 'download',
-                    '-d', slug, '-f', name, '-p', str(PRE)], check=True)
+PRE = Path('/content/pre')
+fetch_file('icold21/kron-corpus-2b', 'tokenizer_meta.json', PRE / 'tokenizer_meta.json')
+fetch_file('icold21/kron-q10-ckpt', 'last.pt', PRE / 'last.pt')
 
 meta = json.loads((PRE / 'tokenizer_meta.json').read_text())
 dp = meta.get('domain_prompts') or {}
@@ -116,12 +159,10 @@ print('preflight OK')
 
 DOWNLOAD = '''from pathlib import Path
 DL = Path('/content/dl'); DL.mkdir(exist_ok=True)
-SLUGS = ['icold21/kron-llm-code-v19', 'icold21/kron-corpus-2b',
-         'icold21/kron-q10-ckpt']
-for slug in SLUGS:
+for slug in ['icold21/kron-llm-code-v19', 'icold21/kron-corpus-2b',
+             'icold21/kron-q10-ckpt']:
     print('[dl]', slug, flush=True)
-    subprocess.run([sys.executable, '-m', 'kaggle', 'datasets', 'download',
-                    '-d', slug, '-p', str(DL), '--unzip'], check=True)
+    fetch_all(slug, DL)
 
 def find(name):
     hits = sorted(p for p in DL.rglob(name))
@@ -190,6 +231,12 @@ if not ck.exists():
     print('no checkpoint written')
 else:
     step = torch.load(ck, map_location='cpu', weights_only=False).get('step')
+    # A copy in /content so the file can be dragged out of the Files pane by
+    # hand if the upload fails -- 200 minutes of training should never hinge on
+    # one CLI call.
+    shutil.copyfile(ck, '/content/last.pt')
+    print('checkpoint copied to /content/last.pt (step', step, ')')
+
     stage = WORK / 'push'
     shutil.copyfile(ck, stage / 'last.pt')
     # best.pt is weights-only and is what the next session averages with; the
@@ -202,8 +249,13 @@ else:
         'licenses': [{'name': 'other'}]}))
     r = subprocess.run([sys.executable, '-m', 'kaggle', 'datasets', 'version',
                         '-p', str(stage), '-m', f'colab session, step {step}',
-                        '--dir-mode', 'zip'])
+                        '--dir-mode', 'zip'], capture_output=True, text=True)
     print('push exit', r.returncode, 'at step', step)
+    if r.returncode != 0:
+        print('stdout:', r.stdout[-800:])
+        print('stderr:', r.stderr[-800:])
+        print('UPLOAD FAILED: download /content/last.pt from the Files pane and')
+        print('version the dataset icold21/kron-q10-ckpt with it by hand.')
 '''
 
 FOOTER = """## Что дальше
@@ -233,6 +285,7 @@ def main() -> None:
         code(ENV),
         code(AUTH),
         code("import torch"),
+        code(API),
         code(PREFLIGHT),
         code(DOWNLOAD),
         code(ASSEMBLE),
