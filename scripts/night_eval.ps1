@@ -62,12 +62,20 @@ if (Test-Path $html) {
     }
     $subject = "Q10 session: step $step, curve and samples (last + soup)"
     Say "mailing: $subject"
-    1..5 | ForEach-Object {
-        python $mail send --model "DeepSeek V4.1 Flash" --project "kron_llm" `
+    # Retry until one send is acknowledged, not a fixed five.  The link drops
+    # mid-SMTP about half the time, so retries are needed -- but the old loop
+    # sent five times unconditionally and delivered five identical letters on
+    # the night of 2026-10-31.  The mailer prints a message_id when it succeeds.
+    $sent = $false
+    for ($m = 1; $m -le 5 -and -not $sent; $m++) {
+        $r = python $mail send --model "DeepSeek V4.1 Flash" --project "kron_llm" `
             --session "kron_chain" --subject $subject --body-file $html --html 2>&1 |
-            Select-Object -Last 1 | ForEach-Object { Say ("  " + $_) }
-        Start-Sleep -Seconds 60
+            Select-Object -Last 1
+        Say ("  " + $r)
+        if ($r -match "message_id|sent to=") { $sent = $true }
+        elseif ($m -lt 5) { Start-Sleep -Seconds 60 }
     }
+    if (-not $sent) { Say "MAIL FAILED after 5 attempts: the report is in $html" }
 } else {
     Say "no HTML report to mail"
 }

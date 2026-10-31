@@ -149,22 +149,40 @@ $stalled = 0
     # 1. wait for the session to end.  A transient API failure must not look like
     #    completion, otherwise the next session would be pushed on top of a live run.
     $deadline = (Get-Date).AddHours(14)
+    $worker = ""
+    $unknown = 0
     while ($true) {
         if ((Get-Date) -gt $deadline) { Say "TIMEOUT waiting for the session"; exit 1 }
         $status = Run 180 @('-m','kaggle','kernels','status',$kernel) | Select-Object -Last 1
         Say $status
-        if ($status -match "COMPLETE|ERROR|CANCEL|FAILED") {
-            if ((Get-Date) -lt $pushedAt.AddMinutes(10)) {
-                Say "status is the previous version's; waiting for the new run to start"
-                Start-Sleep -Seconds 300
-                continue
+        # Only a line that actually carries a worker status counts.  -match is
+        # case-insensitive, so the old pattern "COMPLETE|ERROR|CANCEL|FAILED"
+        # matched the exception text of a failed call ("SSLError"): a dropped
+        # connection read as a finished session, the chain then downloaded the
+        # previous version's output, saw no progress and called the run failed
+        # while the kernel was still alive.  An unreadable answer is "unknown",
+        # never "ended".
+        if ($status -match 'KernelWorkerStatus\.([A-Za-z]+)') {
+            $worker = $Matches[1].ToUpper()
+            if ($worker -match '^(COMPLETE|ERROR|CANCEL|CANCELLED|FAILED)$') {
+                if ((Get-Date) -lt $pushedAt.AddMinutes(10)) {
+                    Say "status is the previous version's; waiting for the new run to start"
+                    Start-Sleep -Seconds 300
+                    continue
+                }
+                break
             }
-            break
+            $unknown = 0
+        } else {
+            $unknown++
+            if ($unknown -eq 1) {
+                Say "status unavailable: the link dropped, not the session; still waiting"
+            }
         }
         Start-Sleep -Seconds 300
     }
-    $errored = $status -match "ERROR|CANCEL|FAILED"
-    Say "session ended, being processed"
+    $errored = $worker -match '^(ERROR|CANCEL|CANCELLED|FAILED)$'
+    Say ("session ended with $worker, being processed")
 
     # 2. download the session output.  The directory is cleared first: a failed run
     #    can hand back the previous version's files, and stale weights are worse
@@ -177,9 +195,18 @@ $stalled = 0
         Out-File -Encoding utf8 -Append $log
     Remove-Item (Join-Path $out "q10") -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $out | Out-Null
-    Run 1800 @('-m','kaggle','kernels','output',$kernel,'-p',$out) |
-        Out-File -Encoding utf8 -Append $log
-    Say "output download finished"
+    # A failed download is not a failed session: it leaves no files, which then
+    # reads as "no progress" and spends one of the three stalls.  Retry the
+    # download itself before judging the session.
+    $got = $false
+    for ($d = 1; $d -le 3; $d++) {
+        Run 1800 @('-m','kaggle','kernels','output',$kernel,'-p',$out) |
+            Out-File -Encoding utf8 -Append $log
+        if (Test-Path (Join-Path $out "q10\log.csv")) { $got = $true; break }
+        Say ("output download came back empty (attempt {0}/3)" -f $d)
+        Start-Sleep -Seconds 60
+    }
+    Say ("output download finished: " + $(if ($got) { "files present" } else { "nothing after 3 attempts" }))
 
     $nowStep = [int](python scripts\session_progress.py --new 2>$null | Select-Object -Last 1)
     Say ("this download ends at step " + $nowStep)
