@@ -639,7 +639,16 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
                       f"({saved_key} -> {data_key}); continuing on the new "
                       f"stream, tokenizer identical ({tok_key})")
         raw_model.load_state_dict(ck["model"])
-        opt.load_state_dict(ck["optimizer"])
+        # A weights-only checkpoint (best.pt, a soup, anything published on its
+        # own) carries no AdamW moments.  Refusing it would mean that losing
+        # last.pt ends the run even though the weights are intact, which is
+        # exactly what happened on 2026-10-31.  A fresh optimiser costs a
+        # transient of ~100 steps, not the run.
+        if ck.get("optimizer"):
+            opt.load_state_dict(ck["optimizer"])
+        elif is_main:
+            print("[resume] no optimizer state in the checkpoint (weights-only);"
+                  " starting a fresh AdamW -- expect ~100 hot steps")
         start_step = int(ck.get("step", 0))
         best_ppl = float(ck.get("val_ppl", float("inf")))
         # A decay pass counts steps from its own origin, not from the epoch it

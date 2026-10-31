@@ -25,6 +25,7 @@ import torch.nn.functional as F
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
 from .kron import KronBank, KronCompose, apply_rope, rope_frequencies
+from .loss_mask import prompt_target_mask
 from torch.utils.checkpoint import checkpoint
 
 # Roles in the order in which a block consumes them.  "fg" is the gate branch
@@ -323,6 +324,9 @@ class MHCRouter(nn.Module):
         then stay within ~2 % of one, which is the part that is approximate.
         Boundedness is the property the loop needs; sum preservation is the
         part that can afford to be approximate.
+
+        Two lanes have a closed form and never come here (see
+        :meth:`sinkhorn2`); this path is for four.
         """
         logits = logits.float()
         for _ in range(iterations):
@@ -331,10 +335,39 @@ class MHCRouter(nn.Module):
         mix = logits.exp()
         return mix / mix.sum(-1, keepdim=True).clamp_min(1e-12)
 
+    @staticmethod
+    def sinkhorn2(logits: torch.Tensor) -> torch.Tensor:
+        """Exact two-lane projection, in closed form.
+
+        A 2x2 doubly stochastic matrix is ``[[x, 1-x], [1-x, x]]``, so it has
+        one degree of freedom and the Sinkhorn limit is determined by the
+        cross-ratio, which scaling cannot change::
+
+            (a/b)(d/c) = (x/(1-x))**2   =>   x = 1 / (1 + sqrt(bc / ad))
+
+        Twenty iterations of logsumexp on an 8-element matrix are forty kernel
+        launches per router, 24 routers, every step -- measured at 1.19 s per
+        step against 0.42 s for the same depth without mHC.  The closed form is
+        exact, so the routing gets cheaper than the block it routes.
+        """
+        a = logits[..., 0, 0].float()
+        b = logits[..., 0, 1].float()
+        c = logits[..., 1, 0].float()
+        d = logits[..., 1, 1].float()
+        ratio = torch.sqrt(torch.exp((b + c) - (a + d)).clamp_min(1e-12))
+        x = 1.0 / (1.0 + ratio)
+        one = torch.ones_like(x)
+        return torch.stack([torch.stack([x, one - x], -1),
+                            torch.stack([one - x, x], -1)], -2)
+
+    def route(self, lanes: torch.Tensor):
+        """``(pre, post, mix)`` for these lanes, computed once per block."""
+        return self._route(lanes)
+
     def _route(self, lanes: torch.Tensor):
         # Autocast off: the routing is eight numbers per position, and bf16/fp16
-        # loses enough in the twenty Sinkhorn normalisations that ``mix`` stops
-        # summing to one -- the property the constraint exists to guarantee.
+        # loses enough in the Sinkhorn normalisations that ``mix`` stops summing
+        # to one -- the property the constraint exists to guarantee.
         with torch.autocast(device_type=lanes.device.type, enabled=False):
             flat = lanes.flatten(-2).float()
             normed = flat * torch.rsqrt(flat.square().mean(-1, keepdim=True)
@@ -346,22 +379,32 @@ class MHCRouter(nn.Module):
             if self.fixed_identity:
                 mix = torch.eye(s, device=flat.device).expand(
                     *flat.shape[:-1], s, s)
+            elif s == 2:
+                mix = self.sinkhorn2(logits[..., 2 * s:].unflatten(-1, (2, 2)))
             else:
                 mix = self.sinkhorn(
                     logits[..., 2 * s:].unflatten(-1, (s, s)), self.iterations)
         return pre, post, mix
 
-    def read(self, lanes: torch.Tensor) -> torch.Tensor:
-        """The branch input the block sees: a learned mix over the lanes."""
-        pre, _, _ = self._route(lanes)
+    def read(self, lanes: torch.Tensor, routing=None) -> torch.Tensor:
+        """The branch input the block sees: a learned mix over the lanes.
+
+        ``routing`` lets the caller compute ``(pre, post, mix)`` once and use it
+        for both the read and the merge.  They are functions of the same lanes,
+        and recomputing them doubled the mHC step cost for nothing.
+        """
+        pre = routing[0] if routing is not None else self._route(lanes)[0]
         branch = torch.matmul(pre.unsqueeze(-2), lanes.float()).squeeze(-2)
         if self.pre_scale != 1.0:
             branch = branch * self.pre_scale
         return branch.to(lanes.dtype)
 
-    def merge(self, lanes: torch.Tensor, branch: torch.Tensor) -> torch.Tensor:
+    def merge(self, lanes: torch.Tensor, branch: torch.Tensor,
+              routing=None) -> torch.Tensor:
         """Mix the lanes and write the branch output into each of them."""
-        _, post, mix = self._route(lanes)
+        if routing is None:
+            routing = self._route(lanes)
+        _, post, mix = routing
         mixed = torch.matmul(mix.to(lanes.dtype), lanes)
         update = post.unsqueeze(-1) * branch.float().unsqueeze(-2)
         return (mixed.float() + update).to(lanes.dtype)
@@ -684,15 +727,17 @@ class KronBlock(nn.Module):
         differently on its second pass.
         """
         cache: Dict[str, Any] = {}
-        branch = router_attn.read(streams)
+        routing_a = router_attn.route(streams)
+        branch = router_attn.read(streams, routing_a)
         o, state, cache, new_kv = self.forward(
             branch, state, layer_idx, cos, sin, collect=collect, mode=mode,
             P=P, past_kv=past_kv, use_cache=use_cache, branch_only=True)
-        streams = router_attn.merge(streams, o)
-        branch = router_ffn.read(streams)
+        streams = router_attn.merge(streams, o, routing_a)
+        routing_f = router_ffn.route(streams)
+        branch = router_ffn.read(streams, routing_f)
         f = self._ffn_half(branch, state, self._make_apply(state, layer_idx,
                                                           mode, P))
-        streams = router_ffn.merge(streams, f)
+        streams = router_ffn.merge(streams, f, routing_f)
         return streams, state, cache, new_kv
 
     def _attend(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor,
@@ -876,6 +921,10 @@ class KronTransformer(nn.Module):
         # torch.utils.checkpoint) so that a wide vocabulary never materialises
         # the full B*T*V logits tensor.  0 disables chunking.
         self.loss_chunk = int(mc.get("loss_chunk") or 0)
+        # Drop the inserted <|system|> prefix from the loss: it is boilerplate
+        # the harness writes at inference, and training on it spent ~1 % of the
+        # gradient on our own strings while flattering the reported loss.
+        self.ignore_prompt_targets = bool(mc.get("ignore_prompt_targets", True))
 
     # -- init -------------------------------------------------------------
     def _init_weights(self, module: nn.Module) -> None:
@@ -1028,17 +1077,27 @@ class KronTransformer(nn.Module):
             return torch.matmul(torch.matmul(x, self.embed_up.weight), w.t())
         return self.lm_head(x)
 
-    def _ce_chunk(self, xc: torch.Tensor, yc: torch.Tensor) -> torch.Tensor:
-        """Cross-entropy over one row chunk; the checkpointed unit of
+    def _ce_chunk(self, xc: torch.Tensor, yc: torch.Tensor,
+                  mc: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Per-token cross-entropy over one row chunk; the checkpointed unit of
         :meth:`_chunked_loss`.  Runs under ``no_grad`` in the forward (freeing
         the chunk's logits) and is recomputed in the backward, so at most one
         chunk of ``chunk x V`` logits exists at a time.  All head weights it
         reads are parameters (leaves), so gradients flow; the kron-embed table
-        is rebuilt from its factor parameters inside the recompute."""
-        logits = self._logits(xc)
-        return F.cross_entropy(logits, yc, reduction="sum")
+        is rebuilt from its factor parameters inside the recompute.
 
-    def _chunked_loss(self, x: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        ``mc`` drops the positions whose target is our own prompt prefix (see
+        :mod:`kronllm.loss_mask`); the caller divides by the number of kept
+        tokens, so the masked positions cost neither gradient nor denominator.
+        """
+        logits = self._logits(xc)
+        per = F.cross_entropy(logits, yc, reduction="none")
+        if mc is not None:
+            per = per[~mc]
+        return per
+
+    def _chunked_loss(self, x: torch.Tensor, targets: torch.Tensor,
+                      mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """Mean cross-entropy in row chunks of ``loss_chunk`` rows.
 
         A wide vocabulary makes the full ``B*T*V`` logits tensor the largest
@@ -1051,14 +1110,21 @@ class KronTransformer(nn.Module):
         """
         y = targets.reshape(-1)
         xr = x.reshape(-1, x.size(-1))
+        m = mask.reshape(-1) if mask is not None else None
         n = y.numel()
         total: Optional[torch.Tensor] = None
+        kept = 0
         for i in range(0, n, self.loss_chunk):
-            chunk = checkpoint(self._ce_chunk, xr[i:i + self.loss_chunk],
-                               y[i:i + self.loss_chunk], use_reentrant=False)
-            total = chunk if total is None else total + chunk
+            sl = slice(i, i + self.loss_chunk)
+            chunk = checkpoint(self._ce_chunk, xr[sl], y[sl],
+                               (m[sl] if m is not None else None),
+                               use_reentrant=False)
+            total = chunk.sum() if total is None else total + chunk.sum()
+            kept += int(chunk.numel())
         assert total is not None, "loss_chunk > 0 guarantees one chunk"
-        return total / n
+        # Dividing by the kept count, not by n: with a mask the two differ, and
+        # the mean must be over the tokens actually trained on.
+        return total / max(1, kept)
 
     # -- forward ----------------------------------------------------------
     def forward(self, idx: torch.Tensor, targets: Optional[torch.Tensor] = None,
@@ -1148,18 +1214,35 @@ class KronTransformer(nn.Module):
         x = self.norm_f(x)
         emb = self.embed_table() if self.kron_embed is not None else None
 
+        # Every document opens with our own <|system|> prefix.  The targets there
+        # are boilerplate, not corpus text, so they are dropped from the loss --
+        # see kronllm/loss_mask.py.  A bare bin (the held-out val bin) produces
+        # an all-False mask and the loss is exactly what it was before.
+        mask: Optional[torch.Tensor] = None
+        if targets is not None and self.ignore_prompt_targets:
+            mask = prompt_target_mask(idx)
+            if not bool(mask.any()):
+                mask = None
+
         if (targets is not None and self.loss_chunk > 0
                 and self.routed is None):
             # Chunked loss: never materialise the full B*T*V logits tensor.
             # Used for training, validation and diagnostics alike; `collect`
             # still records the trace and stats from the block outputs.
-            out: Dict[str, Any] = {"loss": self._chunked_loss(x, targets)}
+            out: Dict[str, Any] = {"loss": self._chunked_loss(x, targets, mask)}
         else:
             logits = self._logits(x, eff, emb)
             out = {"logits": logits}
             if targets is not None:
-                out["loss"] = F.cross_entropy(
-                    logits.view(-1, self.vocab_size), targets.reshape(-1))
+                per = F.cross_entropy(
+                    logits.view(-1, self.vocab_size), targets.reshape(-1),
+                    reduction="none")
+                if mask is not None:
+                    per = per[~mask.reshape(-1)]
+                    out["loss"] = (per.mean() if per.numel()
+                                   else logits.sum() * 0.0)
+                else:
+                    out["loss"] = per.mean()
         if collect:
             ratios = [(h_norms[i + 1] + 1e-9) / (h_norms[i] + 1e-9)
                       for i in range(len(h_norms) - 1)]

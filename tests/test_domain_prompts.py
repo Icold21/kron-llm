@@ -97,6 +97,6 @@ def test_annotate_counts_per_domain():
             [("en", "math"), ("en", "math"), ("ru", "science")])
     ]
     stats = annotate(docs, rate=1.0)
-    assert stats == {"docs": 3, "prompted": 3,
+    assert stats == {"docs": 3, "prompted": 3, "already": 0,
                      "by_domain": {"en/math": 2, "ru/science": 1}}
     assert all(d["text"].startswith(SYSTEM) for d in docs)

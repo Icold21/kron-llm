@@ -99,6 +99,11 @@ DEFAULTS: Dict[str, Any] = {
         # Fuse all composes of the model into a handful of batched GEMMs.
         # See kronllm/kron.py:KronBank for the launch-count rationale.
         "batched_prelude": True,
+        # Drop the <|system|> prefix we insert into every document from the
+        # loss.  The harness writes that prefix at inference, so predicting it
+        # is work with no consumer; masking it also makes the training loss
+        # comparable across the corpus switch (see kronllm/loss_mask.py).
+        "ignore_prompt_targets": True,
         "kron": {
             "L": 4,
             "terms": 2,
