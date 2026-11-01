@@ -84,7 +84,7 @@ Measured, not assumed: the depth carry is worth 1.1 % bpb, freezing its scalar
 
 ## Training budget
 
-At the measured 2.552 s/step on a single Kaggle T4 (batch 32, seq 512), one epoch of the 2.78B-token corpus is **120 GPU-hours**; the decay pass (30 % of the epoch, quality-selected slice plus 5 % chat) adds **35**, and SFT 4,000 steps adds **2.8**. Roughly **132 GPU-hours remain** from step 36,549 -- about 12 sessions of quota. Derivation in `docs/compute_budget.md` of the code repository.
+At the measured 2.552 s/step on a single Kaggle T4 (batch 32, seq 512), one epoch of the 2.82B-token corpus is **122 GPU-hours**; the decay pass (30 % of the epoch, quality-selected slice plus 5 % chat) adds **36**, and SFT 4,000 steps adds **2.8**. Roughly **131 GPU-hours remain** from step 36,549 -- about 12 sessions of quota. Derivation in `docs/compute_budget.md` of the code repository.
 
 ## Next
 

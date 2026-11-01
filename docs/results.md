@@ -657,10 +657,26 @@ Q10 is 9,938,886 parameters (d=512, 25 layers, 8 heads, 8K bilingual BPE,
 Kronecker K=10, gated FFN). Everything above is the bench that chose this
 configuration; this section is the product.
 
-**Corpus.** 2,783,383,150 tokens, 933,522 documents, EN 59.7 % / RU 40.3 % by
-tokens (10.02 GB of text, 3.60 bytes/token). The held-out bin never changes
+**Corpus.** 2,822,521,746 tokens, 1,213,487 documents, EN 59.7 % / RU 40.3 % by
+tokens (9.91 GB of text, 3.51 bytes/token). The held-out bin never changes
 (`sha256 a45bbb03...`, 46.2M tokens), so `val_bpb_mixed` is comparable across
 every session even when the training corpus is rebuilt.
+
+The corpus was rebuilt twice mid-run, which is why the train-loss curve has two
+steps in it that the validation curve does not have:
+
+| version | tokens | what changed |
+|---|---:|---|
+| v3 | 2,347,352,486 | prompt-free (the domain prompts were removed, not masked) |
+| v4 | 2,783,383,150 | prose rebalance: +3.3 GB wiki, +2.6 GB Gutenberg, RU math/science up |
+| **v5** | **2,822,521,746** | **100 MB of arithmetic drills interleaved (1.0 % of tokens, 69 % of them column drills written digit by digit)** |
+
+v5 costs 2,389 extra steps (+1.7 GPU-h on a T4) and moves the token split by
+0.04 of a point, because the drills are generated symmetrically in both
+languages. Their job is the *format*: a worked answer is something the
+pretraining text never contains -- measured, 14.5 `a op b = c` pairs per million
+characters, none of them step by step -- so the decay pass and SFT would
+otherwise have to teach the markup from cold.
 
 **Curve.** `val_bpb_mixed` is the honest number: blocks drawn inside every
 (language, domain) bucket, bytes counted per batch from the tokenizer's

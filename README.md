@@ -610,13 +610,13 @@ Measured speed: **2.552 s/step** (median of the last ten steps of session 5, one
 
 | stage | steps | tokens | GPU hours |
 |---|---|---|---|
-| Q10 pretraining, full epoch | 169,884 | 2.78B | 120.4 |
-| done so far (step 36,549) | 36,549 | 0.60B | 25.9 |
-| left in the epoch | 133,335 | 2.18B | 94.5 |
-| decay Q10A (30 % of the epoch) | 49,384 | 0.81B | 35.0 |
+| Q10 pretraining, full epoch | 172,273 | 2.82B | 122.1 |
+| done so far (step 36,549) | 42,700 | 0.70B | 30.3 |
+| left in the epoch | 129,573 | 2.12B | 91.9 |
+| decay Q10A (30 % of the epoch) | 51,294 | 0.84B | 36.4 |
 | SFT S10 | 4,000 | 0.07B | 2.8 |
 
-**132 GPU hours remain**, ~12 sessions of 11 h at the free Kaggle quota of ~30 h/week. One such session is ~15,517 steps (0.25B tokens).
+**131 GPU hours remain**, ~12 sessions of 11 h at the free Kaggle quota of ~30 h/week. One such session is ~15,517 steps (0.25B tokens).
 
 ## 12. Repository layout
 
