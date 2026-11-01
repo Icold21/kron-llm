@@ -11,6 +11,7 @@ Usage::
 """
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -37,6 +38,12 @@ PATCHES = [
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--code-version", type=int, default=22,
+                    help="the kron-llm-code-vNN dataset this kernel mounts; it "
+                         "carries the config, so bumping the step count or the "
+                         "LR means bumping this")
+    args = ap.parse_args()
     nb = json.loads((SRC / "train.ipynb").read_text(encoding="utf-8"))
     DST.mkdir(parents=True, exist_ok=True)
 
@@ -75,7 +82,7 @@ next one resumes from `last.pt`.
         "enable_gpu": True,
         "enable_internet": True,
         "dataset_sources": [
-            "icold21/kron-llm-code-v21",
+            f"icold21/kron-llm-code-v{args.code_version}",
             "icold21/kron-q10a-anneal-bin",
             "icold21/kron-q10-ckpt",
         ],

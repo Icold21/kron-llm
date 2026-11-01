@@ -13,6 +13,7 @@ Gates, in order:
 """
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import subprocess
@@ -51,6 +52,29 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def language_bytes(mix_dir: Path) -> dict[str, int]:
+    """UTF-8 bytes per language over every shard the encoder read.
+
+    ``build_streaming`` sweeps the domain shards and leaves the side pools
+    (``*_drills``, ``*_chat``), so the directory is exactly the corpus that went
+    into the bin -- except for the 2 % held-out split, which is stratified per
+    (language, domain) and therefore barely moves a ratio.
+    """
+    out: dict[str, int] = {}
+    for path in sorted(mix_dir.glob("*.jsonl.gz")):
+        fallback = path.name.split("_")[0]
+        with gzip.open(path, "rt", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                doc = json.loads(line)
+                lang = doc.get("language") or fallback
+                out[lang] = out.get(lang, 0) + len(
+                    (doc.get("text") or "").encode("utf-8"))
+    return out
+
+
 def main() -> None:
     if not (OUT / "train.bpe.bin").exists():
         raise SystemExit("no bin yet")
@@ -59,13 +83,6 @@ def main() -> None:
     meta_path = OUT / "tokenizer_meta.json"
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
 
-    # The encoder measures the language split on the text it actually encoded,
-    # so its own numbers are kept.  They used to be recomputed here from the mix
-    # report times two bytes-per-token constants, which silently dropped every
-    # slice the report does not carry (the drills pool is interleaved at encode
-    # time, after the report is written) and replaced a measurement with an
-    # estimate.  The report is now a cross-check: it must agree with the bin to
-    # within a few percent, and a disagreement is printed.
     report = json.loads((ROOT / "data" / "bilingual" / "corpus_report.json")
                         .read_text(encoding="utf-8"))
     mixed = report["mixed"]
@@ -79,6 +96,36 @@ def main() -> None:
             f"({drift:.1%} apart -- the interleaved side pools are the difference)")
         if drift > 0.10:
             say("WARNING: the report and the bin disagree by more than 10 %")
+
+    # ``--reuse-val-dir`` copies the held-out meta, and with it the language
+    # block of the *source* directory -- which for the canonical held-out bin is
+    # a small val-only corpus, not this one.  That is how epoch_v5 was first
+    # published with a token share of 62/38 instead of the measured 60/40: the
+    # numbers were not wrong, they described a different corpus.  The block is
+    # therefore rebuilt from the mix that was encoded, scaled to the bytes the
+    # encoder actually wrote (the same method epoch_v4 used, so the two remain
+    # comparable), and the copy is reported rather than trusted.
+    lang_b = language_bytes(ROOT / "data" / "bilingual" / "mix")
+    total_b = sum(lang_b.values())
+    if total_b and measured_b:
+        scale = measured_b / total_b
+        tok = {l: lang_b[l] * scale / BPT.get(l, 3.5) for l in lang_b}
+        tot_tok = sum(tok.values())
+        copied = {l: v.get("bytes") for l, v in (meta.get("language") or {}).items()}
+        say(f"language block in the meta: {copied} (bytes) -- "
+            f"{'stale copy' if sum(v or 0 for v in copied.values()) != measured_b else 'consistent'}")
+        meta["language"] = {l: {"bytes": int(lang_b[l] * scale),
+                                "tokens": int(tok[l]),
+                                "bytes_per_token": BPT.get(l, 3.5)}
+                            for l in sorted(lang_b)}
+        meta["token_share"] = {l: round(tok[l] / tot_tok, 4) for l in sorted(lang_b)}
+        meta["byte_share"] = {l: round(lang_b[l] / total_b, 4) for l in sorted(lang_b)}
+        say(f"rebuilt from the mix: byte share {meta['byte_share']} -> "
+            f"token share {meta['token_share']}")
+        en_share = meta["token_share"].get("en", 0.0)
+        if not 0.55 <= en_share <= 0.65:
+            say(f"WARNING: English holds {en_share:.1%} of the tokens; the "
+                f"contract is 60/40")
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
     old_hash = sha256(OLD / "val.bpe.bin")
@@ -139,17 +186,25 @@ def main() -> None:
 
     chk = ROOT / "data" / "corpus_check_v3"
     chk.mkdir(parents=True, exist_ok=True)
+    expect = hashlib.sha256((OUT / "tokenizer_meta.json").read_bytes()).hexdigest()
     for _ in range(30):
+        # The CLI leaves an existing file in place, so the previous run's copy
+        # is still there when the download is a no-op -- which is how a stale
+        # metadata file once "confirmed" an upload that had not landed yet.
+        (chk / "tokenizer_meta.json").unlink(missing_ok=True)
         subprocess.run([sys.executable, "-m", "kaggle", "datasets", "download",
                         "-d", SLUG, "-f", "tokenizer_meta.json", "-p", str(chk)],
                        capture_output=True, text=True)
         remote = chk / "tokenizer_meta.json"
         if remote.exists():
+            got = hashlib.sha256(remote.read_bytes()).hexdigest()
             rm = json.loads(remote.read_text(encoding="utf-8"))
-            if rm.get("train_tokens") == meta["train_tokens"]:
-                say(f"DONE: remote metadata matches, {rm['train_tokens']:,} tokens, "
+            if got == expect:
+                say(f"DONE: remote metadata is byte-identical "
+                    f"(sha256 {got[:12]}), {rm['train_tokens']:,} tokens, "
                     f"token share {rm.get('token_share')}")
                 return
+            say(f"  remote sha {got[:12]} != local {expect[:12]}; retrying")
         time.sleep(20)
     raise SystemExit("remote metadata never matched")
 

@@ -770,17 +770,19 @@ EXPERIMENTS["Q10"] = {
     },
 }
 # Q10A: the WSD decay pass.  Resumes the end-of-epoch weights, then anneals
-# 3e-4 -> 1e-6 over the tail of an epoch (29 % of it) on the same domain profile
-# selected by quality, plus chat and arithmetic drills so the chat markup and
-# the worked-answer format stop being cold before SFT.  No warmup: the pass
+# 3e-4 -> 1e-6 over the tail of an epoch (29.8 % of it) on the same domain
+# profile selected by quality, plus chat and arithmetic drills so the chat markup
+# and the worked-answer format stop being cold before SFT.  No warmup: the pass
 # starts on the curve at full LR.
 # This pass is the *only* anneal in the schedule (decided 2026-11-01): the epoch
 # keeps 3e-4 to the end, so the drop happens once, at the lowest-LR phase, on
 # the corpus whose documents were chosen for it.  A cosine tail inside the epoch
 # would have started the pass at a rate too small to teach the cold chat and
 # drill tokens anything.
+# The step count is the decay bin divided by the step size
+# (840,414,896 / 16,384 = 51,294), not a hand-picked percentage.
 EXPERIMENTS["Q10A"] = {
-    "desc": "Q10 decay pass: 49,384 steps (29.1% of an epoch, the bin divided by "
+    "desc": "Q10 decay pass: 51,294 steps (29.8% of an epoch, the bin divided by "
             "the step size) on quality-selected data plus chat and drills, "
             "LR 3e-4 -> 1e-6",
     "overrides": {
@@ -788,8 +790,8 @@ EXPERIMENTS["Q10A"] = {
         "training.lr": 3e-4,
         "training.min_lr": 1e-6,
         "training.warmup_steps": 0,
-        "training.run_steps": 49384,
-        "training.schedule_steps": 49384,
+        "training.run_steps": 51294,
+        "training.schedule_steps": 51294,
         # The decay pass deliberately resumes the epoch-1 weights with the
         # epoch-1 optimizer state on a *different* (curated) corpus; the token
         # id space is the same one, only the document mix changes.
