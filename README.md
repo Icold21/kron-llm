@@ -4,8 +4,9 @@ KronLLM is a small decoder-only language model whose matrix layers are built
 entirely from **Kronecker sums of rank-1 factors**. Every attention projection
 and every FFN projection is a composition of `L` such factors instead of a
 dense `d × d` weight, so a layer that would need 102,400 numbers needs 15,753.
-The model is designed for a **6 GB consumer GPU**: the shipped configuration
-trains and samples inside 4.1 GB of VRAM.
+The model is designed for a **6 GB consumer GPU**: the bench configuration trains
+and samples inside 4.1 GB of VRAM, and the main 10M model is sized to ship as an
+int8 artifact under 10 MB.
 
 This repository is a research log as much as a model. It contains the
 architecture, the training code, the measurements that killed several plausible
@@ -17,41 +18,49 @@ see [§8.4](#84-what-we-tried-and-rejected).
 
 | | |
 |---|---|
-| Best model | **Q8g-long** — 2,851,280 parameters |
-| Quality | **0.7542 bits/byte** (TinyStories val, 61.4M tokens seen) |
-| Shipped artifact | [`artifacts/q8g_int8.pt`](artifacts/) — 3.29 MB, int8, +0.0003 bpb |
-| Training cost | 3.3 h on a GTX 1660 Ti, 0.895 s/step, **4.09 GB** peak |
-| Architecture | 24 layers, d=320, 8 heads, seq 192, BPE-4096, gated Kronecker FFN |
-| Tests | 102 passed, 3 skipped (CPU only) |
+| **Main model** | **Q10** — 9,938,886 parameters (d=512, 25 layers, 8K bilingual BPE, K=10) |
+| State | pretraining on the bilingual corpus: **step 36,549 of 169,884** (21.5 % of the epoch) |
+| Quality so far | **1.1828 bits/byte** mixed (EN 1.4327 / RU 0.9411) at step 36,000; GPT-2-124M scores 1.554 on the same blocks |
+| Corpus | 2.78B tokens, EN 59.7 / RU 40.3 by tokens, held-out `a45bbb03` |
+| Checkpoint | [`icold21/kron-q10-ckpt`](https://www.kaggle.com/datasets/icold21/kron-q10-ckpt) — 38 MB weights-only, plus `last.pt` with the optimiser |
+| Compute | 2.552 s/step on one Kaggle T4 (batch 32, seq 512); 120.4 GPU-h for the epoch, **132.4 h left** |
+| Tests | 186 passed (CPU only) |
+| Experimental | Q2 2.08M · Q6 2.47M · Q8g-long 2.85M on TinyStories — a development bench, see below |
 | Hugging Face | [model](https://huggingface.co/Icold/kron-llm) · [corpus](https://huggingface.co/datasets/Icold/kron-corpus) |
 | Corpus repo | [github.com/Icold21/kron-corpus](https://github.com/Icold21/kron-corpus) |
 
-**Read the budget, not just the number.** TinyStories is a *development bench*,
-never the target corpus. Every comparison below is made at equal tokens,
-because step counts alone are misleading: Q6 trained with `batch 32` and Q8g
-with `batch 24`, so 10,000 steps of one is not 10,000 steps of the other.
+**The product is the 10M model.** Everything else here is either a component of
+it or an experiment kept because it answers a question the big run depends on.
+The small models are not the deliverable: they are the development bench that
+made the 10M configuration cheap to choose.
 
-### The next run: 10M parameters on the bilingual corpus
+### Experimental small models (the development bench)
 
-The current checkpoint is a development bench. The real target is a **10M
-model trained on a 1.6B-token bilingual corpus** and shipped as an int8 artifact
-under 10 MB, so it fits a 6 GB GPU and runs on CPU. The reference
-configuration is 9,938,886 parameters (d=512, 25 layers, d×d = 16×32
-Kronecker factors, K=10, 8K bilingual BPE). Purpose, success criteria, corpus
-contract and compute plan are in [`docs/goal_10m.md`](docs/goal_10m.md); the
-corpus itself is published as
-[**Icold21/kron-corpus**](https://github.com/Icold21/kron-corpus). Training is
-scheduled for a Kaggle T4, with the 1660 Ti as the restartable fallback.
+These runs established the architecture on TinyStories, a 61.4M-token synthetic
+corpus. They are **not** the shipped model, and their bits/byte is not
+comparable with Q10's bilingual number: each one isolates a single decision
+(tokenizer, gated FFN, depth recurrence) and is written up in
+[§8](#8-results).
 
 | model | parameters | tokens | bits/byte | note |
 |---|---:|---:|---:|---|
-| Q2 | 2,079,992 | 61.4M | 0.8391 | previous shipped model |
+| Q2 | 2,079,992 | 61.4M | 0.8391 | previous bench model |
 | Q6 | 2,473,208 | 61.4M | 0.7644 | BPE-4096 tokenizer |
-| **Q8g-long** | **2,851,280** | **61.4M** | **0.7542** | **+ gated FFN** |
+| **Q8g-long** | **2,851,280** | **61.4M** | **0.7542** | + gated FFN, the bench's best |
 
-Same token budget, same corpus, same seed. The difference is the tokenizer and
-the gated FFN, both of which are isolated in [§8.2](#82-tokenizer-and-budget-two-effects-that-are-easy-to-confuse)
-and [§8.3](#83-gated-ffn-the-one-architectural-win).
+Same token budget, same corpus, same seed. Every comparison is made at equal
+tokens, because step counts alone are misleading: Q6 trained with `batch 32` and
+Q8g with `batch 24`, so 10,000 steps of one is not 10,000 steps of the other.
+
+### The main run: 10M parameters on the bilingual corpus
+
+Q10 is 9,938,886 parameters (d=512, 25 layers, d×d = 16×32 Kronecker factors,
+K=10, 8K bilingual BPE). It ships as an int8 artifact under 10 MB, so it fits a
+6 GB GPU and runs on CPU. Purpose, success criteria, corpus contract and compute
+plan are in [`docs/goal_10m.md`](docs/goal_10m.md); the corpus is published as
+[**Icold21/kron-corpus**](https://github.com/Icold21/kron-corpus). It trains on a
+Kaggle T4, with the 1660 Ti as the restartable fallback, and the per-stage GPU
+budget is in [`docs/compute_budget.md`](docs/compute_budget.md).
 
 ## Contents
 
@@ -91,7 +100,7 @@ correction on top of it. Per module the factors cost
 L · K · (n1_out² + n2_out²)  +  2L  +  1
 ```
 
-instead of `d_out · d_in`. For the shipped model (`L=4, K=6, n1=16, n2=20,
+instead of `d_out · d_in`. For the bench model (`L=4, K=6, n1=16, n2=20,
 d=320`) that is **15,753 parameters per module** instead of 102,400 — 6.5×
 smaller, and the saving grows with `d`.
 
@@ -252,8 +261,14 @@ python scripts/prepare_data.py
 # BPE-4096 tokenizer + re-tokenised corpus (~4 bytes/token)
 python scripts/prepare_bpe.py --vocab 4096
 
-# training (Q8g = the shipped configuration)
+# the development bench (small model, TinyStories) -- see "Experimental
+# small models" above; the shipped model is Q10 on the bilingual corpus
 python -m kronllm.cli train --exp Q8g --steps 13333 --run-dir runs/Q8g_long
+
+# the main run: download the corpus bins from Kaggle, then resume
+python -m kronllm.cli train --exp Q10 --minutes 660 \
+    --data-dir /kaggle/input/kron-corpus-2b --run-dir /kaggle/working/q10 \
+    --resume /kaggle/input/kron-q10-ckpt/last.pt
 
 # evaluation, generation, analysis
 python -m kronllm.cli eval --run runs/Q8g_long
@@ -303,7 +318,10 @@ curves, the effective-rank spectra and side-by-side samples.
 
 ## 8. Results
 
-### 8.1 The shipped model
+### 8.1 The bench's best model (Q8g-long)
+
+The 10M run's numbers are in [§18 of `docs/results.md`](docs/results.md) and in
+the budget table above; everything in §8 is the TinyStories bench.
 
 **Q8g-long**: 24 layers, `d=320`, 8 heads, seq 192, BPE-4096, gated Kronecker
 FFN. 61.4M tokens (13,333 steps × 24 × 192), 0.895 s/step, **4.09 GB** peak.
@@ -325,7 +343,8 @@ Samples (`T=1.0`, `top_k=8`):
 > toys and she loved to play with her toys. One day, she found a big, red book
 > under a tree. She picked it up and looked at it. It was so bright and beautiful!
 
-Artifacts:
+Artifacts of the **bench** (TinyStories only; the shipped Q10 weights live in
+[`icold21/kron-q10-ckpt`](https://www.kaggle.com/datasets/icold21/kron-q10-ckpt)):
 
 | file | size | quality |
 |---|---:|---|
@@ -615,19 +634,21 @@ docs/               architecture.md, results.md (full tables),
                     free_gains.md (what improves without training),
                     reproducing.md (one command per claim),
                     data_plan.md (bilingual corpus), roadmap.md
-artifacts/          q8g_int8.pt (shipped), q2_int8.pt (previous),
+artifacts/          q8g_int8.pt (bench, int8), q2_int8.pt (bench, previous),
                     q10_tokenizer.json (8K bilingual BPE for Q10 inference)
-runs/               per-experiment logs and metrics; only the two best
-                    checkpoints are kept (Q8g_long, Q6_10k)
+runs/               per-experiment logs and metrics; only the two bench
+                    checkpoints are kept (Q8g_long, Q6_10k).  Q10 weights are
+                    published on Kaggle, not in the repo.
 notebooks/          walkthrough of the architecture and the measurements
 current_progress.md rolling log of the experiment queue
 ```
 
 ## 13. Limitations
 
-- **Development bench only.** Every quality number is TinyStories, English.
-  Nothing here proves the same ordering on the bilingual corpus; the corpus
-  pilot is built but no model has been trained on it yet.
+- **Q10 is 21.5 % through its first epoch.** Its bilingual bits/byte (1.1828
+  mixed at step 36,000) is measured on a held-out bin that never changes, so the
+  curve is honest, but it is a partial pass: the small-model numbers in §8 are
+  TinyStories/English and say nothing about the bilingual ordering.
 - **One GPU, one seed.** Most experiments are single-seed; the one seed control
   performed (hybrid compositions) reversed a published-looking result, which is
   a warning about the rest.
@@ -635,8 +656,8 @@ current_progress.md rolling log of the experiment queue
   model would reach with a fused kernel.
 - **512-token context at most.** RoPE is implemented, but training used 192–256
   tokens; long-context behaviour is untested.
-- **No instruction tuning in the shipped model.** S1 was an SFT probe on
-  Dolly-15k, not a product.
+- **No instruction tuning in Q10 yet.** S1 was an SFT probe on Dolly-15k against
+  the bench; SFT (config S10) comes after the epoch and the decay pass.
 - **int8 only.** int4 is implemented but the delta at this size is not yet
   worth the extra complexity.
 

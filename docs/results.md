@@ -1,10 +1,17 @@
 # Results
 
+> **Scope.** Everything in §1-§12 is the **development bench**: 0.19M-2.85M
+> parameter models on TinyStories, used to choose the architecture. The shipped
+> model is **Q10, 9,938,886 parameters**, trained on the 2.78B-token bilingual
+> corpus; its curve (`val_bpb_mixed`) is in [§18](#18-q10-the-bilingual-run-the-main-model)
+> and in `data/curve_q10.png`. Bench bits/byte and Q10 bits/byte are measured on
+> different corpora and are not comparable.
+
 All numbers were measured on one consumer GPU (GTX 1660 Ti, 6 GB) with Python
 3.11 and `torch 2.6.0+cu124`, unless stated otherwise. Q2 peaks at 4.22 GB of
 VRAM; the from-scratch Q3 pilot peaks at 5.56 GB, also inside a 6 GB card. The
-corpus is TinyStories (200,000 training stories, 10,000 validation stories). The metric
-for cross-tokenizer comparison is bits per byte:
+bench corpus is TinyStories (200,000 training stories, 10,000 validation stories).
+The metric for cross-tokenizer comparison is bits per byte:
 
 ```
 bpb = loss_nats_per_token / bytes_per_token / ln(2)
@@ -332,8 +339,8 @@ bpb** (val loss 1.9653, PPL 7.137) versus Q2's **0.962**, at identical cost:
 2,079,992 parameters, 36.2 MFLOP/token, 4.31 GB peak VRAM. Q4 also beats Q2 at
 every shared evaluation from step 500 onward (see §2). The E8 win therefore
 survives at quality scale, and the stop-gradient stays off for all following
-runs. Q2 remains the shipped model because it trained longer (10,000 steps,
-0.839 bpb); Q4 is the new base for further runs.
+runs. Q2 remained the bench's model at that point because it trained longer
+(10,000 steps, 0.839 bpb); Q4 is the new base for further runs.
 
 Q6 = Q4 + BPE-4096. BPE-1024 compresses to 3.07 bytes/token; BPE-4096 reaches
 **3.96 bytes/token** on the same corpus, and the factorised embedding
@@ -627,8 +634,62 @@ These were one-off code bundles: a new dataset id was cut on every code change
 so a resumed session could never silently mount stale code. That made sense
 during the run; keeping all fourteen afterwards does not.
 
-Kept: `kron-corpus-2b` (the training bins), `kron-q10-ckpt` (the live resume
-point, one version per session), `kron-q10a-anneal-bin` (the decay pass),
-`kron-llm-code-v15` (current code) and `kron-llm-code-v12`, which stays only
-until the session that has it mounted finishes — deleting a dataset a running
-kernel has open is not worth the risk for 208 kB.
+**Cleaned again on 2026-11-01**: `kron-llm-code-v15`, `-v16`, `-v18` and
+`-v19` are gone, and 21 GB of superseded bins (`epoch_np`, `epoch_v3`,
+`kaggle_corpus`, the downloaded `v3` bin, the prompted `epoch/train.bpe.bin`)
+were deleted from disk. Kept, and this is the whole list:
+
+| dataset | why it stays |
+|---|---|
+| `kron-corpus-2b` | the epoch bins; version 10 is the current 2.78B-token corpus |
+| `kron-q10a-anneal-bin` | the decay pass, 809M tokens |
+| `kron-q10-ckpt` | the live resume point, one version per session |
+| `kron-llm-code-v20` | the code the running session mounted |
+| `kron-llm-code-v21` | the code the decay pass will mount |
+
+Deleting a single dataset *version* is not possible -- Kaggle only deletes a
+whole dataset -- so the corpus keeps its old versions in its history. That is
+also why the code travels as separate ids rather than as versions of one.
+
+## 18. Q10: the bilingual run (the main model)
+
+Q10 is 9,938,886 parameters (d=512, 25 layers, 8 heads, 8K bilingual BPE,
+Kronecker K=10, gated FFN). Everything above is the bench that chose this
+configuration; this section is the product.
+
+**Corpus.** 2,783,383,150 tokens, 933,522 documents, EN 59.7 % / RU 40.3 % by
+tokens (10.02 GB of text, 3.60 bytes/token). The held-out bin never changes
+(`sha256 a45bbb03...`, 46.2M tokens), so `val_bpb_mixed` is comparable across
+every session even when the training corpus is rebuilt.
+
+**Curve.** `val_bpb_mixed` is the honest number: blocks drawn inside every
+(language, domain) bucket, bytes counted per batch from the tokenizer's
+`byte_lengths()` table, slices reweighted by the bytes they hold in the val bin.
+
+| step | val_bpb_mixed | EN | RU |
+|---:|---:|---:|---:|
+| 35,000 | 1.1801 | 1.4290 | 0.9380 |
+| 36,000 | 1.1828 | 1.4327 | 0.9411 |
+
+| reference | val_bpb_mixed |
+|---|---:|
+| GPT-2-124M on the same blocks | 1.554 |
+| Q10 at step 36,000 | **1.1828** |
+| best+last soup at step 35,115 | 1.1334 |
+
+The series is flat between 35k and 36k because that boundary is where the
+corpus was rebuilt and the optimiser was reset. The run is at 21.5 % of its
+epoch, so this is a partial pass, not a converged model.
+
+**Sampling, fixed 2026-11-01.** The epoch permutation was over every token
+*offset*, so an epoch drew 5.4M windows out of 2.8B possible starts: 63 % of the
+corpus was read, the rest repeated ~1.6x, and the permutation alone was 22 GB.
+It now permutes blocks of `seq_len` tokens: 100 % coverage, no repeats, 43 MB.
+The step count did not move (169,884) because `steps_per_epoch` was always
+derived from blocks.
+
+**Cost.** 2.552 s/step on one Kaggle T4 (batch 32, seq 512), so an epoch is
+120.4 GPU-hours; the decay pass (49,384 steps) adds 35.0 and SFT 2.8. A session
+stops itself at 11 h because the platform caps it at 12, and `last.pt` carries
+the optimiser, the step counter and the corpus fingerprint, so a killed session
+resumes exactly where it stopped.

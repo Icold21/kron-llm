@@ -1,5 +1,13 @@
 # The 10M model: purpose, contract and compute plan
 
+> **Status (2026-11-01).** The corpus came out at **2,783,383,150 tokens** (EN
+> 59.7 / RU 40.3 by tokens, 10.02 GB of text), not the 2.251B this plan was
+> written against, so the compute tables below are low by ~24 %: multiply the
+> GPU-hour columns by 1.24, or read the generated numbers in
+> [`compute_budget.md`](compute_budget.md). The step count is 169,884 per epoch.
+> Q10 is at step 36,549 (21.5 %) and its curve is §18 of
+> [`results.md`](results.md). Everything else in this document still holds.
+
 This document defines *why* the next model exists, *what* it must do, and *how*
 it will be trained. It is the reference for every decision about the 10M run:
 if a change does not serve the goals below, it does not go in.
