@@ -307,21 +307,25 @@ def _bands(sig: Sequence[int], bands: int) -> Iterator[tuple]:
         yield (i, tuple(sig[i:i + step]))
 
 
-def sweep_stale_mix(mix: Path) -> list[str]:
-    """Delete the previous build's shards from ``mix/``, but keep the chat pools.
+SIDE_POOLS = ("chat", "drills")
 
-    ``en_chat``/``ru_chat`` are built by ``scripts/build_anneal_chat.py`` and
-    consumed by ``prepare_bilingual_bin.py --interleave chat``; they sit in the
-    same directory as the domain shards, so a blanket ``*.jsonl.gz`` sweep
-    silently drops the decay pass's chat slice (it did, twice).  ``Path.stem``
-    strips only the last suffix -- ``en_chat.jsonl.gz`` -> ``en_chat.jsonl`` --
-    which is why a ``stem.endswith("_chat")`` guard never fired.
+
+def sweep_stale_mix(mix: Path) -> list[str]:
+    """Delete the previous build's domain shards from ``mix/``, keep side pools.
+
+    ``en_chat``/``ru_chat`` (built by ``scripts/build_anneal_chat.py``) and
+    ``en_drills``/``ru_drills`` (``build_anneal_drills.py``) sit in the same
+    directory as the domain shards, so a blanket ``*.jsonl.gz`` sweep silently
+    drops the decay pass's chat and arithmetic slices -- it did, twice.
+    ``Path.stem`` strips only the last suffix (``en_chat.jsonl.gz`` ->
+    ``en_chat.jsonl``), which is why a ``stem.endswith("_chat")`` guard never
+    fired.
     """
     mix = Path(mix)
     mix.mkdir(parents=True, exist_ok=True)
     removed = []
     for stale in mix.glob("*.jsonl.gz"):
-        if "_chat." in stale.name:
+        if any(f"_{domain}." in stale.name for domain in SIDE_POOLS):
             continue
         stale.unlink()
         removed.append(stale.name)

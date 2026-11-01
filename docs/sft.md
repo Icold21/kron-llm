@@ -107,7 +107,7 @@ policy in `docs/data_plan.md` §2, so those sites enter through
 |---|---|
 | math, EN | OpenMathInstruct-2 (1M slice), MetaMathQA, Orca-Math, MathInstruct, GSM8K, MATH (algebra/geometry/number theory) |
 | math, RU | translated Orca-Math (`d0rj/…-ru`), translated MathInstruct, Russian math dialogues, ru-alpaca-math |
-| math, synthetic | 13 templated arithmetic families in both languages: exact answers, computed by Python, with a written-out derivation |
+| math, synthetic | 16 templated arithmetic families in both languages: exact answers, computed by Python, with a written-out derivation. Three of them are **column drills** — addition with carries, subtraction with borrows, one-digit multiplication with partial products — written digit by digit, because a one-line "47 + 38 = 85" teaches the format but not the algorithm |
 | code, EN | OpenCodeReasoning (competitive programming: statement + reasoning + solution), Magicoder-OSS-Instruct, self-oss-instruct-sc2, CodeAlpaca, python-instructions-18k |
 | code, RU | English code tasks whose **question** was machine-translated to Russian; the code stays English, as it does in the wild |
 | Q/A, EN | OpenOrca, OpenHermes-2.5, HotpotQA |
@@ -117,7 +117,34 @@ policy in `docs/data_plan.md` §2, so those sites enter through
 | general | Dolly-15k |
 | identity | generated locally from `data/identity` (CC0) |
 
-### 2.1 Russian code questions by translation
+### 2.1 Arithmetic drills write the algorithm, not just the answer
+
+The pretraining corpus contains mathematics **prose** and almost no worked
+examples: measured with `scripts/count_arithmetic_drills.py`, the mix holds
+**14.5** `a op b = c` pairs per million characters, and only 3.7 in `en/math` —
+because textbooks carry notation and proofs, not input-output pairs. That is why
+exact arithmetic sits at 0/60 before SFT (`eval_samples.py`, step 35,115).
+
+The synthetic arithmetic families close that gap, and since 2026-11-01 three of
+them per language are **column drills**: the assistant writes the computation
+digit by digit,
+
+```
+units: 7 + 4 = 11 -> write 1, carry 1
+tens: 0 + 6 + 1 = 7 -> write 7
+hundreds: 6 + 7 = 13 -> write 3, carry 1
+thousands: 1 -> write 1
+```
+
+and the same in Russian (`пишем`, `запоминаем`, `занимаем`, `заём`). The rows are
+produced *from* the digits rather than typed by hand, so a row cannot contradict
+the answer, and `tests/test_arith_columns.py` parses the rendered rows back into
+a number and compares it with Python. Every drill is retried until it actually
+needs a carry or a borrow — a drill without one teaches nothing. They take 39 %
+of the arithmetic examples (55-58 % of that source's bytes) and stay bounded by
+`cap_share=0.40` of the math cell.
+
+### 2.2 Russian code questions by translation
 
 Code is written in English everywhere, so a bilingual code slice does not need a
 Russian solution — it needs a Russian question.  `scripts/translate_code_questions.py`

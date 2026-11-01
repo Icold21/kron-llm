@@ -18,14 +18,16 @@ def _touch(directory: Path, *names: str) -> None:
         (directory / name).write_bytes(b"x")
 
 
-def test_sweep_removes_domain_shards_and_keeps_chat(tmp_path):
+def test_sweep_removes_domain_shards_and_keeps_side_pools(tmp_path):
     _touch(tmp_path, "en_math.jsonl.gz", "ru_cs.jsonl.gz",
-           "en_chat.jsonl.gz", "ru_chat.jsonl.gz")
+           "en_chat.jsonl.gz", "ru_chat.jsonl.gz",
+           "en_drills.jsonl.gz", "ru_drills.jsonl.gz")
     removed = sweep_stale_mix(tmp_path)
     left = sorted(p.name for p in tmp_path.iterdir())
 
     assert sorted(removed) == ["en_math.jsonl.gz", "ru_cs.jsonl.gz"]
-    assert left == ["en_chat.jsonl.gz", "ru_chat.jsonl.gz"]
+    assert left == ["en_chat.jsonl.gz", "en_drills.jsonl.gz",
+                    "ru_chat.jsonl.gz", "ru_drills.jsonl.gz"]
 
 
 def test_sweep_is_idempotent_and_creates_the_directory(tmp_path):
