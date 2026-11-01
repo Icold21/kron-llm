@@ -16,6 +16,7 @@ data/bilingual/anneal_bin/*.bin
 data/bilingual/anneal_bin/tokenizer.json
 data/bilingual/anneal_mix/
 data/bilingual/tokenizer_probe/
+data/bilingual/.cache/
 data/prompt_probe/
 data/prompt_probe_mix/
 data/kaggle_anneal_bin/

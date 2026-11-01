@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 import sys
 import time
@@ -121,7 +122,12 @@ def split_docs(docs: list[dict], val_fraction: float) -> tuple[list, list]:
     for doc in docs:
         buckets.setdefault((doc["language"], doc["domain"]), []).append(doc)
     for key in sorted(buckets):
-        items = sorted(buckets[key], key=lambda d: d["sha256"])
+        # The streaming builder writes documents as they came from the shards,
+        # which do not all carry a sha256; compute it when missing so the split
+        # stays deterministic without a second pass over the corpus.
+        items = sorted(buckets[key],
+                       key=lambda d: d.get("sha256")
+                       or hashlib.sha256(d["text"].encode("utf-8")).hexdigest())
         n_val = max(1, int(len(items) * val_fraction))
         val.extend(items[:n_val])
         train.extend(items[n_val:])
@@ -160,6 +166,15 @@ def main() -> None:
     ap.add_argument("--phase", default="epoch", choices=["epoch", "anneal"],
                     help="recorded in tokenizer_meta.json; the epoch and the "
                          "decay pass reuse the same held-out bin")
+    ap.add_argument("--skip-seen", default=None,
+                    help=".npy of document hashes (scripts/seen_from_index.py) "
+                         "that a previous run already trained on; they are "
+                         "dropped while encoding, so the stream starts at 0 "
+                         "instead of skipping a position")
+    ap.add_argument("--target-tokens", type=int, default=0,
+                    help="stop once the train bin holds this many tokens; with "
+                         "--skip-seen the mix can be over-drawn and still end "
+                         "at the intended size")
     args = ap.parse_args()
 
     t0 = time.time()
@@ -243,8 +258,19 @@ def main() -> None:
 
     # encode_docs streams the text: no second copy of the corpus in memory.
     limit = int(args.max_train_mb * 1e6) if args.max_train_mb else 0
+    skip_hashes = None
+    if args.skip_seen:
+        seen = np.load(args.skip_seen)
+        skip_hashes = set(int(h) for h in seen.tolist())
+        print(f"[seen] {len(skip_hashes):,} documents already trained on; "
+              f"they will be dropped while encoding")
     tr = encode_docs(train, tok, Path(args.out_dir) / "train.bpe.bin",
-                     args.vocab - 1, max_bytes=limit)
+                     args.vocab - 1, max_bytes=limit,
+                     skip_hashes=skip_hashes,
+                     target_tokens=int(args.target_tokens),
+                     index_path=Path(args.out_dir) / "train_index.npy")
+    print(f"[index] {tr['documents']:,} documents, {tr['skipped']:,} skipped "
+          f"as seen -> {Path(args.out_dir) / 'train_index.npy'}")
     if args.reuse_val_dir:
         # The decay pass must be scored on the epoch-1 held-out set, otherwise
         # its bpb cannot be compared with the epoch-end checkpoint.

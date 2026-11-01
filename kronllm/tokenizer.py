@@ -20,9 +20,10 @@ become single ids while rare byte triples stay split.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
-from typing import Any, List, Mapping, Sequence
+from typing import Any, List, Mapping, Optional, Sequence
 
 import numpy as np
 
@@ -279,41 +280,81 @@ def encode_corpus(stories: Sequence[bytes], tok: BPETokenizer,
             "bytes_per_token": float(n_bytes) / max(1, n_tokens)}
 
 
+def doc_hash(tokens: np.ndarray) -> int:
+    """Stable 64-bit hash of one document's token span.
+
+    The seen-set is built from the bin (token ids are all it has) and matched
+    when the *next* bin is encoded, where the same document is encoded with the
+    same tokenizer, so hashing tokens -- not text -- is the right key: no
+    decoding of 600M tokens is needed anywhere.
+    """
+    return int.from_bytes(hashlib.blake2b(np.asarray(tokens, dtype=np.uint16).tobytes(),
+                                         digest_size=8).digest(), "little")
+
+
 def encode_docs(docs: Sequence[dict], tok: BPETokenizer,
                 out_path: str | Path, eot_id: int,
-                chunk: int = 2000, max_bytes: int = 0) -> dict:
+                chunk: int = 2000, max_bytes: int = 0,
+                skip_hashes: Optional[set[int]] = None,
+                target_tokens: int = 0,
+                index_path: str | Path | None = None) -> dict:
     """Encode document dicts without materialising the whole corpus as bytes.
 
     ``encode_corpus`` expects a list of byte strings; at 8 GB of text that list
     is another 8 GB of RAM.  This variant reads ``doc['text']`` chunk by chunk,
     so peak memory stays at the document store plus one chunk.
+
+    ``skip_hashes`` drops documents a previous run already trained on (see
+    ``scripts/seen_from_index.py``), ``target_tokens`` stops once the bin holds
+    that many tokens -- together they let a rebuild over-draw the mix and still
+    end with exactly one fresh pass.  ``index_path`` records, for every document
+    that landed in the bin, its token span and hash, which is what makes the
+    seen-set computable for the next session without rescanning 5.6 GB.
     """
     n_bytes = 0
     n_tokens = 0
     used = 0
+    skipped = 0
+    index: list[tuple[int, int, int]] = []
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "wb") as fh:
         for start in range(0, len(docs), chunk):
             batch = docs[start:start + chunk]
             texts = []
+            sizes = []
             for doc in batch:
                 text = doc["text"]
                 data = text.encode("utf-8")
                 if max_bytes and used + len(data) > max_bytes:
                     break
                 texts.append(text)
+                sizes.append(len(data))
                 used += len(data)
                 n_bytes += len(data)
             if not texts:
                 break
-            for seq in tok.encode_batch(texts):
+            for size, seq in zip(sizes, tok.encode_batch(texts)):
                 arr = np.empty(len(seq) + 1, dtype=np.uint16)
                 arr[:-1] = np.asarray(seq, dtype=np.uint16)
                 arr[-1] = eot_id
+                h = doc_hash(arr)
+                if skip_hashes and h in skip_hashes:
+                    skipped += 1
+                    n_bytes -= size
+                    continue
                 arr.tofile(fh)
+                index.append((n_tokens, len(arr), h))
                 n_tokens += len(arr)
-            if max_bytes and used >= max_bytes:
+                if target_tokens and n_tokens >= target_tokens:
+                    break
+            if (max_bytes and used >= max_bytes) or \
+                    (target_tokens and n_tokens >= target_tokens):
                 break
+    if index_path:
+        np.save(Path(index_path),
+                np.array(index, dtype=[("start", "<i8"), ("n", "<i4"),
+                                       ("h", "<u8")]))
     return {"bytes": int(n_bytes), "tokens": int(n_tokens),
+            "documents": int(len(index)), "skipped": int(skipped),
             "bytes_per_token": float(n_bytes) / max(1, n_tokens)}

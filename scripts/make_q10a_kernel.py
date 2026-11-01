@@ -27,6 +27,12 @@ PATCHES = [
     ("'/kaggle/working/q10'", "'/kaggle/working/q10a'"),
     ("open('/kaggle/working/q10/results.json')",
      "open('/kaggle/working/q10a/results.json')"),
+    # The copied cells describe the *epoch* session; the decay pass copies a
+    # 1.6 GB bin, not 5.7 GB, and the old "500-minute kill" number is stale.
+    ("# The session stops itself before Kaggle's 500-minute kill: the budget",
+     "# The session stops itself before the platform's 12-hour limit: the budget"),
+    ("copying the 5.7 GB bin costs ~10 min, so 690 left no room",
+     "copying the 1.6 GB anneal bin costs ~3 min, so 690 left no room"),
 ]
 
 
@@ -46,14 +52,14 @@ def main() -> None:
     nb["cells"][0]["source"] = """# KronLLM Q10A — decay pass (WSD tail)
 
 Resumes the end-of-epoch Q10 weights and anneals the LR 3e-4 → 1e-6 over
-**29.6 % of an epoch** (40,649 steps × 16,384 tokens = 666M tokens) on the
-curated mix: literature, encyclopedic, science, 3× more math than the epoch saw,
-and the whole identity slice repeated to ~2.5 % of the tokens. The step count is
-the bin divided by the step size, so the pass reads its data exactly once.
+**30 % of an epoch** (50,965 steps × 16,384 tokens = 835M tokens) on the same
+domain profile selected by quality, plus **5 % chat** so the four chat tokens
+stop being cold before SFT. The step count is a fixed fraction of the epoch
+bin, so the pass reads its data exactly once.
 
 No warmup: the pass starts at full LR on the curve. Checkpoints every 250 steps
-to `/kaggle/working/q10a`; the session stops at the 500-minute wall clock and
-the next one resumes from `last.pt`.
+to `/kaggle/working/q10a`; the session stops at its wall-clock budget and the
+next one resumes from `last.pt`.
 """.splitlines(keepends=True)
 
     (DST / "train.ipynb").write_text(json.dumps(nb, indent=1, ensure_ascii=False),
@@ -69,7 +75,7 @@ the next one resumes from `last.pt`.
         "enable_gpu": True,
         "enable_internet": True,
         "dataset_sources": [
-            "icold21/kron-llm-code-v16",
+            "icold21/kron-llm-code-v21",
             "icold21/kron-q10a-anneal-bin",
             "icold21/kron-q10-ckpt",
         ],

@@ -183,10 +183,9 @@ probe, and generation at T=1.0, top_k=5–10.
 |---|---|
 | launch | 	orchrun --nproc_per_node=2 -m kronllm.cli train --exp Q10 --data-dir /kaggle/input/kron-corpus-2b |
 | DDP | rank-0 logging and checkpoints, per-rank batches, identical validation; verified on two CPU ranks |
-| epoch sampler | one shared permutation per epoch, ranks take 
-ank::world, so an epoch is a full pass (not the ~63 % of random sampling) |
+| epoch sampler | one shared permutation of **blocks** per epoch, ranks take `rank::world`, so an epoch is a full pass (offset sampling, before 2026-11-01, covered only 63 %) |
 | checkpoints | save_every=500, last.pt carries model + optimizer + step, --resume tested |
-| steps | 137,377 x 16,384 tokens = 2.251B = one epoch (one T4, batch 32, fp16) |
+| steps | 169,884 x 16,384 tokens = 2.783B = one epoch (one T4, batch 32, fp16) |
 | Kaggle | code dataset icold21/kron-llm-code; bins icold21/kron-corpus-2b |
 
 The first epoch is the first segment, not a hard target: if validation bpb is

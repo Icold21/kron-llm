@@ -584,6 +584,21 @@ Two serving optimisations are implemented and exact but not useful here:
 `torch.compile` is unavailable in this environment (no Triton on Windows), so
 all speed-ups are structural, not compiler-driven.
 
+
+## GPU budget per stage
+
+Measured speed: **2.552 s/step** (median of the last ten steps of session 5, one Kaggle T4, batch 32, seq 512), **16,384 tokens per step**. Full derivation: [`docs/compute_budget.md`](docs/compute_budget.md).
+
+| stage | steps | tokens | GPU hours |
+|---|---|---|---|
+| Q10 pretraining, full epoch | 169,884 | 2.78B | 120.4 |
+| done so far (step 36,549) | 36,549 | 0.60B | 25.9 |
+| left in the epoch | 133,335 | 2.18B | 94.5 |
+| decay Q10A (30 % of the epoch) | 49,384 | 0.81B | 35.0 |
+| SFT S10 | 4,000 | 0.07B | 2.8 |
+
+**132 GPU hours remain**, ~12 sessions of 11 h at the free Kaggle quota of ~30 h/week. One such session is ~15,517 steps (0.25B tokens).
+
 ## 12. Repository layout
 
 ```
@@ -665,18 +680,21 @@ Next steps:
 
 1. train **Q10** (9,938,886 params, d=512, 25 layers, K=10, seq 512) on the
    corpus on one Kaggle T4 with fp16 and batch 32 (DDP is unstable in the
-   Kaggle image; see `docs/goal_10m.md`), one epoch = 137,377 steps of 16,384
-   tokens = 2.251B, checkpoint every 500 steps;
+   Kaggle image; see `docs/goal_10m.md`), one epoch = 169,884 steps of 16,384
+   tokens = 2.783B, checkpoint every 500 steps;
 2. package the result, then compare against public small-model baselines
    before the SFT stage;
 3. decide the language rebalance for SFT (Russian is 38 % of tokens now).
 
 **Reproducibility details that matter for the run.** The epoch sampler is
 sharded: all ranks build the same permutation from a shared seed and take
-`rank::world`, so one epoch is one full pass instead of the ~63 % a random
-sampler covers. DDP writes logs and checkpoints only on rank 0; `last.pt`
-carries the optimizer and the step counter, so a killed Kaggle session resumes
-exactly where it stopped.
+`rank::world`. The permutation is over **blocks of `seq_len` tokens**, so one
+epoch is one full pass. Until 2026-11-01 it was over every token *offset*
+instead, which drew 5.4M windows out of 2.8B possible starts: an epoch covered
+63 % of the tokens, repeated the rest ~1.6 times and cost a 22 GB permutation.
+DDP writes logs and checkpoints only on rank 0; `last.pt` carries the optimizer
+and the step counter, so a killed Kaggle session resumes exactly where it
+stopped.
 
 The long-term plan, including the SFT families and the comparison phase, is in
 [docs/roadmap.md](docs/roadmap.md).

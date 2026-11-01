@@ -231,7 +231,7 @@ assert dp.get('prompted_docs', 0) == 0, 'some documents were prefixed anyway'
 print('corpus is the prompt-free epoch bin')
 '''
 
-TRAIN = '''MINUTES = 135          # sized to end before midnight; Pro allows 660
+TRAIN = '''MINUTES = 170          # sized to end before midnight; Pro allows 660
 CKPT = find('last.pt')
 cmd = [sys.executable, '-u', '-m', 'kronllm.cli', 'train', '--exp', 'Q10',
        '--device', 'cuda',

@@ -37,11 +37,13 @@ template's system turn:
   `identity`, written by hand in English and Russian — 108 prompts in total.
   The variant is chosen by `sha256(document) % len(variants)`, so a rebuild
   produces the same bin byte for byte and every variant appears equally often.
-* **85 % of documents are annotated** (`--prompt-rate`), the rest stay bare.
-  With every document annotated the model would never see a continuation
-  without a prompt — and the held-out bin, which every bpb number we quote is
-  measured on, has no prompts.  Keeping a sixth of the stream bare keeps both
-  modes in distribution.
+* **Every document is annotated** (`--prompt-rate`, default 1.0).  The first
+  version left a sixth bare, on the theory that the held-out bin has no prompts
+  and the promptless mode therefore had to stay in distribution.  That was
+  defensive and empty: a training window is cut at a random offset inside a
+  document, so a bare *document start* — the only place the tag could appear —
+  reaches the model in a small fraction of windows either way.  The partial rate
+  bought nothing measurable and cost a second distribution to explain.
 * **Dialogue is skipped.**  Documents that already open with `<|system|>` (the
   chat pools of the decay pass) are left alone: wrapping a rendered
   conversation in a second system turn would teach the model that a system
@@ -66,28 +68,26 @@ the same tag introduce different *contracts* over different text.
 
 ## 4. What it costs
 
-Measured on the decay bin, built 2026-10-30 (`data/bilingual/anneal_bin`,
-`tokenizer_meta.json` → `domain_prompts`):
+Measured on the two bins rebuilt 2026-10-31 (`tokenizer_meta.json` →
+`domain_prompts`).  "Added" and "already chat" are separate counters on purpose:
+a chat document opens with `<|system|>` already, so it is covered without being
+annotated, and `added + already` is what must equal the document count.
 
-| quantity | value |
-|---|---|
-| training documents | 404,277 |
-| documents with a prompt | 300,744 (74 %) |
-| prompts, mean length | 21.1 tokens |
-| tokens added | 6,354,032 (650,472,331 → 656,826,363, +0.98 %) |
-| held-out documents | 8,242 (untouched) |
+| quantity | decay bin | epoch bin |
+|---|---|---|
+| training documents | 397,504 | 1,028,370 |
+| prompts added | 346,895 | 964,626 |
+| already chat (skipped) | 50,609 | 63,744 |
+| covered | **397,504 (100 %)** | **1,028,370 (100 %)** |
+| prompts, mean length | 21.3 tokens | 21.3 tokens |
+| train tokens | 655,857,221 | building |
+| held-out documents | 8,101 (untouched) | 20,978 (untouched) |
 
-Coverage per (language, domain), prompted documents: en/math 33,363,
-en/ml 43,500, en/encyclopedic 42,135, en/identity 41,198, en/code 12,251,
-en/science 8,033, en/logic 2,715, en/literature 1,760; ru/identity 46,899,
-ru/literature 34,855, ru/encyclopedic 23,595, ru/math 4,452, ru/science 3,147,
-ru/cs 1,689, ru/ml 774, ru/logic 378.  Every domain of the mix is represented in
-both languages — that is the check the counter exists for.
-
-The 74 % is not a bug in the rate.  Twelve and a half per cent of the documents
-in this mix are the chat pools (51,641 of 412,519), and those are skipped
-because they already open with a rendered `<|system|>` turn; of the remaining
-87.5 %, the rate annotates 85 %: `0.875 × 0.85 = 0.744`.
+The 87 % and 94 % the build log prints are "prompts added over documents", not
+coverage: the remainder is the chat pools, which already carry a system turn.
+Coverage per (language, domain) is in `by_domain` in the same file, and every
+domain of the mix appears in both languages — that is the check the counter
+exists for.
 
 The cost is paid once per document, not per window: a document split across
 several 512-token windows carries its prompt only at the start.
@@ -113,13 +113,52 @@ buys is a warm chat template, a domain signal, and an SFT stage that starts from
 python -c "import numpy as np; a=np.fromfile('data/bilingual/anneal_bin/train.bpe.bin', dtype=np.uint16); print((a==8187).sum(), 'system tokens of', len(a))"
 ```
 
-Measured on the 2026-10-30 decay bin: **351,353 `<|system|>` ids in
-656,826,363 tokens** — 300,744 prompt prefixes plus 50,609 chat documents that
-already opened with a system turn.  `<|user|>` / `<|assistant|>` appear 90,218 /
-90,342 times, all of them inside the chat pools: the prompts themselves add no
-dialogue turns.
+Measured on the 2026-10-31 decay bin: **397,504 `<|system|>` ids in
+655,857,221 tokens** — exactly one per document, which is the whole point: 346,895
+added by the pass plus 50,609 chat documents that already opened with a system
+turn.  A single extra or missing tag shows up immediately in that count.
 
 Decode the first window with `kronllm.tokenizer.BPETokenizer` and it opens with
 `<|system|>`, a domain prompt, `<|eot|>` and then the document.  The build log
 prints coverage per (language, domain), so a domain that silently got no prompt
 is visible in the log rather than inferred from a flat loss curve.
+
+## 7. Removed: 2026-10-31
+
+The prompts are out of the corpus.  Measured on both bins end to end:
+
+| bin | tokens | `<\|system\|>` | documents | tags/doc |
+|---|---|---|---|---|
+| prompted | 2,368,625,438 | 1,028,370 | 1,028,370 | 1.000 |
+| prompt-free | 2,347,352,486 | 63,744 | 1,028,370 | 0.062 |
+
+21,272,952 tokens (0.90 %) of the stream were our own boilerplate, and exactly
+one tag per document means every one of them was ours.  The prompt-free rebuild
+keeps 63,744 tags -- the chat documents that open with a system turn of their
+own, which is data, not boilerplate.
+
+Why: step 35,115 was trained without prompts, and the run resumes there.
+Prefixing 74 % of documents changes what the model is asked to predict without
+changing the step count, and the mask only hid that from the loss, not from the
+context.  With 10 M parameters, spending 1 % of the budget on 108 repeated
+strings to teach "this register follows this sentence" is not worth a format
+that SFT then has to unlearn.  The held-out bin was never prompted, so every
+historical bpb stays comparable -- it was always measured on the bare text.
+
+The mask (`kronllm/loss_mask.py`, `model.ignore_prompt_targets`) stays on: it
+still removes the system turn of those 63,744 chat documents, and it is what
+makes a future prompt-bearing corpus safe by construction.
+
+Rebuild recipe:
+
+```bash
+python -u scripts/prepare_bilingual_bin.py \
+  --out-dir E:/kron_bins/epoch_np \
+  --reuse-tokenizer data/bilingual/tokenizer.json \
+  --reuse-val-dir E:/kron_bins/epoch \
+  --phase epoch --no-domain-prompts
+```
+
+`--reuse-val-dir` is what keeps `val.bpe.bin` byte-identical (sha256 a45bbb03…).
+Note that `--no-domain-prompts` used to leave `rate: 0.85` in the metadata; it
+now writes 0.0, and the 2026-10-31 bin was patched by hand for the same reason.

@@ -13,6 +13,22 @@ def build(**kw):
     return KronTransformer(make_cfg(**kw))
 
 
+def test_two_lane_projection_has_a_closed_form():
+    """sinkhorn2 must equal the iterative limit, and be exact on the polytope."""
+    torch.manual_seed(0)
+    logits = torch.randn(2048, 2, 2) * 4
+    closed = MHCRouter.sinkhorn2(logits)
+    reference = MHCRouter.sinkhorn(logits, 400)
+    assert (closed - reference).abs().max() < 2e-3
+    assert torch.allclose(closed.sum(-1), torch.ones(2048, 2), atol=1e-6)
+    assert torch.allclose(closed.sum(-2), torch.ones(2048, 2), atol=1e-6)
+    # The 15:1 initialisation must land on the same matrix both ways.
+    diag = torch.full((4, 2, 2), float(torch.log(torch.tensor(15.0))))
+    init = diag - torch.eye(2) * diag + torch.zeros(4, 2, 2)
+    assert torch.allclose(MHCRouter.sinkhorn2(init),
+                          MHCRouter.sinkhorn(init, 20), atol=1e-5)
+
+
 def test_mix_cannot_grow_the_residual():
     """Row sums are exactly 1, so each lane is a convex combination."""
     torch.manual_seed(0)

@@ -63,6 +63,10 @@ Measured, not assumed: the depth carry is worth 1.1 % bpb, freezing its scalar
 0.8 %, and widening the window to four layers *costs* 1.4 %. Details in the
 [research log](https://github.com/Icold21/kron-llm/blob/main/docs/results.md).
 
+## Training budget
+
+At the measured 2.552 s/step on a single Kaggle T4 (batch 32, seq 512), one epoch of the 2.78B-token corpus is **120 GPU-hours**; the decay pass (30 % of the epoch, quality-selected slice plus 5 % chat) adds **35**, and SFT 4,000 steps adds **2.8**. Roughly **132 GPU-hours remain** from step 36,549 -- about 12 sessions of quota. Derivation in `docs/compute_budget.md` of the code repository.
+
 ## Next
 
 The 10M model (Q10: d=512, 25 layers, K=10, 9,938,886 parameters) trains on

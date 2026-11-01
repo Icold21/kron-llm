@@ -16,8 +16,15 @@ def ds(tmp_path):
     return ByteDataset(path, seq_len=64, dtype=np.uint16)
 
 
-def _n_starts(ds: ByteDataset) -> int:
-    return len(ds.data) - ds.seq_len - 1
+def _n_blocks(ds: ByteDataset) -> int:
+    """The epoch is a permutation of blocks, not of every token offset.
+
+    Permuting offsets (the behaviour before 2026-11-01) made one epoch cover
+    63 % of the corpus and repeat the rest, and cost a 22 GB permutation for a
+    2.8B-token bin.  A block is ``seq_len`` tokens, so an epoch tiles the
+    corpus exactly once.
+    """
+    return max(1, (len(ds.data) - 1) // ds.seq_len)
 
 
 def _draw_epoch(ds: ByteDataset, batch: int = 32) -> list[int]:
@@ -37,7 +44,7 @@ def _draw_epoch(ds: ByteDataset, batch: int = 32) -> list[int]:
 
 
 def test_ranks_are_disjoint_and_cover_everything(ds):
-    n = _n_starts(ds)
+    n = _n_blocks(ds)
     ds.set_shard(0, 2, seed=1234)
     ds._new_epoch(None)
     perm0 = ds._perm.tolist()
@@ -55,7 +62,7 @@ def test_ranks_are_disjoint_and_cover_everything(ds):
 def test_epoch_is_a_full_pass_without_repeats(ds):
     ds.set_shard(0, 1, seed=7)
     seen = _draw_epoch(ds, batch=64)
-    n = _n_starts(ds)
+    n = _n_blocks(ds)
     assert len(seen) == len(set(seen))            # each block once
     assert len(seen) == n - n % 64                # tail dropped, not repeated
     assert set(seen) <= set(range(n))
@@ -108,4 +115,51 @@ def test_resume_continues_the_epoch_instead_of_replaying_it(ds):
     ds._new_epoch(None)
     ds._new_epoch(None)
     assert ds._pos == 0
+
+
+def test_resumed_session_returns_the_same_windows(ds):
+    """The windows a resumed session gets must be the ones it would have seen.
+
+    ``test_resume_continues_the_epoch_instead_of_replaying_it`` checks
+    ``_pos``; that is not enough.  Comparing ``perm[a:b]`` with the same slice
+    of the same array passes even when ``get_batch`` returns the wrong windows,
+    so this test compares the tensors: an uninterrupted 28-draw run must end
+    with exactly the draw a session resumed at offset 27 sees first.
+    """
+    import torch
+
+    ds.set_shard(0, 1, seed=11)
+    tail = None
+    for _ in range(28):
+        tail = ds.get_batch(8)
+
+    ds.set_shard(0, 1, seed=11, skip=27 * 8)
+    x, y = ds.get_batch(8)
+    assert ds._pos == 28 * 8
+    assert torch.equal(x, tail[0]), "resumed window differs from the original"
+    assert torch.equal(y, tail[1]), "resumed target differs from the original"
+
+    # The target is still that window shifted by one token, so the resume lands
+    # on a block boundary and the pair (x, y) stays consistent.
+    assert torch.equal(y[:, :-1], x[:, 1:])
+
+
+def test_an_epoch_tiles_the_corpus_and_covers_it(ds):
+    """Blocks, not token offsets: an epoch must read the corpus once.
+
+    Permuting every token offset drew 5.4M windows out of 2.8B possible starts
+    on the real corpus, so a full epoch covered only 63 % of the tokens and hit
+    the rest 1.6 times.  Blocks tile the corpus, so one epoch is one honest pass.
+    """
+    ds.set_shard(0, 1, seed=3)
+    blocks = _draw_epoch(ds, batch=32)
+    n = _n_blocks(ds)
+
+    assert len(blocks) == len(set(blocks)) == n - n % 32
+    starts = [b * ds.seq_len for b in blocks]
+    assert max(starts) + ds.seq_len <= len(ds.data)
+    # every block is seq_len wide and no two share a token
+    assert len(set(starts)) * ds.seq_len == sum(ds.seq_len for _ in starts)
+    assert len(starts) * ds.seq_len >= 0.95 * len(ds.data)
+
 

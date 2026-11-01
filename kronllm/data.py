@@ -84,8 +84,15 @@ class ByteDataset(Dataset):
         self._skip = max(0, int(skip))
 
     def _new_epoch(self, generator: Optional[torch.Generator]) -> None:
-        n_starts = len(self.data) - self.seq_len - 1
-        if n_starts < self._world:
+        # The permutation is over *blocks* of ``seq_len`` tokens, not over every
+        # token offset.  Permuting offsets (the behaviour before 2026-11-01)
+        # drew 5.4M windows out of 2.8B possible starts, so one epoch covered
+        # only 63 % of the corpus and hit the rest ~1.6 times, and the
+        # permutation itself cost 22 GB of RAM.  Blocks give exactly one pass
+        # with no repeats and a 43 MB tensor, and ``__getitem__``/``__len__``
+        # already assumed blocks -- only this sampler disagreed.
+        n_blocks = max(1, (len(self.data) - 1) // self.seq_len)
+        if n_blocks < self._world:
             raise ValueError(
                 f"corpus too small for {self._world} ranks at seq_len={self.seq_len}")
         if self._seed is None:
@@ -93,7 +100,7 @@ class ByteDataset(Dataset):
         else:
             seed = (self._seed + 7919 * self._epoch) % (2 ** 31 - 1)
         g = torch.Generator().manual_seed(seed)
-        perm = torch.randperm(n_starts, generator=g)
+        perm = torch.randperm(n_blocks, generator=g)
         self._perm = perm[self._rank::self._world]
         self._pos = 0
         self._epoch += 1
@@ -110,10 +117,14 @@ class ByteDataset(Dataset):
             self._new_epoch(generator)          # drop the tail, reshuffle
         ix = self._perm[self._pos:self._pos + batch_size]
         self._pos += int(ix.numel())
+        # ``ix`` holds block numbers; a block is seq_len tokens wide, so the
+        # windows of one epoch tile the corpus instead of overlapping it.
+        starts = (ix * self.seq_len).tolist()
         x = torch.stack([torch.from_numpy(
-            np.asarray(self.data[i:i + self.seq_len], dtype=np.int64)) for i in ix])
+            np.asarray(self.data[s:s + self.seq_len], dtype=np.int64)) for s in starts])
         y = torch.stack([torch.from_numpy(
-            np.asarray(self.data[i + 1:i + 1 + self.seq_len], dtype=np.int64)) for i in ix])
+            np.asarray(self.data[s + 1:s + 1 + self.seq_len], dtype=np.int64))
+            for s in starts])
         return x.to(device, non_blocking=True), y.to(device, non_blocking=True)
 
     def iter_blocks(self, batch_size: int, device: torch.device | str = "cpu"

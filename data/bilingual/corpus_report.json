@@ -1,156 +1,45 @@
 {
- "total_bytes": 7647040875,
- "total_docs": 807024,
- "by_language": {
-  "ru": {
-   "bytes": 2389740919,
-   "docs": 111197,
-   "domains": {
-    "math": 634992881,
-    "science": 609100964,
-    "logic": 159561056,
-    "literature": 313693185,
-    "encyclopedic": 615134014,
-    "ml": 18009439,
-    "identity": 3866213,
-    "cs": 35383167
-   }
+  "mixed": {
+    "en": {
+      "code": 143000163,
+      "logic": 52035748,
+      "science": 117119976,
+      "math": 338018777,
+      "literature": 195536549,
+      "encyclopedic": 208004932,
+      "ml": 91001032,
+      "cs": 130001236,
+      "humour": 11404092,
+      "identity": 954636
+    },
+    "ru": {
+      "math": 195007579,
+      "science": 150035895,
+      "logic": 30100274,
+      "literature": 225054516,
+      "encyclopedic": 510005260,
+      "ml": 15004863,
+      "cs": 315001261,
+      "identity": 1439448,
+      "code": 19981874
+    }
   },
-  "en": {
-   "bytes": 5257299956,
-   "docs": 695827,
-   "domains": {
-    "code": 1072561972,
-    "logic": 137685801,
-    "science": 1038669522,
-    "math": 1298006954,
-    "literature": 620563635,
-    "encyclopedic": 640033228,
-    "ml": 378782991,
-    "identity": 2825262,
-    "cs": 54378288,
-    "humour": 13792303
-   }
-  }
- },
- "by_domain": {
-  "math": {
-   "bytes": 1932999835,
-   "docs": 215897
+  "mixed_total_bytes": 2748708111,
+  "ru_share": 0.5318,
+  "documents": {
+    "en": 96882,
+    "ru": 93031
   },
-  "science": {
-   "bytes": 1647770486,
-   "docs": 66644
+  "shortfalls": [
+    "en/humour: 11 of 13 MB",
+    "en/identity: 1 of 13 MB",
+    "ru/code: 20 of 45 MB",
+    "ru/humour: nothing available",
+    "ru/identity: 1 of 8 MB"
+  ],
+  "budgets_mb": {
+    "en": 1300.0,
+    "ru": 1500.0
   },
-  "logic": {
-   "bytes": 297246857,
-   "docs": 15952
-  },
-  "literature": {
-   "bytes": 934256820,
-   "docs": 17193
-  },
-  "encyclopedic": {
-   "bytes": 1255167242,
-   "docs": 205880
-  },
-  "code": {
-   "bytes": 1072561972,
-   "docs": 98902
-  },
-  "ml": {
-   "bytes": 396792430,
-   "docs": 169113
-  },
-  "identity": {
-   "bytes": 6691475,
-   "docs": 6600
-  },
-  "cs": {
-   "bytes": 89761455,
-   "docs": 10611
-  },
-  "humour": {
-   "bytes": 13792303,
-   "docs": 232
-  }
- },
- "by_licence": {
-  "CC-BY-SA-4.0": 575960347,
-  "PSF-2.0": 12574406,
-  "BSD-3-Clause": 3661099,
-  "Apache-2.0": 111770727,
-  "MIT": 1550712,
-  "CC0-1.0": 6691475,
-  "ODC-By-1.0": 2379668366,
-  "arXiv non-exclusive (see dataset card)": 1039908709,
-  "public domain (US)": 566679627,
-  "CC-BY-SA-3.0": 1876603947,
-  "permissive (per-file, see dataset card)": 1059987566,
-  "public-domain": 8606188,
-  "fan transcript; see the dataset pages": 1389496,
-  "CC-BY-SA-3.0 (Fandom); fan transcripts for the rest": 1988210
- },
- "shards": 63,
- "language_share": {
-  "ru": 0.3125,
-  "en": 0.6875
- },
- "domain_share": {
-  "math": 0.2528,
-  "science": 0.2155,
-  "logic": 0.0389,
-  "literature": 0.1222,
-  "encyclopedic": 0.1641,
-  "code": 0.1403,
-  "ml": 0.0519,
-  "identity": 0.0009,
-  "cs": 0.0117,
-  "humour": 0.0018
- },
- "dedup": {
-  "before": 807026,
-  "kept": 787004,
-  "dropped": 20022,
-  "kept_bytes": 7118583839
- },
- "mixed": {
-  "en": {
-   "math": 1075012295,
-   "science": 633657233,
-   "code": 645001193,
-   "logic": 123819349,
-   "literature": 473256461,
-   "encyclopedic": 387001049,
-   "cs": 180458742,
-   "ml": 453621342,
-   "humour": 1872509,
-   "identity": 903241
-  },
-  "ru": {
-   "math": 567268719,
-   "science": 317662789,
-   "logic": 147883971,
-   "literature": 1349595428,
-   "encyclopedic": 2218928097,
-   "cs": 18882340,
-   "ml": 10618455,
-   "identity": 1374927
-  }
- },
- "mixed_total_bytes": 8606818140,
- "ru_share": 0.5382,
- "shortfalls": [
-  "en/logic: 123.8 MB of 430.0 MB",
-  "en/cs: 34.9 MB of 129.0 MB",
-  "en/ml: 333.6 MB of 516.0 MB",
-  "en/humour: 1.9 MB of 43.0 MB",
-  "en/identity: 0.9 MB of 43.0 MB",
-  "ru/code: empty",
-  "ru/logic: 147.9 MB of 226.9 MB",
-  "ru/cs: 18.9 MB of 68.1 MB",
-  "ru/ml: 10.6 MB of 272.3 MB",
-  "ru/humour: empty",
-  "ru/identity: 1.4 MB of 22.7 MB"
- ]
+  "dedupe": "exact sha256 + 2 KB prefix"
 }

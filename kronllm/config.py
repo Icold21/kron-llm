@@ -760,24 +760,25 @@ EXPERIMENTS["Q10"] = {
     },
 }
 # Q10A: the WSD decay pass.  Resumes the end-of-epoch weights, then anneals
-# 3e-4 -> 1e-6 over the tail of an epoch (~29.6 %, 40,649 steps, ~28 GPU-h) on
-# a curated subset: encyclopedic, literature, science, more math than the epoch
-# saw, and the whole identity slice repeated to ~2.5 % of the tokens.  No
-# warmup: the pass starts on the curve at full LR.  The share was raised from
-# 20 % on 2026-10-27: a 10M model on 2.25B tokens is far past compute-optimal,
-# so the tail of the schedule is the cheapest descent left on the table.
-# The step count is the curated bin divided by the step size (666.0M tokens /
-# 16,384), so the pass reads its data exactly once and repeats nothing.
+# 3e-4 -> 1e-6 over the tail of an epoch (30 %, 50,965 steps, ~36 GPU-h) on the
+# same domain profile selected by quality, plus 5 % chat so the four chat tokens
+# stop being cold before SFT.  No warmup: the pass starts on the curve at full
+# LR.  The shares are the owner's call (30 % on 2026-11-01, up from 29.6 %);
+# a 10M model on 2.78B tokens is far past compute-optimal, so the tail of the
+# schedule is the cheapest descent left on the table.
+# The step count is 30 % of the epoch bin (2,783,383,150 tokens / 16,384 =
+# 169,884 steps), so it tracks any future corpus rebuild.
 EXPERIMENTS["Q10A"] = {
-    "desc": "Q10 decay pass: 40,649 steps (29.6% of an epoch) on curated data, "
+    "desc": "Q10 decay pass: 49,384 steps (29.1% of an epoch, the bin divided by "
+            "the step size) on quality-selected data plus 5% chat, "
             "LR 3e-4 -> 1e-6",
     "overrides": {
         **EXPERIMENTS["Q10"]["overrides"],
         "training.lr": 3e-4,
         "training.min_lr": 1e-6,
         "training.warmup_steps": 0,
-        "training.run_steps": 40649,
-        "training.schedule_steps": 40649,
+        "training.run_steps": 49384,
+        "training.schedule_steps": 49384,
         # The decay pass deliberately resumes the epoch-1 weights with the
         # epoch-1 optimizer state on a *different* (curated) corpus; the token
         # id space is the same one, only the document mix changes.

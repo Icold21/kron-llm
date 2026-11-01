@@ -694,6 +694,20 @@ HF_ROUTES: dict[str, dict] = {
         "targets_mb": {"math": 800, "science": 700, "logic": 300,
                        "ml": 500, "cs": 250, "literature": 250},
     },
+    "habr_ru": {
+        "dataset": "georgiyozhegov/habr", "config": None,
+        "fields": {"text": "cs"}, "lang": "ru",
+        "licence": "Habr content, see dataset card",
+        "source": "Habr (HF georgiyozhegov/habr)",
+        "default_domain": "cs", "targets_mb": {"cs": 600},
+    },
+    "so_en": {
+        "dataset": "bigcode/stackoverflow-clean", "config": None,
+        "fields": {"content": "cs"}, "lang": "en",
+        "licence": "CC-BY-SA-4.0",
+        "source": "Stack Overflow (HF bigcode/stackoverflow-clean)",
+        "default_domain": "cs", "targets_mb": {"cs": 1400},
+    },
     "cosmopedia_ml": {
         "dataset": "HuggingFaceTB/cosmopedia", "config": "web_samples_v2",
         "text": "text", "url": "seed_data", "lang": "en",

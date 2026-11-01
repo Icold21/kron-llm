@@ -81,6 +81,18 @@ def main() -> None:
     ax.plot(x, y, color="#b8c4d4", lw=0.8, label="train loss (raw)")
     ax.plot(x, smooth(y, 41), color="#1f4e79", lw=1.8,
             label="train loss (41-step mean)")
+
+    # The prompt tokens are inside the training loss, so that loss is flattered
+    # by ~1 % of the stream becoming cheap for free.  Correcting it with the
+    # probe is what makes the two sessions comparable; the corrected line sits
+    # almost on top of the raw one, which is the point.
+    px_, py_ = column(sess, "nats_prompt")
+    sx_, sy_ = column(sess, "loss")
+    if len(px_) and TOKEN_SHARE:
+        corr = (sy_ - TOKEN_SHARE * py_) / (1 - TOKEN_SHARE)
+        ax.plot(sx_, corr, ":", color="#c0504d", lw=1.4,
+                label=f"same, prompt tokens excluded ({TOKEN_SHARE:.1%} of stream)")
+
     ax.set_ylabel("cross-entropy, nats/token")
     ax.set_title("Q10 pretraining: 25-layer, 10.0M params, batch 32, "
                  "constant LR 3e-4", fontsize=11, loc="left")
