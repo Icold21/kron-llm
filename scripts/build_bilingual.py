@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import re
 import sys
 import time
@@ -84,38 +85,66 @@ WIKI_HOST = {"wikipedia": "{lang}.wikipedia.org",
              "wikibooks": "{lang}.wikibooks.org",
              "wikiversity": "{lang}.wikiversity.org"}
 
-#: Wikibooks shelves pages under ``Category:Subject:<name>`` rather than a
-#: plain topic category, so ``--category Chemistry`` becomes
-#: ``Category:Subject:Chemistry`` on that site.  Wikiversity uses ordinary
-#: categories and does not need the prefix.
-SUBJECT_SITES = {"wikibooks"}
+#: Wikibooks makes an exception of *English* Wikibooks, which shelves pages
+#: under ``Category:Subject:<name>`` rather than a plain topic category, so
+#: ``--category Chemistry`` becomes ``Category:Subject:Chemistry`` there.  The
+#: Russian Wikibooks uses ordinary categories (``Category:Химия``), and asking
+#: it for ``Category:Subject:Химия`` returns an empty list rather than an error,
+#: which looks exactly like a shelf with no content.  Wikiversity uses ordinary
+#: categories in both languages.
+SUBJECT_SITES = {("wikibooks", "en")}
 
 
 # ---------------------------------------------------------------------------
 # HTTP helpers
 # ---------------------------------------------------------------------------
 
-def _get(url: str, timeout: int = 60, retries: int = 3) -> bytes:
-    """GET with a polite user agent and bounded retries."""
+def _get(url: str, timeout: int = 60, retries: int = 3,
+         deadline: Optional[float] = None) -> bytes:
+    """GET with a polite user agent and bounded retries.
+
+    ``deadline`` (seconds) switches to *patient* mode: keep retrying with
+    exponential backoff until the deadline instead of giving up after
+    ``retries`` attempts.  A link that answers one request in ten and drops out
+    for minutes at a time -- measured on 2026-10-30 -- defeats any fixed retry
+    count, and the calls that need it here are the ones where one success is
+    worth minutes of waiting (a 30 MB catalog, a 500 KB book).
+    """
     last: Optional[Exception] = None
-    for attempt in range(retries):
+    started = time.time()
+    backoff = 2.0
+    attempt = 0
+    while True:
+        attempt += 1
         try:
             req = urllib.request.Request(url, headers=UA)
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.read()
         except Exception as exc:                      # noqa: BLE001
             last = exc
-            time.sleep(1.5 * (attempt + 1))
+            if deadline is None:
+                if attempt >= retries:
+                    break
+                time.sleep(1.5 * attempt)
+            else:
+                if time.time() - started > deadline:
+                    raise RuntimeError(f"GET failed after {attempt} attempts "
+                                       f"over {deadline:.0f}s: {url}") from last
+                time.sleep(min(30.0, backoff) * (0.7 + 0.6 * random.random()))
+                backoff = min(30.0, backoff * 1.6)
     raise RuntimeError(f"GET failed after {retries} tries: {url}") from last
 
 
-def reset_shard(path: Path, manifest: Path) -> None:
-    """Delete a shard and its manifest rows (the meaning of ``--force``)."""
-    if path.exists():
-        path.unlink()
+def drop_manifest_rows(path: Path, manifest: Path) -> None:
+    """Drop the manifest rows for one shard, keeping the shard file.
+
+    A resumed fetch appends to a shard that already has a row; without this it
+    would register the same path twice, once with the partial ``docs``/``bytes``
+    of the interrupted run, and ``corpus_report`` would count both.
+    """
     if not manifest.exists():
         return
-    keep = []
+    keep: list[str] = []
     target = path.resolve()
     for line in manifest.read_text(encoding="utf-8").splitlines():
         if not line.strip():
@@ -129,6 +158,13 @@ def reset_shard(path: Path, manifest: Path) -> None:
             keep.append(line)
     manifest.write_text("\n".join(keep) + ("\n" if keep else ""),
                         encoding="utf-8")
+
+
+def reset_shard(path: Path, manifest: Path) -> None:
+    """Delete a shard and its manifest rows (the meaning of ``--force``)."""
+    if path.exists():
+        path.unlink()
+    drop_manifest_rows(path, manifest)
 
 
 def _api(site: str, lang: str, params: dict) -> dict:
@@ -248,7 +284,7 @@ def cmd_fetch_wiki(args: argparse.Namespace) -> None:
                          f"not in CATEGORIES")
     else:
         roots = CATEGORIES[args.lang][args.domain]
-    if site in SUBJECT_SITES:
+    if (site, args.lang) in SUBJECT_SITES:
         roots = [r if r.startswith("Subject:") else f"Subject:{r}"
                  for r in roots]
     # 20 KB per article is the observed average after cleaning; 1.7x headroom
@@ -595,6 +631,11 @@ KEYWORDS: dict[str, dict[str, tuple[str, ...]]] = {
         "ml": ("нейросет", "машинное обучение", "машинного обучения",
                "градиент", "трансформер", "датасет", "функция потерь",
                "обратное распространение", "переобучени"),
+        # Added 2026-11-01: Russian had no cs supply at all (4.8 MB), so the
+        # domain quota could not be met and it fell into shortfall every build.
+        "cs": ("программирован", "компилятор", "алгоритм", "отладк",
+               "исходный код", "база данных", "операционная систем",
+               "интерфейс программирован", "библиотека функций"),
         "literature": ("роман", "повест", "рассказ", "стихотвор", "глава",
                        "герой", "сюжет", "проза", "поэм"),
     },
@@ -609,7 +650,10 @@ HF_ROUTES: dict[str, dict] = {
         "text": "text", "title": "title", "url": "url", "lang": "en",
         "licence": "CC-BY-SA-3.0", "source": "Wikipedia 2023-11-01 (HF)",
         "default_domain": "encyclopedic",
-        "targets_mb": {"encyclopedic": 550, "math": 250, "science": 250,
+        # 550 -> 2500 MB: English was 77 % technical (ml, math, code, science)
+        # and only 16 % encyclopedic, while the Russian side holds the whole
+        # dump.  The prose is what the model was missing in English.
+        "targets_mb": {"encyclopedic": 2500, "math": 250, "science": 250,
                        "logic": 120, "ml": 80},
     },
     "wiki_ru": {
@@ -637,15 +681,18 @@ HF_ROUTES: dict[str, dict] = {
         "dataset": "sedthh/gutenberg_english", "config": "default",
         "text": "TEXT", "lang": "en", "licence": "public domain (US)",
         "source": "Project Gutenberg (HF sedthh/gutenberg_english)",
-        "default_domain": "literature", "targets_mb": {"literature": 550},
+        # 550 -> 2000 MB: English literature was 1 % of the English side while
+        # Russian literature was 30 % of the Russian one.
+        "default_domain": "literature",
+        "targets_mb": {"literature": 2000},
     },
     "fineweb_ru": {
         "dataset": "HuggingFaceFW/fineweb-2", "config": "rus_Cyrl",
         "text": "text", "url": "url", "lang": "ru",
         "licence": "ODC-By-1.0", "source": "FineWeb-2 rus_Cyrl (HF)",
         "default_domain": None,
-        "targets_mb": {"math": 450, "science": 400, "logic": 200,
-                       "ml": 300, "literature": 250},
+        "targets_mb": {"math": 800, "science": 700, "logic": 300,
+                       "ml": 500, "cs": 250, "literature": 250},
     },
     "cosmopedia_ml": {
         "dataset": "HuggingFaceTB/cosmopedia", "config": "web_samples_v2",
@@ -975,7 +1022,7 @@ def _gut_catalog() -> list[dict]:
     cache = ROOT / "pg_catalog.csv"
     if not cache.exists():
         cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_bytes(_get(GUT_CATALOG, timeout=300))
+        cache.write_bytes(_get(GUT_CATALOG, timeout=300, deadline=1800))
     with cache.open(encoding="utf-8", newline="") as fh:
         return list(csv.DictReader(fh))
 
@@ -991,8 +1038,7 @@ def cmd_fetch_gutenberg_catalog(args: argparse.Namespace) -> None:
     if args.force:
         reset_shard(out, MANIFEST)
     elif out.exists():
-        print(f"[skip] {out} exists")
-        return
+        print(f"[resume] {out.name} exists (--force to restart)")
 
     keys = GUT_FILTERS[args.domain]
     # The filter name selects candidates; ``--corpus-domain`` is where the
@@ -1023,15 +1069,32 @@ def cmd_fetch_gutenberg_catalog(args: argparse.Namespace) -> None:
     print(f"[catalog] {len(rows)} candidates for {args.domain}")
 
     target = int(args.target_mb * 1_000_000)
-    written = kept = 0
+    # Books already in the shard are skipped, so a run that dies on a dead link
+    # resumes instead of re-downloading 40 MB of text it already has.
+    have: set[str] = set()
+    if out.exists():
+        with open(out, encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    try:
+                        have.add(json.loads(line).get("title") or "")
+                    except ValueError:
+                        continue
+    written = out.stat().st_size if out.exists() else 0
+    kept = 0
+    deadline = getattr(args, "request_deadline", 1800.0)
     with open(out, "a", encoding="utf-8") as sink:
         for _score, book_id, title in rows:
             if written >= target or kept >= args.max_books:
                 break
+            if title in have:
+                continue
             try:
                 raw = _get(GUT_MIRROR.format(id=book_id),
-                           timeout=120).decode("utf-8", errors="replace")
-            except RuntimeError:
+                           timeout=120, deadline=deadline).decode(
+                               "utf-8", errors="replace")
+            except RuntimeError as exc:
+                print(f"  ! {book_id} {title[:40]}: {exc}")
                 continue
             body = _RE_GUT_START.split(raw, maxsplit=1)[-1]
             body = _RE_GUT_END.split(body, maxsplit=1)[0]
@@ -1055,13 +1118,16 @@ def cmd_fetch_gutenberg_catalog(args: argparse.Namespace) -> None:
         if out.exists():
             out.unlink()
         return
+    total = sum(1 for line in open(out, encoding="utf-8") if line.strip())
+    drop_manifest_rows(out, MANIFEST)
     shard = record_shard(out, MANIFEST,
                          source="Project Gutenberg (pglaf mirror)",
                          licence="public-domain",
                          url="https://gutenberg.pglaf.org/",
-                         language=args.lang, domain=corpus, docs=kept,
+                         language=args.lang, domain=corpus, docs=total,
                          note=f"catalog keywords {keys[:3]}")
-    print(f"[done] {kept} books, {shard.bytes/1e6:.1f} MB -> {out.name}")
+    print(f"[done] {kept} new books, {total} in the shard, "
+          f"{shard.bytes/1e6:.1f} MB -> {out.name}")
 
 
 def cmd_fetch_wiki_titles(args: argparse.Namespace) -> None:
@@ -1402,6 +1468,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--corpus-domain", default=None,
                    choices=list(DOMAIN_QUOTAS),
                    help="mix domain for the shard; defaults to --domain")
+    p.add_argument("--request-deadline", type=float, default=1800.0,
+                   help="seconds to keep retrying one download before giving "
+                        "up on it")
     p.add_argument("--lang", default="en")
     p.add_argument("--target-mb", type=float, default=12.0)
     p.add_argument("--max-books", type=int, default=60)

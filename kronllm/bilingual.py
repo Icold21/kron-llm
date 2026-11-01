@@ -333,7 +333,13 @@ def dedup(docs: Iterable[dict], threshold: float = 0.8,
         if h in seen_exact:
             dropped += 1
             continue
-        sig = minhash(text)
+        # Fingerprint only the opening of a document: shingling all 2 GB of
+        # corpus text in Python took 55 minutes and 20 GB of RAM on the
+        # 2026-11-01 rebuild, almost all of it inside five thousand Gutenberg
+        # books of half a megabyte each.  Two documents that share their first
+        # 8 KB are duplicates for our purposes, and near-duplicates that differ
+        # only later are rare enough to keep.
+        sig = minhash(text[:8000])
         is_dup = False
         for band in _bands(sig, 16):
             bucket = buckets.setdefault(band, [])
@@ -433,17 +439,22 @@ def record_shard(path: Path, manifest: Path, source: str, licence: str,
 # ---------------------------------------------------------------------------
 
 DOMAIN_QUOTAS = {
-    "math": 0.25,
-    "science": 0.14,
+    # Rebalanced 2026-11-01: the English side was 79 % technical (math, ml,
+    # code, science, cs, logic) and 20 % prose, which made English bpb 1.43
+    # against 0.93 for Russian -- the model was bad at English *prose*, not at
+    # English.  Prose is now 36 % and the technical block 62 %, with math kept
+    # at 20 % because the project cares about it.
+    "math": 0.20,
+    "science": 0.12,
     "code": 0.15,
-    "logic": 0.10,
-    "literature": 0.11,
-    "encyclopedic": 0.09,
+    "logic": 0.07,
+    "literature": 0.15,
+    "encyclopedic": 0.18,
     # Computer science, software engineering and engineering prose.  A small
     # slice: the code domain already teaches the syntax, this teaches the
     # discourse around it.
     "cs": 0.03,
-    "ml": 0.12,
+    "ml": 0.08,
     # Humour, satire and jokes: short texts that teach tone rather than facts.
     "humour": 0.01,
     # Self-identity: synthetic first-person texts that teach the model its own
