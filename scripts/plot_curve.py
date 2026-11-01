@@ -1,26 +1,28 @@
-"""Plot the Q10 pretraining curve from the two logs that hold it.
+"""Plot the Q10 pretraining curve from every log the run has produced.
 
-`data/q10_history.csv` covers steps 1-35,100 (sessions 1-3, collected from the
-per-session logs as they came back); `data/kaggle_out/q10/log.csv` covers
-35,150-43,895 (session 4).  They are concatenated here rather than merged into
-one file, because the session-4 log also carries the prompt probe columns that
-the earlier sessions never wrote.
+Sources, concatenated in step order rather than merged:
 
-Three panels, because the run is read three different ways:
+* ``data/q10_history.csv`` -- steps 1..35,100 (sessions 1-3);
+* ``data/kaggle_out/q10/log.csv`` -- the archived session-4 log, if present;
+* ``E:/kron_out/session*/log.csv`` -- every session the watcher has downloaded.
 
-* training loss -- did the optimiser keep working, and where did the step time
-  change;
-* `val_bpb_mixed` -- the metric that is actually quoted, with the per-language
-  split and the GPT-2-124M reference on the same blocks;
-* the prompt probe -- the evidence that the step-35,115 discontinuity is the
-  model learning the `<|system|>` tag, not a regression.
+Two panels, because the run is read two ways: the training loss says whether the
+optimiser kept working, and ``val_bpb_mixed`` is the number that gets quoted.  The
+prompt-probe panel of the earlier version is gone with the prompts themselves: the
+corpus is prompt-free since step 36,549, so those columns no longer fill.
+
+Corpus switches are marked, not smoothed over: the train loss steps at every
+rebuild and the validation curve does not, because the held-out bin never
+changes.  Saying which is which in the figure is cheaper than explaining it twice.
 
 Usage::
 
     python scripts/plot_curve.py
+    python scripts/plot_curve.py --out data/curve_q10.png
 """
 from __future__ import annotations
 
+import argparse
 import csv
 from pathlib import Path
 
@@ -30,20 +32,43 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-HISTORY = Path("data/q10_history.csv")
-SESSION = Path("data/kaggle_out/q10/log.csv")
-OUT = Path("data/curve_q10.png")
+ROOT = Path(__file__).resolve().parents[1]
+HISTORY = ROOT / "data" / "q10_history.csv"
+ARCHIVE = ROOT / "data" / "kaggle_out" / "q10" / "log.csv"
+SESSIONS = Path(r"E:/kron_out")
+OUT = ROOT / "data" / "curve_q10.png"
 
-# Step at which the fully-prompted corpus and the fixed resume both took effect.
-CORPUS_SWITCH = 35_115
-# Averaged checkpoint: best.pt + last.pt, alpha 0.5, 1024 strided blocks.
-SOUP_BPB = 1.13343
+EPOCH_STEPS = 172_273          # corpus v5
 GPT2_BPB = 1.554
+SOUP_BPB = 1.13343
+# (step, label) where the corpus changed under the run.  The validation curve is
+# unaffected by all of them: the held-out bin is the same bytes since step 1.
+SWITCHES = [
+    (35_115, "v3: prompts removed", 0.03),
+    (36_549, "v4: prose rebalance", 0.11),
+]
 
 
 def load(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
     with path.open(encoding="utf-8") as fh:
-        return [r for r in csv.DictReader(fh)]
+        rows = [r for r in csv.DictReader(fh) if (r.get("step") or "").strip()]
+    for r in rows:
+        r["_src"] = path.parent.parent.name if path.parent.parent.name != "data" else "history"
+    return rows
+
+
+def session_logs() -> list[tuple[str, list[dict]]]:
+    out = []
+    if SESSIONS.exists():
+        for d in sorted(SESSIONS.glob("session*")):
+            for cand in d.rglob("log.csv"):
+                rows = load(cand)
+                if rows:
+                    out.append((d.name, rows))
+                break
+    return out
 
 
 def column(rows: list[dict], name: str) -> tuple[np.ndarray, np.ndarray]:
@@ -53,11 +78,11 @@ def column(rows: list[dict], name: str) -> tuple[np.ndarray, np.ndarray]:
         if v:
             xs.append(int(r["step"]))
             ys.append(float(v))
-    return np.array(xs), np.array(ys)
+    order = np.argsort(xs)
+    return np.array(xs)[order], np.array(ys)[order]
 
 
 def smooth(y: np.ndarray, k: int) -> np.ndarray:
-    """Rolling mean that keeps the ends honest (shrinking window, not NaN)."""
     if len(y) < k:
         return y
     out = np.empty_like(y)
@@ -68,44 +93,36 @@ def smooth(y: np.ndarray, k: int) -> np.ndarray:
 
 
 def main() -> None:
-    hist = load(HISTORY)
-    sess = load(SESSION)
-    both = hist + sess
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default=str(OUT))
+    args = ap.parse_args()
 
-    fig, axes = plt.subplots(3, 1, figsize=(11, 12), sharex=True,
-                             gridspec_kw={"height_ratios": [1.1, 1.0, 0.9]})
+    hist = load(HISTORY)
+    archive = load(ARCHIVE)
+    parts = session_logs()
+    both = hist + archive + [r for _, rows in parts for r in rows]
+    if not both:
+        raise SystemExit("no logs found")
+    both.sort(key=lambda r: int(r["step"]))
+
+    fig, axes = plt.subplots(2, 1, figsize=(11, 8.2), sharex=True,
+                             gridspec_kw={"height_ratios": [1.15, 1.0]})
+    # Explicit margins: tight_layout left a hand's width of empty canvas above the
+    # first panel because the rotated switch labels live outside the axes.
+    fig.subplots_adjust(left=0.075, right=0.985, top=0.90, bottom=0.075,
+                        hspace=0.30)
 
     # ---------------------------------------------------------- 1. train loss
     ax = axes[0]
     x, y = column(both, "loss")
-    ax.plot(x, y, color="#b8c4d4", lw=0.8, label="train loss (raw)")
-    ax.plot(x, smooth(y, 41), color="#1f4e79", lw=1.8,
-            label="train loss (41-step mean)")
-
-    # The prompt tokens are inside the training loss, so that loss is flattered
-    # by ~1 % of the stream becoming cheap for free.  Correcting it with the
-    # probe is what makes the two sessions comparable; the corrected line sits
-    # almost on top of the raw one, which is the point.
-    px_, py_ = column(sess, "nats_prompt")
-    sx_, sy_ = column(sess, "loss")
-    if len(px_) and TOKEN_SHARE:
-        corr = (sy_ - TOKEN_SHARE * py_) / (1 - TOKEN_SHARE)
-        ax.plot(sx_, corr, ":", color="#c0504d", lw=1.4,
-                label=f"same, prompt tokens excluded ({TOKEN_SHARE:.1%} of stream)")
-
+    ax.plot(x, y, color="#b8c4d4", lw=0.7, label="train loss (raw)")
+    ax.plot(x, smooth(y, 61), color="#1f4e79", lw=1.9, label="train loss (61-step mean)")
     ax.set_ylabel("cross-entropy, nats/token")
-    ax.set_title("Q10 pretraining: 25-layer, 10.0M params, batch 32, "
-                 "constant LR 3e-4", fontsize=11, loc="left")
-    ax.legend(loc="upper right", frameon=False, fontsize=9,
-              bbox_to_anchor=(1.0, 0.80))
-    ax.annotate("corpus rebuilt: prompt in every document, resume fixed\n"
-                "(step 35,115; the loss dip is the new <|system|> tag "
-                "being learned, see the bottom panel)",
-                (CORPUS_SWITCH, 0.42), xycoords=("data", "axes fraction"),
-                textcoords="offset points", xytext=(-8, 0), ha="right",
-                fontsize=9, color="#c0504d")
+    ax.set_title("Q10 pretraining: 9.94M params, 25 layers, batch 32, fp16, one T4, "
+                 "LR 3e-4", fontsize=11, loc="left")
+    ax.legend(loc="lower left", frameon=False, fontsize=9)
 
-    # ---------------------------------------------------------- 2. val bpb
+    # ------------------------------------------------------------ 2. val bpb
     ax = axes[1]
     vx, vy = column(both, "val_bpb_mixed")
     ax.plot(vx, vy, "o-", color="#1f4e79", ms=4, lw=1.6,
@@ -114,68 +131,55 @@ def main() -> None:
     rx, ry = column(both, "val_bpb_ru")
     ax.plot(ex, ey, "--", color="#c0504d", lw=1.2, label="EN")
     ax.plot(rx, ry, "--", color="#4f81bd", lw=1.2, label="RU")
-    ax.axhline(GPT2_BPB, color="#7f7f7f", ls=":", lw=1.3)
-    ax.annotate(f"GPT-2-124M  {GPT2_BPB:.3f}", (vx[0], GPT2_BPB),
-                textcoords="offset points", xytext=(4, 4),
-                fontsize=9, color="#595959")
-    ax.axhline(SOUP_BPB, color="#2e7d32", ls="-.", lw=1.3)
-    ax.annotate(f"best+last soup  {SOUP_BPB:.3f}", (vx[0], SOUP_BPB),
-                textcoords="offset points", xytext=(4, -12),
-                fontsize=9, color="#2e7d32")
+    if len(vx):
+        ax.axhline(GPT2_BPB, color="#7f7f7f", ls=":", lw=1.3)
+        ax.annotate(f"GPT-2-124M  {GPT2_BPB:.3f}", (vx[0], GPT2_BPB),
+                    textcoords="offset points", xytext=(4, 4), fontsize=9,
+                    color="#595959")
+        ax.axhline(SOUP_BPB, color="#2e7d32", ls="-.", lw=1.2)
+        ax.annotate(f"best+last soup at 35k  {SOUP_BPB:.3f}", (vx[0], SOUP_BPB),
+                    textcoords="offset points", xytext=(4, -12), fontsize=9,
+                    color="#2e7d32")
     ax.set_ylabel("bits per byte")
-    ax.set_ylim(0.85, 1.62)
-    ax.set_title("Held-out bpb (mixed eval slices, bytes counted per batch)",
-                 fontsize=11, loc="left")
-    ax.legend(loc="lower left", frameon=False, fontsize=9)
-    ax.annotate("the mixed eval was added at step 24,000;\n"
-                "the legacy val_bpb column is not plotted (different span)",
-                (0.02, 0.60), xycoords="axes fraction", fontsize=8.5,
-                color="#595959")
-
-    # ---------------------------------------------------------- 3. prompt probe
-    ax = axes[2]
-    px, pn = column(sess, "nats_prompt")
-    bx, bn = column(sess, "nats_bare")
-    if len(px):
-        ax.plot(px, smooth(pn, 9), color="#2e7d32", lw=1.6,
-                label="loss on the ~21 tokens after <|system|>")
-        ax.plot(bx, smooth(bn, 9), color="#7f7f7f", lw=1.6,
-                label="loss on bare tokens in the same windows")
-    ax.set_ylabel("cross-entropy, nats/token")
-    ax.set_title("Prompt probe: the tag is learned, the text is not disturbed",
-                 fontsize=11, loc="left")
-    ax.legend(loc="upper left", frameon=False, fontsize=9)
     ax.set_xlabel("step")
+    ax.set_title("Held-out bpb: blocks inside every (language, domain) bucket, "
+                 "bytes counted per batch", fontsize=11, loc="left")
+    ax.legend(loc="lower left", frameon=False, fontsize=9)
 
-    for ax in axes:
-        ax.axvline(CORPUS_SWITCH, color="#c0504d", ls="--", lw=1.0, alpha=0.7)
-        ax.grid(alpha=0.25, lw=0.6)
+    # Sessions as shaded bands, so a flat stretch is attributable to a session
+    # boundary and not to a bad batch.
+    for name, rows in parts:
+        s0 = int(rows[0]["step"])
+        s1 = int(rows[-1]["step"])
+        for a in axes:
+            a.axvspan(s0, s1, color="#1f4e79", alpha=0.045)
+        axes[0].annotate(name.replace("session", "s"), (s0, 0.06),
+                         xycoords=("data", "axes fraction"), fontsize=8,
+                         color="#8a8a8a", rotation=90, va="bottom")
+
+    for step, label, height in SWITCHES:
+        for a in axes:
+            a.axvline(step, color="#c0504d", ls="--", lw=1.0, alpha=0.75)
+        axes[0].annotate(label, (step, height), xycoords=("data", "axes fraction"),
+                         textcoords="offset points", xytext=(-5, 0), fontsize=8.5,
+                         color="#c0504d", ha="right", va="bottom")
+
+    for a in axes:
+        a.grid(alpha=0.25, lw=0.6)
         for side in ("top", "right"):
-            ax.spines[side].set_visible(False)
+            a.spines[side].set_visible(False)
 
-    axes[0].annotate("session 4", (0.90, 0.55), xycoords="axes fraction",
-                     fontsize=9, color="#8a8a8a", ha="center")
-    axes[2].annotate("session 4 only\n(the probe did not exist before)",
-                     (0.02, 0.06), xycoords="axes fraction",
-                     fontsize=8.5, color="#595959")
+    last = int(x[-1]) if len(x) else 0
+    fig.suptitle(f"KronLLM Q10 — pretraining to step {last:,} "
+                 f"({last / EPOCH_STEPS:.1%} of a {EPOCH_STEPS:,}-step epoch)",
+                 fontsize=13, y=0.995)
+    fig.savefig(args.out, dpi=150)
+    print(f"[out] {args.out}")
 
-    # Shade the sessions so the 500-minute boundaries are visible.
-    for start, end, name in [(1, CORPUS_SWITCH, "sessions 1-3"),
-                             (CORPUS_SWITCH, int(x[-1]), "session 4")]:
-        axes[0].axvspan(start, end, color="#1f4e79",
-                        alpha=0.03 if name.endswith("4") else 0.06)
-
-    fig.suptitle("KronLLM Q10 - pretraining curve to step 43,895 "
-                 "(16.4 % of the epoch)", fontsize=13, y=0.995)
-    fig.tight_layout(rect=(0, 0, 1, 0.985))
-    fig.savefig(OUT, dpi=150)
-    print(f"[out] {OUT}")
-
-    # The numbers the plot is drawn from, so the figure can be checked.
-    print(f"[train]  {len(x)} points, {x[0]}..{x[-1]}, "
-          f"loss {y[:50].mean():.3f} -> {y[-50:].mean():.3f}")
-    print(f"[val]    {len(vx)} mixed points: " +
-          ", ".join(f"{a}:{b:.4f}" for a, b in zip(vx, vy)))
+    print(f"[train] {len(x)} points, {x[0]}..{x[-1]}, "
+          f"mean {y[:200].mean():.3f} -> {y[-200:].mean():.3f}")
+    if len(vx):
+        print(f"[val]   {len(vx)} mixed points, last {vy[-1]:.4f} at step {vx[-1]:,}")
 
 
 if __name__ == "__main__":

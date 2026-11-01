@@ -4,20 +4,28 @@ Sequence, each step gated on the previous one:
 
 1. poll the kernel until it is terminal (default deadline: 14 h);
 2. download the output to ``E:\\kron_out\\session<N>`` -- ``C:`` has run out of
-   space before, and a half-downloaded ``last.pt`` is worse than none;
+   space before, and a half-downloaded ``last.pt`` is worse than none -- with a
+   timeout and a retry, because this link stalls;
 3. read ``log.csv``: the step, ``val_bpb_mixed`` and sec/step, which are the
    numbers worth quoting (``val_ppl`` in the checkpoint is the legacy metric);
 4. publish the checkpoint as a new version of ``kron-q10-ckpt`` and wait until
    the dataset reports ready -- pushing the next session before that would
    resume from the *previous* session's weights;
-5. mail the report as HTML;
-6. push the next session, unless ``--no-push`` (or the epoch is finished, in
-   which case the decay pass is what comes next and is left to a human).
+5. generate samples from the checkpoint just downloaded and redraw the curve;
+6. mail the report as HTML with the curve attached;
+7. push the next session, patching the kernel's wall-clock budget first, unless
+   ``--no-push`` (or the epoch is finished, in which case the decay pass is what
+   comes next and is left to a human).
+
+``--chain N`` repeats steps 1-7 N times back to back, so one command covers the
+night; ``--minutes-plan 330,660`` sets the kernel budget of each session it
+pushes, which is how a session is made to end at a chosen hour instead of after
+a fixed eleven.
 
 Usage::
 
     python -u scripts/finish_session.py --start-step 36549 --session 6
-    python -u scripts/finish_session.py --start-step 36549 --session 6 --no-push
+    python -u scripts/finish_session.py --session 6 --chain 2 --minutes-plan 330,660
 """
 from __future__ import annotations
 
@@ -38,6 +46,7 @@ MAIL = (Path.home() / ".config" / "opencode" / "skills" / "email-control"
         / "scripts" / "mail.py")
 TOKENS_PER_STEP = 16_384
 EPOCH_STEPS = 172_273          # corpus v5: 2,822,521,746 tokens (drills in)
+MODEL_NAME = "DeepSeek V4.1 Flash"
 
 
 def log_path(session: int) -> Path:
@@ -122,8 +131,53 @@ def publish_ckpt(info: dict, session: int) -> bool:
     return False
 
 
+def run_generation(session: int, out: Path, minutes: int = 25) -> Path | None:
+    """Write ``data/samples_session<N>.md`` from the checkpoint just downloaded."""
+    ckpt = out / "last.pt"
+    if not ckpt.exists():
+        say("  no last.pt: skipping the generation", session)
+        return None
+    dst = ROOT / "data" / f"samples_session{session}.md"
+    step = ckpt_info(out).get("last.pt", {}).get("step", "?")
+    cmd = [sys.executable, "-u", str(ROOT / "scripts" / "generate_samples.py"),
+           "--ckpt", str(ckpt), "--out", str(dst),
+           "--label", f"сессия {session}, шаг {step}", "--tokens", "60"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=minutes * 60)
+        tail = ((r.stdout or "") + (r.stderr or "")).strip().splitlines()
+        say(f"  generation exit {r.returncode}: "
+            f"{tail[-1][:110] if tail else '-'}", session)
+        return dst if dst.exists() else None
+    except subprocess.TimeoutExpired:
+        say(f"  generation timed out after {minutes} min", session)
+        return None
+
+
+def run_plot(session: int) -> Path | None:
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "plot_curve.py")],
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
+    tail = ((r.stdout or "") + (r.stderr or "")).strip().splitlines()
+    say(f"  plot exit {r.returncode}: {tail[-1][:110] if tail else '-'}", session)
+    png = ROOT / "data" / "curve_q10.png"
+    return png if png.exists() else None
+
+
+def curve_table(val: list[dict], limit: int = 10) -> list[str]:
+    rows = [r for r in val if (r.get("val_bpb_mixed") or "").strip()][-limit:]
+    if not rows:
+        return ["_в этом логе нет строк валидации_"]
+    out = ["| шаг | val_bpb_mixed | EN | RU |", "|---:|---:|---:|---:|"]
+    for r in rows:
+        out.append(f"| {int(r['step']):,} | {r['val_bpb_mixed']} | "
+                   f"{r.get('val_bpb_en', '—')} | {r.get('val_bpb_ru', '—')} |")
+    return out
+
+
 def mail_report(session: int, out: Path, train: list[dict], val: list[dict],
-                info: dict, start_step: int) -> None:
+                info: dict, start_step: int, samples: Path | None,
+                png: Path | None, minutes: int | None) -> None:
     last = train[-1] if train else {}
     v = val[-1] if val else {}
     step = info.get("last.pt", {}).get("step")
@@ -132,20 +186,42 @@ def mail_report(session: int, out: Path, train: list[dict], val: list[dict],
     md = [
         f"# Q10: сессия {session} завершена",
         "",
-        f"Старт был с шага **{start_step:,}**, бюджет 660 минут.",
+        f"Старт был с шага **{start_step:,}**, бюджет "
+        f"{minutes if minutes else '—'} минут.",
         "",
         "| параметр | значение |",
         "|---|---|",
         f"| шаг чекпоинта | **{step if step else '—'}** |",
-        f"| пройдено за сессию | {done:,} шагов ({done * TOKENS_PER_STEP / 1e9:.2f} млрд токенов) |",
+        f"| пройдено за сессию | {done:,} шагов "
+        f"({done * TOKENS_PER_STEP / 1e9:.2f} млрд токенов) |",
         f"| скорость | {sec:.2f} с/шаг |",
         f"| loss (последняя запись) | {last.get('loss', '—')} |",
         f"| **val_bpb_mixed** | **{v.get('val_bpb_mixed') or v.get('bpb') or '—'}** |",
-        f"| val_bpb_en / ru | {v.get('val_bpb_en', '—')} / {v.get('val_bpb_ru', '—')} |",
-        f"| до конца эпохи | {max(0, EPOCH_STEPS - (step or start_step)):,} шагов |",
+        f"| val_bpb_en / ru | {v.get('val_bpb_en', '—')} / "
+        f"{v.get('val_bpb_ru', '—')} |",
+        f"| до конца эпохи | {max(0, EPOCH_STEPS - (step or start_step)):,} шагов "
+        f"({max(0, EPOCH_STEPS - (step or start_step)) / EPOCH_STEPS:.1%}) |",
         "",
-        f"Выгрузка: `{out}`. Чекпоинт опубликован версией `{CKPT_SLUG}`.",
+        "## Кривые",
+        "",
+        f"Валидация за сессию (`val_bpb_mixed` — единственная честная метрика: "
+        f"held-out бин не меняется с первого шага, поэтому серия сопоставима "
+        f"несмотря на пересборки корпуса):",
+        "",
     ]
+    md += curve_table(val)
+    md += [
+        "",
+        "График приложен к письму (`curve_q10.png`): сверху train loss, снизу "
+        "`val_bpb_mixed` с языками и референсами GPT-2-124M (1.554) и soup на "
+        "шаге 35k (1.133). Вертикальные линии — смены корпуса; ступени на "
+        "train loss в этих местах ожидаемы, на валидации их нет.",
+        "",
+    ]
+    if samples and samples.exists():
+        md += [samples.read_text(encoding="utf-8"), ""]
+    md += [f"Выгрузка: `{out}`. Чекпоинт опубликован версией `{CKPT_SLUG}`."]
+
     md_path = ROOT / "data" / f"report_session{session}.md"
     html_path = ROOT / "data" / f"report_session{session}.html"
     md_path.write_text("\n".join(md) + "\n", encoding="utf-8")
@@ -155,8 +231,10 @@ def mail_report(session: int, out: Path, train: list[dict], val: list[dict],
            "--subject", f"Q10: сессия {session} завершена, "
                         f"val_bpb_mixed {v.get('val_bpb_mixed', '—')} "
                         f"(шаг {step})",
-           "--model", "DeepSeek V4.1 Flash Free", "--session", "kron_chain",
+           "--model", MODEL_NAME, "--session", "kron_chain",
            "--html", "--body-file", str(html_path)]
+    if png and png.exists():
+        cmd += ["--attach", str(png)]
     for attempt in range(1, 4):
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
         if r.returncode == 0:
@@ -190,63 +268,152 @@ def download_output(out: Path, s: int, attempts: int = 4,
     return False
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--start-step", type=int, required=True)
-    ap.add_argument("--session", type=int, required=True)
-    ap.add_argument("--hours", type=float, default=14.0)
-    ap.add_argument("--out", default=None)
-    ap.add_argument("--no-push", action="store_true")
-    args = ap.parse_args()
+def notebook_minutes() -> int | None:
+    """The kernel budget this session was pushed with, for the report."""
+    nb_path = ROOT / "kaggle" / "q10" / "train.ipynb"
+    try:
+        nb = json.loads(nb_path.read_text(encoding="utf-8"))
+    except OSError:
+        return None
+    for cell in nb["cells"]:
+        for line in cell["source"]:
+            if line.strip().startswith("MINUTES ="):
+                try:
+                    return int(line.split("=", 1)[1].strip().split()[0])
+                except (IndexError, ValueError):
+                    return None
+    return None
 
-    s = args.session
-    out = Path(args.out) if args.out else Path(rf"E:\kron_out\session{s}")
-    say(f"waiting for {KERNEL} (session {s}, started at step {args.start_step:,})", s)
-    deadline = time.time() + args.hours * 3600
+
+def patch_minutes(minutes: int, session: int) -> bool:
+    """Set ``MINUTES`` in the kernel notebook before pushing it.
+
+    The session is meant to end at a wall-clock hour, not after a fixed eleven;
+    the notebook is the only place the budget lives, and the watcher is what
+    pushes it.
+    """
+    nb_path = ROOT / "kaggle" / "q10" / "train.ipynb"
+    nb = json.loads(nb_path.read_text(encoding="utf-8"))
+    hits = 0
+    for cell in nb["cells"]:
+        for i, line in enumerate(cell["source"]):
+            if line.strip().startswith("MINUTES ="):
+                cell["source"][i] = f"MINUTES = {minutes}\n"
+                hits += 1
+    if hits:
+        nb_path.write_text(json.dumps(nb, indent=1, ensure_ascii=False),
+                           encoding="utf-8")
+    say(f"  kernel MINUTES -> {minutes} ({hits} cell)", session)
+    return bool(hits)
+
+
+def finish_one(session: int, start_step: int | None, hours: float, out: Path,
+               push: bool, next_minutes: int | None) -> int | None:
+    """Wait, download, publish, report; return the step the run reached."""
+    say(f"waiting for {KERNEL} (session {session}, "
+        f"started at {('step ' + format(start_step, ',')) if start_step else 'an unknown step'})",
+        session)
+    deadline = time.time() + hours * 3600
     kind = "?"
     while time.time() < deadline:
         st = status()
         if st != kind:
-            say(f"  status: {st}", s)
+            say(f"  status: {st}", session)
             kind = st
         low = st.lower()
         if any(k in low for k in ("complete", "error", "cancel", "fail")):
             break
         time.sleep(180)
     if "complete" not in kind.lower():
-        say(f"kernel ended as {kind}", s)
+        say(f"kernel ended as {kind}", session)
 
     out.mkdir(parents=True, exist_ok=True)
-    if not download_output(out, s):
+    if not download_output(out, session):
         say("the output could not be downloaded; the checkpoint is still in the "
-            "kernel output on Kaggle and the next session was NOT pushed", s)
-        return
+            "kernel output on Kaggle and the next session was NOT pushed", session)
+        return None
 
     train, val = read_logs(out)
     info = ckpt_info(out)
-    say(f"log rows: {len(train)} train / {len(val)} val | "
-        f"last.pt step {info.get('last.pt', {}).get('step')}", s)
-
-    published = publish_ckpt(info, s)
-    mail_report(s, out, train, val, info, args.start_step)
-
     step = info.get("last.pt", {}).get("step", 0)
-    if args.no_push:
-        say("--no-push: stopping here", s)
-        return
+    if start_step is None:
+        # Infer from the log: the first row is where this session began.
+        start_step = int(train[0]["step"]) if train else step
+        say(f"  start step inferred from log.csv: {start_step:,}", session)
+    say(f"log rows: {len(train)} train / {len(val)} val | last.pt step {step}", session)
+
+    published = publish_ckpt(info, session)
+    samples = run_generation(session, out)
+    png = run_plot(session)
+    mail_report(session, out, train, val, info, start_step, samples,
+                png, notebook_minutes())
+
+    if not push:
+        say("--no-push: stopping here", session)
+        return None
     if not published:
-        say("checkpoint not published: refusing to start the next session", s)
-        return
+        say("checkpoint not published: refusing to start the next session", session)
+        return None
     if step >= EPOCH_STEPS - 1_000:
-        say("the epoch is finished: the next stage is Q10A, left to a human", s)
-        return
+        say("the epoch is finished: the next stage is Q10A, left to a human", session)
+        return None
     if "complete" not in kind.lower():
-        say(f"the session did not complete ({kind}): not chaining", s)
-        return
-    say("pushing the next epoch session", s)
+        say(f"the session did not complete ({kind}): not chaining", session)
+        return None
+    if next_minutes:
+        patch_minutes(next_minutes, session)
+    say("pushing the next epoch session", session)
     r = kaggle("kernels", "push", "-p", str(ROOT / "kaggle" / "q10"))
     tail = ((r.stdout or "") + (r.stderr or "")).strip().splitlines()
-    say(f"  push exit {r.returncode}: {tail[-1][:140] if tail else '-'}", s)
+    say(f"  push exit {r.returncode}: {tail[-1][:140] if tail else '-'}", session)
+    if r.returncode != 0:
+        return None
+    wait_for_restart(session)
+    return step
+
+
+def wait_for_restart(session: int, minutes: float = 25.0) -> bool:
+    """Poll until the kernel stops reporting the previous run as complete."""
+    deadline = time.time() + minutes * 60
+    while time.time() < deadline:
+        st = status().lower()
+        if not any(k in st for k in ("complete", "error", "cancel", "fail")):
+            say(f"  kernel restarted: {st}", session)
+            return True
+        time.sleep(30)
+    say("  kernel never left the previous terminal state: not chaining further",
+        session)
+    return False
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--start-step", type=int, default=None,
+                    help="step the session started from; inferred from log.csv "
+                         "when omitted, which is what chaining needs")
+    ap.add_argument("--session", type=int, required=True)
+    ap.add_argument("--hours", type=float, default=14.0)
+    ap.add_argument("--out", default=None)
+    ap.add_argument("--no-push", action="store_true")
+    ap.add_argument("--chain", type=int, default=1,
+                    help="how many sessions to finish back to back")
+    ap.add_argument("--minutes-plan", default="",
+                    help="comma list of kernel budgets, one per pushed session")
+    args = ap.parse_args()
+
+    plan = [int(x) for x in args.minutes_plan.split(",") if x.strip()]
+    session = args.session
+    start = args.start_step
+    for turn in range(args.chain):
+        out = Path(args.out) if args.out else Path(rf"E:\kron_out\session{session}")
+        step = finish_one(session, start, args.hours, out,
+                          push=not args.no_push,
+                          next_minutes=plan[turn] if turn < len(plan) else None)
+        if step is None:
+            break
+        start = step
+        session += 1
+    say("done", session)
 
 
 if __name__ == "__main__":
