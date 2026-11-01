@@ -37,7 +37,7 @@ STAGE = Path(r"E:\kron_ckpt_stage")
 MAIL = (Path.home() / ".config" / "opencode" / "skills" / "email-control"
         / "scripts" / "mail.py")
 TOKENS_PER_STEP = 16_384
-EPOCH_STEPS = 169_884          # the rebuilt corpus, 2,783,383,150 tokens
+EPOCH_STEPS = 172_273          # corpus v5: 2,822,521,746 tokens (drills in)
 
 
 def log_path(session: int) -> Path:
@@ -166,6 +166,30 @@ def mail_report(session: int, out: Path, train: list[dict], val: list[dict],
     say("  mail failed; body is in data/report_session*.html", session)
 
 
+def download_output(out: Path, s: int, attempts: int = 4,
+                    timeout: float = 900.0) -> bool:
+    """``kaggle kernels output`` with a timeout, a retry and a size check."""
+    ckpt = out / "last.pt"
+    for i in range(1, attempts + 1):
+        for stale in out.glob("*.pt"):
+            stale.unlink(missing_ok=True)
+        try:
+            r = subprocess.run(
+                [sys.executable, "-m", "kaggle", "kernels", "output", KERNEL,
+                 "-p", str(out)],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=timeout)
+            tail = ((r.stdout or "") + (r.stderr or "")).strip().splitlines()
+            say(f"  download {i}/{attempts}: exit {r.returncode} "
+                f"{(tail[-1][:120] if tail else '-')}", s)
+            if r.returncode == 0 and ckpt.exists() and ckpt.stat().st_size > 1_000_000:
+                return True
+        except subprocess.TimeoutExpired:
+            say(f"  download {i}/{attempts}: stalled after {timeout:.0f}s", s)
+        time.sleep(30)
+    return False
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--start-step", type=int, required=True)
@@ -193,10 +217,10 @@ def main() -> None:
         say(f"kernel ended as {kind}", s)
 
     out.mkdir(parents=True, exist_ok=True)
-    r = kaggle("kernels", "output", KERNEL, "-p", str(out))
-    say(f"download exit {r.returncode}", s)
-    if r.returncode != 0:
-        say((r.stderr or r.stdout or "").strip()[-300:], s)
+    if not download_output(out, s):
+        say("the output could not be downloaded; the checkpoint is still in the "
+            "kernel output on Kaggle and the next session was NOT pushed", s)
+        return
 
     train, val = read_logs(out)
     info = ckpt_info(out)
