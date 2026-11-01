@@ -743,6 +743,16 @@ EXPERIMENTS["Q10"] = {
         # rate, so every token gets the same weight, and the quality work is
         # done by the separate decay pass (Q10A) instead of by a cosine tail
         # that would give the curated data almost no say (see README).
+        #
+        # Considered and rejected on 2026-11-01: dropping to 1e-4 from step
+        # 42.7k.  The held-out curve says the plateau is the capacity ceiling,
+        # not instability -- bpb 1.2482 (11.7k) -> 1.1984 (23.5k) -> 1.1760
+        # (35.1k), i.e. each 11.7k steps buys about half of the previous one,
+        # so the whole remaining headroom is ~0.018 bpb and a lower rate only
+        # slows the approach to it.  gnorm 1.7-3.7 under clip 1.0 is noise, not
+        # divergence.  A 3e-4 -> 1e-4 step decay would have spent 75 % of the
+        # epoch at a third of the rate and then a long cosine tail would have
+        # duplicated Q10A, whose job is the one anneal -- on curated data.
         "training.min_lr": 3e-4,
         "training.warmup_steps": 1000,
         "training.max_steps": 0,
@@ -760,17 +770,18 @@ EXPERIMENTS["Q10"] = {
     },
 }
 # Q10A: the WSD decay pass.  Resumes the end-of-epoch weights, then anneals
-# 3e-4 -> 1e-6 over the tail of an epoch (30 %, 50,965 steps, ~36 GPU-h) on the
-# same domain profile selected by quality, plus 5 % chat so the four chat tokens
-# stop being cold before SFT.  No warmup: the pass starts on the curve at full
-# LR.  The shares are the owner's call (30 % on 2026-11-01, up from 29.6 %);
-# a 10M model on 2.78B tokens is far past compute-optimal, so the tail of the
-# schedule is the cheapest descent left on the table.
-# The step count is 30 % of the epoch bin (2,783,383,150 tokens / 16,384 =
-# 169,884 steps), so it tracks any future corpus rebuild.
+# 3e-4 -> 1e-6 over the tail of an epoch (29 % of it) on the same domain profile
+# selected by quality, plus chat and arithmetic drills so the chat markup and
+# the worked-answer format stop being cold before SFT.  No warmup: the pass
+# starts on the curve at full LR.
+# This pass is the *only* anneal in the schedule (decided 2026-11-01): the epoch
+# keeps 3e-4 to the end, so the drop happens once, at the lowest-LR phase, on
+# the corpus whose documents were chosen for it.  A cosine tail inside the epoch
+# would have started the pass at a rate too small to teach the cold chat and
+# drill tokens anything.
 EXPERIMENTS["Q10A"] = {
     "desc": "Q10 decay pass: 49,384 steps (29.1% of an epoch, the bin divided by "
-            "the step size) on quality-selected data plus 5% chat, "
+            "the step size) on quality-selected data plus chat and drills, "
             "LR 3e-4 -> 1e-6",
     "overrides": {
         **EXPERIMENTS["Q10"]["overrides"],

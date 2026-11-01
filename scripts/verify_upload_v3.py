@@ -35,7 +35,7 @@ _args, _ = _ap.parse_known_args()
 OUT = Path(_args.dir)
 OLD = Path(_args.old)
 SLUG = _args.slug
-EOT, SYS = 8191, 8187
+EOT, SYS, USER = 8191, 8187, 8188
 BPT = {"en": 2.917, "ru": 4.964}
 
 
@@ -59,23 +59,27 @@ def main() -> None:
     meta_path = OUT / "tokenizer_meta.json"
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
 
+    # The encoder measures the language split on the text it actually encoded,
+    # so its own numbers are kept.  They used to be recomputed here from the mix
+    # report times two bytes-per-token constants, which silently dropped every
+    # slice the report does not carry (the drills pool is interleaved at encode
+    # time, after the report is written) and replaced a measurement with an
+    # estimate.  The report is now a cross-check: it must agree with the bin to
+    # within a few percent, and a disagreement is printed.
     report = json.loads((ROOT / "data" / "bilingual" / "corpus_report.json")
                         .read_text(encoding="utf-8"))
     mixed = report["mixed"]
-    en_b = sum(mixed.get("en", {}).values())
-    ru_b = sum(mixed.get("ru", {}).values())
-    total_b = en_b + ru_b
-    tok = {"en": en_b / BPT["en"], "ru": ru_b / BPT["ru"]}
-    tot_tok = sum(tok.values())
-    meta["language"] = {l: {"bytes": int(mixed and sum(mixed.get(l, {}).values())),
-                            "tokens": int(tok[l]),
-                            "bytes_per_token": BPT[l]} for l in ("en", "ru")}
-    meta["token_share"] = {l: round(tok[l] / tot_tok, 4) for l in ("en", "ru")}
-    meta["byte_share"] = {l: round(sum(mixed.get(l, {}).values()) / total_b, 4)
-                          for l in ("en", "ru")}
+    estimate_b = sum(mixed.get("en", {}).values()) + sum(mixed.get("ru", {}).values())
+    measured_b = meta.get("train_bytes") or 0
+    say(f"meta: {meta['train_tokens']:,} tokens, {measured_b/1e9:.2f} GB, "
+        f"token share {meta.get('token_share')}, byte share {meta.get('byte_share')}")
+    if estimate_b and measured_b:
+        drift = abs(measured_b - estimate_b) / measured_b
+        say(f"mix report {estimate_b/1e9:.2f} GB vs bin {measured_b/1e9:.2f} GB "
+            f"({drift:.1%} apart -- the interleaved side pools are the difference)")
+        if drift > 0.10:
+            say("WARNING: the report and the bin disagree by more than 10 %")
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    say(f"meta: {meta['train_tokens']:,} tokens, token share {meta['token_share']}, "
-        f"byte share {meta['byte_share']}")
 
     old_hash = sha256(OLD / "val.bpe.bin")
     new_hash = sha256(OUT / "val.bpe.bin")
@@ -103,6 +107,19 @@ def main() -> None:
     if per_doc > 2.0:
         say(f"WARNING: {n_sys:,} <|system|> for {n_eot:,} documents looks "
             f"like inserted prompts rather than chat markup")
+
+    # The epoch bin took the arithmetic pools in through --interleave drills and
+    # the decay bin takes chat through --interleave chat.  Both are written into
+    # mix/ by separate scripts, and both have silently gone missing before (the
+    # sweep deleted them, twice), so the bin itself is asked whether they are
+    # in there: <|user|> appears only in those rendered turns, never in prose.
+    n_user = int((tokens == USER).sum())
+    pools = sorted(p.name for p in (ROOT / "data" / "bilingual" / "mix").glob(
+        "*_*ills.jsonl.gz")) + sorted(
+        p.name for p in (ROOT / "data" / "bilingual" / "mix").glob("*_chat.jsonl.gz"))
+    say(f"turns: <|user|> {n_user:,} in the bin, pools present {pools or 'none'}")
+    if pools and n_user == 0:
+        raise SystemExit("side pools exist but the bin holds no rendered turns")
 
     (OUT / "dataset-metadata.json").write_text(json.dumps({
         "title": "Kron Q10A anneal bin" if "anneal" in SLUG

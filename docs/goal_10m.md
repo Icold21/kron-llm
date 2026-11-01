@@ -193,7 +193,8 @@ probe, and generation at T=1.0, top_k=5–10.
 | DDP | rank-0 logging and checkpoints, per-rank batches, identical validation; verified on two CPU ranks |
 | epoch sampler | one shared permutation of **blocks** per epoch, ranks take `rank::world`, so an epoch is a full pass (offset sampling, before 2026-11-01, covered only 63 %) |
 | checkpoints | save_every=500, last.pt carries model + optimizer + step, --resume tested |
-| steps | 169,884 x 16,384 tokens = 2.783B = one epoch (one T4, batch 32, fp16) |
+| steps | 171,568 x 16,384 tokens = 2.811B = one epoch (one T4, batch 32, fp16) |
+| LR | 3e-4 constant through the epoch (WSD), then the decay pass Q10A 3e-4 → 1e-6 on curated data — one anneal, at the end. Dropping the epoch to 1e-4 at step 42.7k was considered on 2026-11-01 and rejected: bpb 1.2482 → 1.1984 → 1.1760 at 11.7k / 23.5k / 35.1k steps means each 11.7k steps buys about half the previous one, so the remaining headroom is ~0.018 bpb and the plateau is the capacity ceiling, not divergence. |
 | Kaggle | code dataset icold21/kron-llm-code; bins icold21/kron-corpus-2b |
 
 The first epoch is the first segment, not a hard target: if validation bpb is

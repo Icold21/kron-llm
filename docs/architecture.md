@@ -423,8 +423,8 @@ model.
 — roughly 40× past compute-optimal for a model this size. That is deliberate:
 the Kronecker parameterisation is only interesting if it holds up when the
 *data* is the constraint, so the run is set up to be data-bound from the first
-step. The decay pass (Q10A) then spends the last 30 % of the schedule at
-`LR 3e-4 → 1e-6` on curated data.
+step. The decay pass (Q10A) then spends the last 29 % of the schedule at
+`LR 3e-4 → 1e-6` on curated data — the only anneal in the run.
 
 ### Arithmetic cost: the prelude is not free
 
@@ -458,7 +458,7 @@ recurrence state are the obvious next steps, and neither exists on this setup
 | knob | value |
 |---|---|
 | optimiser | AdamW, `β` defaults, `ε` default |
-| LR | 3e-4 constant through the epoch (WSD), `θ` at 1e-2, `τ`/`γ` at LR |
+| LR | 3e-4 constant through the epoch (WSD), `θ` at 1e-2, `τ`/`γ` at LR; the only anneal is the decay pass Q10A, 3e-4 → 1e-6 |
 | weight decay | 0.1 on matrices, 0 on `θ` (learned mixing rates) |
 | grad clip | 1.0 |
 | precision | fp16 autocast, single T4 |

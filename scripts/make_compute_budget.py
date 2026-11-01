@@ -17,8 +17,8 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-META = Path(r"E:\kron_bins\epoch_v4\tokenizer_meta.json")
-ANNEAL_META = Path(r"E:\kron_bins\anneal_v4\tokenizer_meta.json")
+META = Path(r"E:\kron_bins\epoch_v5\tokenizer_meta.json")
+ANNEAL_META = Path(r"E:\kron_bins\anneal_v5\tokenizer_meta.json")
 FALLBACK_TOKENS = 2_783_383_150
 
 SEC_PER_STEP = 2.552        # median of the last ten steps of session 5, T4
@@ -198,7 +198,17 @@ def update_card(n: dict) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--print", action="store_true", help="numbers only")
+    ap.add_argument("--done", type=int, default=None,
+                    help="steps finished so far (the last session's checkpoint)")
+    ap.add_argument("--epoch-meta", default=str(META))
+    ap.add_argument("--anneal-meta", default=str(ANNEAL_META))
     args = ap.parse_args()
+    if args.done is not None:
+        globals()["DONE_STEPS"] = args.done
+    if args.epoch_meta != str(META):
+        globals()["META"] = Path(args.epoch_meta)
+    if args.anneal_meta != str(ANNEAL_META):
+        globals()["ANNEAL_META"] = Path(args.anneal_meta)
     n = numbers()
     if args.print:
         print(json.dumps(n, indent=2))
