@@ -60,10 +60,21 @@ def say(msg: str, session: int) -> None:
         fh.write(line + "\n")
 
 
-def kaggle(*argv: str) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, "-m", "kaggle", *argv],
-                          capture_output=True, text=True, encoding="utf-8",
-                          errors="replace")
+def kaggle(*argv: str, timeout: float = 180.0) -> subprocess.CompletedProcess:
+    """Run the Kaggle CLI, and never wait on it forever.
+
+    This link stalls: one upload sat 2 h 20 min, and a `kernels status` call
+    blocked the whole watcher for over an hour on 2026-11-02.  A timeout turns
+    that into a failed call the loop can report and retry.
+    """
+    try:
+        return subprocess.run([sys.executable, "-m", "kaggle", *argv],
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(
+            args=list(argv), returncode=1, stdout="",
+            stderr=f"timeout after {timeout:.0f}s")
 
 
 def status() -> str:
@@ -133,10 +144,11 @@ def publish_ckpt(info: dict, session: int) -> bool:
 
 def run_generation(session: int, out: Path, minutes: int = 25) -> Path | None:
     """Write ``data/samples_session<N>.md`` from the checkpoint just downloaded."""
-    ckpt = out / "last.pt"
-    if not ckpt.exists():
+    found = sorted(out.rglob("last.pt"), key=lambda q: q.stat().st_mtime)
+    if not found:
         say("  no last.pt: skipping the generation", session)
         return None
+    ckpt = found[-1]
     dst = ROOT / "data" / f"samples_session{session}.md"
     step = ckpt_info(out).get("last.pt", {}).get("step", "?")
     cmd = [sys.executable, "-u", str(ROOT / "scripts" / "generate_samples.py"),
@@ -247,9 +259,13 @@ def mail_report(session: int, out: Path, train: list[dict], val: list[dict],
 def download_output(out: Path, s: int, attempts: int = 4,
                     timeout: float = 900.0) -> bool:
     """``kaggle kernels output`` with a timeout, a retry and a size check."""
-    ckpt = out / "last.pt"
+    def complete() -> bool:
+        # The trainer writes into /kaggle/working/q10, so the files come back
+        # under <out>/q10/ -- a top-level check misses them entirely.
+        return any(p.stat().st_size > 1_000_000 for p in out.rglob("last.pt"))
+
     for i in range(1, attempts + 1):
-        for stale in out.glob("*.pt"):
+        for stale in out.rglob("*.pt"):
             stale.unlink(missing_ok=True)
         try:
             r = subprocess.run(
@@ -260,7 +276,8 @@ def download_output(out: Path, s: int, attempts: int = 4,
             tail = ((r.stdout or "") + (r.stderr or "")).strip().splitlines()
             say(f"  download {i}/{attempts}: exit {r.returncode} "
                 f"{(tail[-1][:120] if tail else '-')}", s)
-            if r.returncode == 0 and ckpt.exists() and ckpt.stat().st_size > 1_000_000:
+            if r.returncode == 0 and complete():
+                say("  checkpoint on disk", s)
                 return True
         except subprocess.TimeoutExpired:
             say(f"  download {i}/{attempts}: stalled after {timeout:.0f}s", s)
