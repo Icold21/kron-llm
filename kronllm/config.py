@@ -104,6 +104,11 @@ DEFAULTS: Dict[str, Any] = {
         # is work with no consumer; masking it also makes the training loss
         # comparable across the corpus switch (see kronllm/loss_mask.py).
         "ignore_prompt_targets": True,
+        # Whether a <|user|> turn is prompt (masked) or data (trained).  False
+        # for pretraining: a text model should be able to write the question,
+        # and the drills carry one on purpose.  SFT flips it, because there the
+        # prompt is supplied by the harness and only the answer is a target.
+        "mask_user_turns": False,
         "kron": {
             "L": 4,
             "terms": 2,
@@ -816,6 +821,12 @@ EXPERIMENTS["S10"] = {
         "data.data_dir": "data/sft",
         "data.train_bin": "train.bpe.bin",
         "data.val_bin": "val.bpe.bin",
+        # Fine-tuning is the one phase where the prompt is not data: the harness
+        # writes the system turn, the user turn and the <|assistant|> marker, so
+        # every one of those tokens is masked and only the answer is trained.
+        # Pretraining keeps the user turn (it is text, and a text model should be
+        # able to write a question) -- see kronllm/loss_mask.py.
+        "model.mask_user_turns": True,
         "training.init_from": "runs/Q10/best.pt",
         "training.max_steps": 4000,
         "training.schedule_steps": 4000,

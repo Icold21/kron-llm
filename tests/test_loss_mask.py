@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 import torch
 
+from kronllm.config import EXPERIMENTS
 from kronllm.loss_mask import prompt_target_mask
 from kronllm.model import KronTransformer
 from kronllm.testutils import make_cfg
@@ -59,22 +60,55 @@ def test_the_prompt_is_masked_including_its_opening_marker():
                     False], mask
 
 
-def test_chat_document_masks_the_system_turn_and_the_question():
-    """Only the answer is a target -- the same span SFT trains on."""
+def test_chat_document_masks_only_the_system_turn_in_pretraining():
+    """Pretraining is a text model: the question is data and stays."""
     idx = _ids([SYSTEM_ID, 20, 21, TURN_EOT_ID,
                 USER_ID, 40, 41, TURN_EOT_ID, ASSISTANT_ID, 50, DOC])
     mask = prompt_target_mask(idx)[0].tolist()
-    # Everything up to and including <|assistant|> is prompt: positions 0..7.
+    # The system turn is ours (the persona), so it is masked: positions 0..2.
+    assert mask[:3] == [True, True, True], mask
+    # Everything from <|user|> on is corpus text -- question, answer, both ends.
+    assert not any(mask[3:]), mask
+
+
+def test_sft_masks_the_whole_prompt_including_the_question():
+    """SFT is an assistant: the harness writes the prompt, so only the answer."""
+    idx = _ids([SYSTEM_ID, 20, 21, TURN_EOT_ID,
+                USER_ID, 40, 41, TURN_EOT_ID, ASSISTANT_ID, 50, DOC])
+    mask = prompt_target_mask(idx, mask_user_turns=True)[0].tolist()
     assert mask[:8] == [True] * 8, mask
-    # The answer and the document end stay supervised.
     assert mask[8:] == [False, False, False], mask
+
+
+def test_the_two_phases_disagree_on_user_turns_by_config():
+    """Wiring mistake check: the flag must come from the experiment, not a default.
+
+    The mask is one function with a parameter precisely because the two phases
+    want opposite answers, so a config that forgets to set it silently trains the
+    wrong objective -- the kind of error that costs a week of quota.
+    """
+    def flag(name):
+        return EXPERIMENTS[name]["overrides"].get("model.mask_user_turns")
+
+    assert not flag("Q10"), "pretraining must keep the user turn"
+    assert not flag("Q10A"), "the decay pass still trains text"
+    assert flag("S10") is True, "SFT must mask the whole prompt"
+
+
+def test_the_model_reads_the_flag():
+    """A parameter nothing passes is a parameter that does nothing."""
+    x, y = _batch()
+    strict = _model(**{"model.mask_user_turns": True})
+    loose = _model()
+    loose.load_state_dict(strict.state_dict())
+    assert strict.mask_user_turns is True and loose.mask_user_turns is False
 
 
 def test_the_first_answer_token_is_a_target():
     """Off by one here would train the model to repeat the question's marker."""
     idx = _ids([SYSTEM_ID, 20, TURN_EOT_ID, USER_ID, 40, TURN_EOT_ID,
                 ASSISTANT_ID, 50, 51, TURN_EOT_ID, DOC])
-    mask = prompt_target_mask(idx)[0].tolist()
+    mask = prompt_target_mask(idx, mask_user_turns=True)[0].tolist()
     # Position 6 targets idx[7], the first answer token: must not be masked.
     assert not mask[6], mask
     # Position 5 targets idx[6], the marker: must be masked.
@@ -83,7 +117,9 @@ def test_the_first_answer_token_is_a_target():
 
 def test_a_question_without_an_answer_marker_masks_to_the_edge():
     idx = _ids([USER_ID, 40, 41, TURN_EOT_ID])
-    assert prompt_target_mask(idx)[0].tolist() == [True, True, True, True]
+    assert prompt_target_mask(idx, mask_user_turns=True)[0].tolist() == [True] * 4
+    # ... and in pretraining the same document is entirely data.
+    assert not prompt_target_mask(idx).any()
 
 
 def test_a_window_starting_inside_a_question_masks_nothing():
@@ -93,7 +129,24 @@ def test_a_window_starting_inside_a_question_masks_nothing():
 
 
 @pytest.mark.skipif(not TOK_PATH.exists(), reason="the 8K tokenizer is not in the repo")
-def test_the_masked_tokens_decode_to_exactly_the_sft_prompt():
+def test_in_pretraining_only_the_system_turn_is_masked():
+    """The masked tokens decode to exactly the persona we wrote."""
+    tok = BPETokenizer(TOK_PATH, vocab_size=VOCAB, bytes_per_token=1.0,
+                       eot_id=DOC)
+    ids = tok.encode(DRILL) + [DOC]
+    mask = prompt_target_mask(_ids(ids))[0]
+    masked = [ids[t + 1] for t in range(len(ids) - 1) if mask[t]]
+
+    start = len("<|system|>")
+    end = DRILL.index("<|eot|>") + len("<|eot|>")
+    assert tok.decode(masked) == DRILL[start:end], tok.decode(masked)
+    # the question is still a target
+    trained = [ids[t + 1] for t in range(len(ids) - 1) if not mask[t]]
+    assert "Compute 605 * 8" in tok.decode(trained)
+
+
+@pytest.mark.skipif(not TOK_PATH.exists(), reason="the 8K tokenizer is not in the repo")
+def test_in_sft_the_masked_tokens_decode_to_exactly_the_prompt():
     """The masked span must be the prompt, character for character.
 
     Position arithmetic is easy to get almost right: one token of the answer
@@ -104,7 +157,7 @@ def test_the_masked_tokens_decode_to_exactly_the_sft_prompt():
     tok = BPETokenizer(TOK_PATH, vocab_size=VOCAB, bytes_per_token=1.0,
                        eot_id=DOC)
     ids = tok.encode(DRILL) + [DOC]
-    mask = prompt_target_mask(_ids(ids))[0]
+    mask = prompt_target_mask(_ids(ids), mask_user_turns=True)[0]
     masked = [ids[t + 1] for t in range(len(ids) - 1) if mask[t]]
 
     end = DRILL.index("<|assistant|>") + len("<|assistant|>")

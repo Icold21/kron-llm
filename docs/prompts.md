@@ -145,15 +145,22 @@ strings to teach "this register follows this sentence" is not worth a format
 that SFT then has to unlearn.  The held-out bin was never prompted, so every
 historical bpb stays comparable -- it was always measured on the bare text.
 
-The mask (`kronllm/loss_mask.py`, `model.ignore_prompt_targets`) stays on, and
-since 2026-11-01 it covers the whole prompt rather than only the system turn: for
-a document with `<|system|>`/`<|user|>`/`<|assistant|>` markup, everything up to
-and including the `<|assistant|>` marker is context and only the answer is a
-target.  That is the same span `prompt_tokens` marks in SFT, so pretraining and
-fine-tuning optimise one objective on the same rendered text.  Measured on the
-drill pool: the system turn is 10 % of a document, the question 15 %, the answer
-75 % -- so masking the prompt leaves three quarters of the signal and removes
-the part the harness writes anyway.
+The mask (`kronllm/loss_mask.py`, `model.ignore_prompt_targets`) stays on and
+masks the system turn: that text is ours -- the persona we wrote -- so predicting
+it is work with no consumer.  The **user turn is different per phase**, and
+`model.mask_user_turns` says which:
+
+| phase | system turn | `<|user|>` question / reply | `<|assistant|>` answer |
+|---|---|---|---|
+| pretraining (Q10, Q10A) | masked | **trained** — it is text | trained |
+| SFT (S10) | masked | masked, it is the prompt | trained |
+
+Pretraining is a text model: at inference it continues a document, so a question
+or a human reply is exactly the kind of text it should be able to write, and
+masking it threw away 15 % of every drill and half of every chat document for no
+benefit.  SFT is an assistant whose prompt the harness supplies, so everything up
+to `<|assistant|>` is context -- the span `prompt_tokens` records in
+`sft_index.npy`.
 
 Rebuild recipe:
 

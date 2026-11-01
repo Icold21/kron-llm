@@ -925,6 +925,10 @@ class KronTransformer(nn.Module):
         # the harness writes at inference, and training on it spent ~1 % of the
         # gradient on our own strings while flattering the reported loss.
         self.ignore_prompt_targets = bool(mc.get("ignore_prompt_targets", True))
+        # Pretraining trains a text model, so a <|user|> turn is data and stays
+        # in the loss; SFT masks it, because there the prompt comes from the
+        # harness and only the answer is a target.
+        self.mask_user_turns = bool(mc.get("mask_user_turns", False))
 
     # -- init -------------------------------------------------------------
     def _init_weights(self, module: nn.Module) -> None:
@@ -1220,7 +1224,7 @@ class KronTransformer(nn.Module):
         # an all-False mask and the loss is exactly what it was before.
         mask: Optional[torch.Tensor] = None
         if targets is not None and self.ignore_prompt_targets:
-            mask = prompt_target_mask(idx)
+            mask = prompt_target_mask(idx, mask_user_turns=self.mask_user_turns)
             if not bool(mask.any()):
                 mask = None
 
