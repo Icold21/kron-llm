@@ -354,13 +354,217 @@ def ru_sequence(rng: random.Random) -> Case:
     return q, cot, str(total)
 
 
+PLACE_EN = ["units", "tens", "hundreds", "thousands"]
+PLACE_RU = ["единицы", "десятки", "сотни", "тысячи"]
+
+WORDS_EN = {"write": "write", "carry": "carry", "borrow": "borrow 1",
+            "lt": "is less than", "carry_row": "carry", "borrowing": "borrow"}
+WORDS_RU = {"write": "пишем", "carry": "запоминаем", "borrow": "заём 1",
+            "lt": "меньше", "carry_row": "перенос", "borrowing": "занимаем"}
+
+
+def _digits(n: int, width: int) -> List[int]:
+    return [int(c) for c in str(n).zfill(width)]
+
+
+def add_columns(a: int, b: int, places: List[str],
+                words: Dict[str, str] = WORDS_EN) -> Tuple[List[str], int]:
+    """Digit-by-digit addition with an explicit carry, as text rows.
+
+    The rows are produced *from* the digits, not written by hand, so a wrong
+    carry cannot slip into the training data; ``add_columns`` is re-parsed by
+    the tests to rebuild the number from the printed rows.
+    """
+    width = max(len(str(a)), len(str(b)))
+    da, db = _digits(a, width), _digits(b, width)
+    carry = 0
+    rows, value = [], 0
+    for pos in range(width):
+        left, right = da[width - 1 - pos], db[width - 1 - pos]
+        total = left + right + carry
+        digit, new_carry = total % 10, total // 10
+        extra = f" + {carry}" if carry else ""
+        tail = f", {words['carry']} {new_carry}" if new_carry else ""
+        rows.append(f"{places[pos]}: {left} + {right}{extra} = {total} -> "
+                    f"{words['write']} {digit}{tail}")
+        value += digit * 10 ** pos
+        carry = new_carry
+    if carry:
+        label = places[width] if width < len(places) else words["carry_row"]
+        rows.append(f"{label}: {carry} -> {words['write']} {carry}")
+        value += carry * 10 ** width
+    return rows, value
+
+
+def sub_columns(a: int, b: int, places: List[str],
+                words: Dict[str, str] = WORDS_EN) -> Tuple[List[str], int]:
+    width = max(len(str(a)), len(str(b)))
+    da, db = _digits(a, width), _digits(b, width)
+    borrow = 0
+    rows, value = [], 0
+    for pos in range(width):
+        left, right = da[width - 1 - pos], db[width - 1 - pos]
+        if left - borrow < right:
+            used = left - borrow + 10
+            rows.append(f"{places[pos]}: {left} - {borrow} {words['lt']} {right} -> "
+                        f"{words['borrowing']}: {used} - {right} = {used - right}, "
+                        f"{words['borrow']}")
+            digit, borrow = used - right, 1
+        else:
+            subtrahend = right + borrow
+            extra = f" - {borrow}" if borrow else ""
+            rows.append(f"{places[pos]}: {left} - {right}{extra} = "
+                        f"{left - subtrahend}")
+            digit, borrow = left - subtrahend, 0
+        value += digit * 10 ** pos
+    return rows, value
+
+
+def mul_columns(a: int, b: int, places: List[str],
+                words: Dict[str, str] = WORDS_EN) -> Tuple[List[str], int]:
+    """One-digit multiplier: partial products, right to left, with carries."""
+    width = len(str(a))
+    da = _digits(a, width)
+    carry = 0
+    rows, value = [], 0
+    for pos in range(width):
+        digit_in = da[width - 1 - pos]
+        total = digit_in * b + carry
+        digit, new_carry = total % 10, total // 10
+        extra = f" + {carry}" if carry else ""
+        tail = f", {words['carry']} {new_carry}" if new_carry else ""
+        rows.append(f"{places[pos]}: {digit_in} * {b}{extra} = {total} -> "
+                    f"{words['write']} {digit}{tail}")
+        value += digit * 10 ** pos
+        carry = new_carry
+    if carry:
+        rows.append(f"{words['carry_row']}: {carry} -> {words['write']} {carry}")
+        value += carry * 10 ** width
+    return rows, value
+
+
+def _carry_count(a: int, b: int) -> int:
+    """How many carries the addition needs, without rendering anything."""
+    width = max(len(str(a)), len(str(b)))
+    da, db = _digits(a, width), _digits(b, width)
+    carry, n = 0, 0
+    for pos in range(width):
+        total = da[width - 1 - pos] + db[width - 1 - pos] + carry
+        carry = total // 10
+        n += carry
+    return n
+
+
+def _borrow_count(a: int, b: int) -> int:
+    """How many borrows the subtraction needs."""
+    width = max(len(str(a)), len(str(b)))
+    da, db = _digits(a, width), _digits(b, width)
+    borrow, n = 0, 0
+    for pos in range(width):
+        left = da[width - 1 - pos] - borrow
+        if left < db[width - 1 - pos]:
+            borrow, n = 1, n + 1
+        else:
+            borrow = 0
+    return n
+
+
+def en_add_columns(rng: random.Random) -> Case:
+    while True:
+        a, b = rng.randint(120, 989), rng.randint(120, 989)
+        if _carry_count(a, b):
+            break
+    rows, result = add_columns(a, b, PLACE_EN)
+    assert result == a + b
+    q = rng.choice([f"What is {a} + {b}?", f"Add {a} and {b} column by column.",
+                    f"Compute {a} + {b} and show the carries."])
+    cot = "Add the columns from the units:\n" + "\n".join(rows) + \
+          f"\nSo {a} + {b} = {result}."
+    return q, cot, str(result)
+
+
+def ru_add_columns(rng: random.Random) -> Case:
+    while True:
+        a, b = rng.randint(120, 989), rng.randint(120, 989)
+        if _carry_count(a, b):
+            break
+    rows, result = add_columns(a, b, PLACE_RU, WORDS_RU)
+    assert result == a + b
+    q = rng.choice([f"Сколько будет {a} + {b}?",
+                    f"Сложи {a} и {b} по разрядам.",
+                    f"Вычисли {a} + {b} и покажи переносы."])
+    cot = "Складываем по разрядам, начиная с единиц:\n" + "\n".join(rows) + \
+          f"\nЗначит, {a} + {b} = {result}."
+    return q, cot, str(result)
+
+
+def en_sub_columns(rng: random.Random) -> Case:
+    while True:
+        a = rng.randint(320, 989)
+        b = rng.randint(120, a - 100)
+        if _borrow_count(a, b):
+            break
+    rows, result = sub_columns(a, b, PLACE_EN)
+    assert result == a - b
+    q = rng.choice([f"What is {a} - {b}?", f"Subtract {b} from {a} column by column.",
+                    f"Compute {a} - {b} and show the borrows."])
+    cot = "Subtract the columns from the units:\n" + "\n".join(rows) + \
+          f"\nSo {a} - {b} = {result}."
+    return q, cot, str(result)
+
+
+def ru_sub_columns(rng: random.Random) -> Case:
+    while True:
+        a = rng.randint(320, 989)
+        b = rng.randint(120, a - 100)
+        if _borrow_count(a, b):
+            break
+    rows, result = sub_columns(a, b, PLACE_RU, WORDS_RU)
+    assert result == a - b
+    q = rng.choice([f"Сколько будет {a} - {b}?",
+                    f"Вычти {b} из {a} по разрядам.",
+                    f"Вычисли {a} - {b} и покажи заёмы."])
+    cot = "Вычитаем по разрядам, начиная с единиц:\n" + "\n".join(rows) + \
+          f"\nЗначит, {a} - {b} = {result}."
+    return q, cot, str(result)
+
+
+def en_mul_columns(rng: random.Random) -> Case:
+    a, b = rng.randint(120, 989), rng.randint(3, 9)
+    rows, result = mul_columns(a, b, PLACE_EN)
+    assert result == a * b
+    q = rng.choice([f"What is {a} * {b}?", f"Multiply {a} by {b} digit by digit.",
+                    f"Compute {a} * {b} and show the carries."])
+    cot = f"Multiply one digit at a time, starting from the units:\n" + \
+          "\n".join(rows) + f"\nSo {a} * {b} = {result}."
+    return q, cot, str(result)
+
+
+def ru_mul_columns(rng: random.Random) -> Case:
+    a, b = rng.randint(120, 989), rng.randint(3, 9)
+    rows, result = mul_columns(a, b, PLACE_RU, WORDS_RU)
+    assert result == a * b
+    q = rng.choice([f"Сколько будет {a} * {b}?",
+                    f"Умножь {a} на {b} по разрядам.",
+                    f"Вычисли {a} * {b} и покажи переносы."])
+    cot = "Умножаем по одной цифре, начиная с единиц:\n" + \
+          "\n".join(rows) + f"\nЗначит, {a} * {b} = {result}."
+    return q, cot, str(result)
+
+
 FAMILIES: Dict[str, Tuple[List[Callable[[random.Random], Case]], str]] = {
-    "en": ([en_add, en_sub, en_mul, en_div, en_mul_add, en_paren,
-            en_percent, en_avg, en_fraction, en_speed, en_money, en_gcd,
-            en_sequence], "en"),
-    "ru": ([ru_add, ru_sub, ru_mul, ru_div, ru_mul_add, ru_paren,
-            ru_percent, ru_avg, ru_fraction, ru_speed, ru_money, ru_gcd,
-            ru_sequence], "ru"),
+    "en": ([(f, 1) for f in
+            (en_add, en_sub, en_mul, en_div, en_mul_add, en_paren,
+             en_percent, en_avg, en_fraction, en_speed, en_money, en_gcd,
+             en_sequence)] +
+           [(en_add_columns, 2), (en_sub_columns, 2), (en_mul_columns, 2)],
+           "en"),
+    "ru": ([(f, 1) for f in
+            (ru_add, ru_sub, ru_mul, ru_div, ru_mul_add, ru_paren,
+             ru_percent, ru_avg, ru_fraction, ru_speed, ru_money, ru_gcd,
+             ru_sequence)] +
+           [(ru_add_columns, 2), (ru_sub_columns, 2), (ru_mul_columns, 2)],
+           "ru"),
 }
 
 SOURCE_NAME = {"en": "arith_en", "ru": "arith_ru"}
@@ -382,11 +586,16 @@ def main() -> None:
         path = out / f"{SOURCE_NAME[lang]}.jsonl.gz"
         kept = 0
         total_bytes = 0
+        # weighted pool: the column families are the ones that teach the
+        # algorithm, so they get twice the share of a prose family
+        pool: List[Callable[[random.Random], Case]] = []
+        for fn, weight in families:
+            pool.extend([fn] * weight)
         with gzip.open(path, "wt", encoding="utf-8", compresslevel=3) as fh:
             for i in range(args.per_lang * 3):
                 if kept >= args.per_lang:
                     break
-                family = families[i % len(families)]
+                family = pool[i % len(pool)]
                 question, cot, answer = family(rng)
                 text = f"{question}\x00{cot}\x00{answer}"
                 key = int.from_bytes(
