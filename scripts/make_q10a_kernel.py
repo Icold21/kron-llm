@@ -33,7 +33,7 @@ PATCHES = [
     ("# The session stops itself before Kaggle's 500-minute kill: the budget",
      "# The session stops itself before the platform's 12-hour limit: the budget"),
     ("copying the 5.7 GB bin costs ~10 min, so 690 left no room",
-     "copying the 1.6 GB anneal bin costs ~3 min, so 690 left no room"),
+     "copying the 1.8 GB anneal bin costs ~3 min, so 690 left no room"),
 ]
 
 
