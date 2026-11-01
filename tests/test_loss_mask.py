@@ -11,16 +11,30 @@ Three things can go wrong with a loss mask and only one of them is visible:
 
 The equivalence test is the one that catches the third.
 """
+from pathlib import Path
+
+import pytest
 import torch
 
 from kronllm.loss_mask import prompt_target_mask
 from kronllm.model import KronTransformer
 from kronllm.testutils import make_cfg
-from kronllm.tokenizer import SYSTEM_ID, TURN_EOT_ID
+from kronllm.tokenizer import (ASSISTANT_ID, BPETokenizer, SYSTEM_ID,
+                               TURN_EOT_ID, USER_ID)
 
 DOC = 8191          # <|endoftext|>, the document separator
 VOCAB = 8192        # the reserved ids live above 8186, so the tiny vocab of
                     # make_cfg() is too small for a model-level test
+TOK_PATH = Path(__file__).resolve().parents[1] / "data" / "bilingual" / "tokenizer.json"
+
+DRILL = ("<|system|>You are Kron, a bilingual assistant.<|eot|>"
+         "<|user|>Compute 605 * 8 and show the carries.<|eot|>"
+         "<|assistant|>Multiply one digit at a time, starting from the units:\n"
+         "units: 5 * 8 = 40 -> write 0, carry 4\n"
+         "tens: 0 * 8 + 4 = 4 -> write 4\n"
+         "hundreds: 6 * 8 = 48 -> write 8, carry 4\n"
+         "carry: 4 -> write 4\n"
+         "So 605 * 8 = 4840.")
 
 
 def _ids(seq):
@@ -34,26 +48,91 @@ def test_bare_text_is_not_masked():
     assert not prompt_target_mask(idx).any()
 
 
-def test_prompt_is_masked_and_system_token_is_not():
+def test_the_prompt_is_masked_including_its_opening_marker():
     # <|system|> p p p <|eot|> then the document.
     idx = _ids([10, SYSTEM_ID, 20, 21, 22, TURN_EOT_ID, 30, 31, DOC])
     mask = prompt_target_mask(idx)[0].tolist()
-    # Target t is idx[t + 1], so the prompt text at idx[2..5] is predicted at
-    # positions 1..4.
-    assert mask == [False, True, True, True, True, False, False, False,
+    # Target t is idx[t + 1].  The prompt is idx[1..5], predicted at positions
+    # 0..4, so <|system|> itself (the target of position 0) goes with it: the
+    # model never has to emit the tag, the harness does.
+    assert mask == [True, True, True, True, True, False, False, False,
                     False], mask
-    # <|system|> itself is context for the first prompt token and stays
-    # supervised: it is the document boundary.
-    assert not mask[0]
 
 
-def test_chat_document_masks_only_the_system_turn():
-    idx = _ids([SYSTEM_ID, 20, 21, TURN_EOT_ID, 40, 41, TURN_EOT_ID, 50, DOC])
+def test_chat_document_masks_the_system_turn_and_the_question():
+    """Only the answer is a target -- the same span SFT trains on."""
+    idx = _ids([SYSTEM_ID, 20, 21, TURN_EOT_ID,
+                USER_ID, 40, 41, TURN_EOT_ID, ASSISTANT_ID, 50, DOC])
     mask = prompt_target_mask(idx)[0].tolist()
-    # The system turn is predicted at 0..2 (its <|eot|> at index 3 is the target
-    # of position 2); the user turn at 3.. is conversation and stays supervised.
-    assert mask[:3] == [True, True, True], mask
-    assert not any(mask[3:]), mask
+    # Everything up to and including <|assistant|> is prompt: positions 0..7.
+    assert mask[:8] == [True] * 8, mask
+    # The answer and the document end stay supervised.
+    assert mask[8:] == [False, False, False], mask
+
+
+def test_the_first_answer_token_is_a_target():
+    """Off by one here would train the model to repeat the question's marker."""
+    idx = _ids([SYSTEM_ID, 20, TURN_EOT_ID, USER_ID, 40, TURN_EOT_ID,
+                ASSISTANT_ID, 50, 51, TURN_EOT_ID, DOC])
+    mask = prompt_target_mask(idx)[0].tolist()
+    # Position 6 targets idx[7], the first answer token: must not be masked.
+    assert not mask[6], mask
+    # Position 5 targets idx[6], the marker: must be masked.
+    assert mask[5], mask
+
+
+def test_a_question_without_an_answer_marker_masks_to_the_edge():
+    idx = _ids([USER_ID, 40, 41, TURN_EOT_ID])
+    assert prompt_target_mask(idx)[0].tolist() == [True, True, True, True]
+
+
+def test_a_window_starting_inside_a_question_masks_nothing():
+    """No marker in the window, so there is nothing to identify as prompt."""
+    idx = _ids([40, 41, TURN_EOT_ID, 50])
+    assert not prompt_target_mask(idx).any()
+
+
+@pytest.mark.skipif(not TOK_PATH.exists(), reason="the 8K tokenizer is not in the repo")
+def test_the_masked_tokens_decode_to_exactly_the_sft_prompt():
+    """The masked span must be the prompt, character for character.
+
+    Position arithmetic is easy to get almost right: one token of the answer
+    dragged into the mask, or the ``<|assistant|>`` marker left out, and every
+    count-based test still passes.  This one decodes the masked targets and
+    compares the text with the rendered prompt.
+    """
+    tok = BPETokenizer(TOK_PATH, vocab_size=VOCAB, bytes_per_token=1.0,
+                       eot_id=DOC)
+    ids = tok.encode(DRILL) + [DOC]
+    mask = prompt_target_mask(_ids(ids))[0]
+    masked = [ids[t + 1] for t in range(len(ids) - 1) if mask[t]]
+
+    end = DRILL.index("<|assistant|>") + len("<|assistant|>")
+    # The first token of a window is never a target -- there is nothing before it
+    # to predict it from -- so the leading <|system|> is absent by construction.
+    expected = DRILL[len("<|system|>"):end]
+    assert tok.decode(masked) == expected, tok.decode(masked)
+    # and the answer itself is untouched
+    trained = [ids[t + 1] for t in range(len(ids) - 1) if not mask[t]]
+    assert "Multiply one digit" in tok.decode(trained)
+
+
+@pytest.mark.skipif(not TOK_PATH.exists(), reason="the 8K tokenizer is not in the repo")
+def test_a_second_document_in_the_window_masks_its_system_tag_too():
+    """Mid-window the tag *is* predictable, so it must be masked."""
+    tok = BPETokenizer(TOK_PATH, vocab_size=VOCAB, bytes_per_token=1.0,
+                       eot_id=DOC)
+    one = tok.encode(DRILL) + [DOC]
+    ids = one + tok.encode(DRILL) + [DOC]
+    mask = prompt_target_mask(_ids(ids))[0]
+    second = len(one)
+    assert ids[second] == SYSTEM_ID
+    # The target of position second - 1 is the second document's <|system|>.
+    assert bool(mask[second - 1]), (second, mask.tolist()[:second + 2])
+    # The first answer token of the second document is still a target: it is
+    # predicted at the position before it.
+    answer_at = second + ids[second:].index(ASSISTANT_ID) + 1
+    assert not bool(mask[answer_at - 1]), (answer_at, mask.tolist())
 
 
 def test_window_starting_inside_a_prompt_masks_nothing():
@@ -64,17 +143,19 @@ def test_window_starting_inside_a_prompt_masks_nothing():
 
 def test_prompt_without_closing_eot_runs_to_the_end():
     idx = _ids([10, SYSTEM_ID, 20, 21, 22])
-    assert prompt_target_mask(idx)[0].tolist() == [False, True, True, True, True]
+    assert prompt_target_mask(idx)[0].tolist() == [True, True, True, True, True]
 
 
 def test_two_prompts_in_one_window_are_both_masked():
     idx = _ids([SYSTEM_ID, 20, TURN_EOT_ID, 30, DOC,
                 SYSTEM_ID, 21, TURN_EOT_ID, 31, DOC])
     mask = prompt_target_mask(idx)[0].tolist()
-    # Each prompt is predicted up to (not including) the position of its <|eot|>.
+    # Each prompt is masked from its own <|system|> up to its <|eot|>: the first
+    # covers positions 0..1, the second 4..6, and the corpus text between them
+    # stays supervised.
     assert mask[:2] == [True, True], mask
-    assert not mask[2] and not mask[3] and not mask[4]
-    assert mask[5:7] == [True, True], mask
+    assert not mask[2] and not mask[3]
+    assert mask[4:7] == [True, True, True], mask
     assert not mask[7] and not mask[8] and not mask[9]
 
 

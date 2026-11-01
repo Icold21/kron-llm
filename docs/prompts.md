@@ -145,9 +145,15 @@ strings to teach "this register follows this sentence" is not worth a format
 that SFT then has to unlearn.  The held-out bin was never prompted, so every
 historical bpb stays comparable -- it was always measured on the bare text.
 
-The mask (`kronllm/loss_mask.py`, `model.ignore_prompt_targets`) stays on: it
-still removes the system turn of those 63,744 chat documents, and it is what
-makes a future prompt-bearing corpus safe by construction.
+The mask (`kronllm/loss_mask.py`, `model.ignore_prompt_targets`) stays on, and
+since 2026-11-01 it covers the whole prompt rather than only the system turn: for
+a document with `<|system|>`/`<|user|>`/`<|assistant|>` markup, everything up to
+and including the `<|assistant|>` marker is context and only the answer is a
+target.  That is the same span `prompt_tokens` marks in SFT, so pretraining and
+fine-tuning optimise one objective on the same rendered text.  Measured on the
+drill pool: the system turn is 10 % of a document, the question 15 %, the answer
+75 % -- so masking the prompt leaves three quarters of the signal and removes
+the part the harness writes anyway.
 
 Rebuild recipe:
 

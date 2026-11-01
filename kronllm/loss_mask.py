@@ -1,65 +1,96 @@
 """Which target positions belong to us, not to the corpus.
 
-The rebuilt corpora open every document with ``<|system|>`` + a hand-written
-instruction + ``<|eot|>``.  At inference the harness writes that prefix and the
-model only has to continue, so those tokens are never something the model must
-produce -- yet they sat inside the training loss, which cost two things:
+Two kinds of text are ours and must not be taught:
 
-* ~1 % of the gradient went into predicting our own boilerplate.  The prompt is
-  23.3 tokens of a 2,303-token document, so it is small, but it is pure waste:
-  the same 108 strings, repeated, learned as if they were text.
-* the reported loss was flattered.  A cheap 1 % of tokens drags the mean down,
-  and it does so *more* as the model learns the tag, so the curve showed a drop
-  at the corpus switch that was partly bookkeeping rather than progress.
+* the rebuilt corpora open every document with ``<|system|>`` + a hand-written
+  instruction + ``<|eot|>``;
+* a drill or chat document also carries ``<|user|>`` + a question + ``<|eot|>``
+  + ``<|assistant|>``.
 
-Masking makes the training loss mean the same thing it meant before the prompts
-existed: cross-entropy on corpus text.  That is what makes the two phases of the
-run comparable, and it is the same convention SFT uses (loss on the answer, not
-on the prompt).
+At inference the harness writes both prefixes and the model only has to
+continue, so those tokens are never something the model must produce -- yet
+they sat inside the training loss, which cost two things:
 
-``<|system|>`` itself stays supervised on purpose.  It is the document boundary
--- the model does have to know where a document starts, because it has to stop
-somewhere -- and it is one token per document.
+* ~1 % of the gradient went into predicting our own boilerplate (23.3 tokens of
+  a 2,303-token document), and for drills the question is another 40 % of the
+  document;
+* the reported loss was flattered.  Cheap tokens drag the mean down, and they
+  do so *more* as the model learns them, so the curve showed drops that were
+  partly bookkeeping rather than progress.
+
+Masking makes the training loss mean the same thing it meant before the
+prompts existed: cross-entropy on text the model has to produce.  It is also
+the same convention SFT uses -- ``sft_index.npy`` stores ``prompt_tokens`` and
+the answer starts after ``<|assistant|>`` -- so the two phases optimise the
+same objective on the same rendered text.
+
+``<|system|>`` and ``<|user|>`` themselves are masked too.  One token per
+document and one per turn is nothing, but the rule is then exact: the loss
+covers only text the model has to produce, which on a drill is the worked
+answer and on a chat document is each assistant reply.  That is precisely the
+span ``prompt_tokens`` marks in SFT, so the two phases optimise the same
+objective on the same rendered text -- a window in which the pretrainer trained
+on the question and SFT did not would have been an argument waiting to happen.
 """
 from __future__ import annotations
 
 import torch
 
-from .tokenizer import SYSTEM_ID, TURN_EOT_ID
+from .tokenizer import ASSISTANT_ID, SYSTEM_ID, TURN_EOT_ID, USER_ID
 
 
 def prompt_target_mask(idx: torch.Tensor,
                        system_id: int = SYSTEM_ID,
-                       eot_id: int = TURN_EOT_ID) -> torch.Tensor:
+                       eot_id: int = TURN_EOT_ID,
+                       user_id: int = USER_ID,
+                       assistant_id: int = ASSISTANT_ID) -> torch.Tensor:
     """Boolean mask, True where the target is our own prompt and is not trained.
 
     ``idx`` is the model *input*; the target at position ``t`` is ``idx[t + 1]``.
-    The prompt text occupies ``idx[s + 1 .. e]`` (``s`` is ``<|system|>``, ``e``
-    the closing ``<|eot|>``), so it is predicted at positions ``s .. e - 1`` and
-    that is the range masked.  ``<|system|>`` at ``s`` is the last *context*
-    token of the preceding document and stays supervised.
+    A system prompt occupies ``idx[s .. e]`` (``s`` is ``<|system|>``, ``e`` the
+    closing ``<|eot|>``), so those tokens are predicted at positions
+    ``s - 1 .. e - 1`` and that is the range masked.
+
+    For a ``<|user|>`` turn the same arithmetic runs against the ``<|assistant|>``
+    marker at ``a``: the question, its ``<|eot|>`` and the marker are tokens
+    ``u .. a``, predicted at positions ``u - 1 .. a - 1``, so the first *trained*
+    target is the first token of the answer -- exactly the span ``prompt_tokens``
+    covers in SFT.
 
     A window that begins inside a prompt has no marker and nothing to mask; a
-    chat document's first ``<|eot|>`` closes its system turn, and any later turn
-    ends in the window are left alone -- they are conversation, not boilerplate.
+    user turn with no assistant marker after it (a truncated window) is masked
+    to the edge, because everything that follows is still the prompt.
     """
     mask = torch.zeros_like(idx, dtype=torch.bool)
     if idx.numel() == 0:
         return mask
     is_sys = idx == system_id
-    if not bool(is_sys.any()):
+    is_user = idx == user_id
+    if not bool(is_sys.any()) and not bool(is_user.any()):
         return mask
     is_eot = idx == eot_id
+    is_asst = idx == assistant_id
     width = idx.shape[1]
     for b in range(idx.shape[0]):
         starts = is_sys[b].nonzero(as_tuple=False).flatten().tolist()
-        if not starts:
+        if starts:
+            ends = is_eot[b].nonzero(as_tuple=False).flatten().tolist()
+            for s in starts:
+                later = [e for e in ends if e > s]
+                # No closing <|eot|> in the window: the prompt runs to its edge,
+                # and the last position's target is still prompt, so mask to
+                # ``width``.
+                e = later[0] if later else width
+                mask[b, max(0, s - 1):e] = True
+        turns = is_user[b].nonzero(as_tuple=False).flatten().tolist()
+        if not turns:
             continue
-        ends = is_eot[b].nonzero(as_tuple=False).flatten().tolist()
-        for s in starts:
-            later = [e for e in ends if e > s]
-            # No closing <|eot|> in the window: the prompt runs to its edge, and
-            # the last position's target is still prompt, so mask to ``width``.
-            e = later[0] if later else width
-            mask[b, s:e] = True
+        answers = is_asst[b].nonzero(as_tuple=False).flatten().tolist()
+        for u in turns:
+            later = [a for a in answers if a > u]
+            if later:
+                mask[b, max(0, u - 1):later[0]] = True
+            else:
+                mask[b, max(0, u - 1):width] = True
     return mask
+
