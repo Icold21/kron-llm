@@ -112,8 +112,14 @@ def main() -> None:
         tok = {l: lang_b[l] * scale / BPT.get(l, 3.5) for l in lang_b}
         tot_tok = sum(tok.values())
         copied = {l: v.get("bytes") for l, v in (meta.get("language") or {}).items()}
+        copied_total = sum(v or 0 for v in copied.values())
+        # The rebuilt block lands a few bytes short of ``train_bytes`` because
+        # each language is truncated to an int, so "same corpus" has to be a
+        # tolerance, not equality -- otherwise a second run calls its own output
+        # a stale copy.
+        consistent = abs(copied_total - measured_b) <= max(1000, measured_b * 0.002)
         say(f"language block in the meta: {copied} (bytes) -- "
-            f"{'stale copy' if sum(v or 0 for v in copied.values()) != measured_b else 'consistent'}")
+            f"{'consistent with the bin' if consistent else 'stale copy'}")
         meta["language"] = {l: {"bytes": int(lang_b[l] * scale),
                                 "tokens": int(tok[l]),
                                 "bytes_per_token": BPT.get(l, 3.5)}
