@@ -1,0 +1,17 @@
+{
+  "id": "icold21/kron-s10-sft",
+  "title": "Kron S10 supervised fine-tuning",
+  "code_file": "train.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "icold21/kron-llm-code-v23",
+    "icold21/kron-sft-corpus",
+    "icold21/kron-q10-ckpt"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}
