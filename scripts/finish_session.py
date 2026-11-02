@@ -433,13 +433,22 @@ def finish_one(session: int, start_step: int | None, hours: float, out: Path,
         return None
     if next_minutes:
         patch_minutes(next_minutes, session)
-    say("pushing the next epoch session", session)
+    say("pushing the next session", session)
     r = kaggle("kernels", "push", "-p", str(ROOT / PUSH_DIR))
-    tail = ((r.stdout or "") + (r.stderr or "")).strip().splitlines()
+    text = (r.stdout or "") + (r.stderr or "")
+    tail = text.strip().splitlines()
     say(f"  push exit {r.returncode}: {tail[-1][:140] if tail else '-'}", session)
-    if r.returncode != 0:
+    low = text.lower()
+    if r.returncode != 0 or "error" in low or "quota" in low:
+        # A quota refusal comes back as exit 0 with "Kernel push error: Maximum
+        # weekly GPU quota ..." on stdout, so the return code alone says nothing.
+        if "quota" in low:
+            say("  the weekly GPU quota is spent: this stage waits for the reset",
+                session)
+        say("  the next session was NOT pushed: stopping the chain", session)
         return None
-    wait_for_restart(session)
+    if not wait_for_restart(session):
+        return None
     return step
 
 
