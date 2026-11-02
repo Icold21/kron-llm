@@ -48,6 +48,8 @@ TOKENS_PER_STEP = 16_384
 EPOCH_STEPS = 172_273          # corpus v5: 2,822,521,746 tokens (drills in)
 MODEL_NAME = "DeepSeek V4.1 Flash"
 PUSH_DIR = Path("kaggle") / "q10"
+THEN_PUSH_DIR = None            # None means "the next stage is left to a human"
+THEN_MINUTES = 0
 
 
 def log_path(session: int) -> Path:
@@ -426,7 +428,24 @@ def finish_one(session: int, start_step: int | None, hours: float, out: Path,
         say("checkpoint not published: refusing to start the next session", session)
         return None
     if step >= EPOCH_STEPS - 1_000:
-        say("the epoch is finished: the next stage is Q10A, left to a human", session)
+        if not THEN_PUSH_DIR:
+            say("this stage is finished: the next one is left to a human", session)
+            return None
+        say(f"this stage is finished at step {step:,}: pushing the next stage "
+            f"from {THEN_PUSH_DIR}", session)
+        if THEN_MINUTES:
+            patch_minutes(THEN_MINUTES, session)
+        r = kaggle("kernels", "push", "-p", str(ROOT / THEN_PUSH_DIR))
+        text = (r.stdout or "") + (r.stderr or "")
+        tail = text.strip().splitlines()
+        say(f"  push exit {r.returncode}: {tail[-1][:140] if tail else '-'}",
+            session)
+        low = text.lower()
+        if r.returncode != 0 or "error" in low or "quota" in low:
+            say("  the next stage was NOT pushed: stopping here", session)
+            return None
+        say(f"  {THEN_PUSH_DIR} pushed; it is a different kernel, so this watch "
+            f"ends here -- start a watcher for it", session)
         return None
     if "complete" not in kind.lower():
         say(f"the session did not complete ({kind}): not chaining", session)
@@ -481,6 +500,11 @@ def main() -> None:
                     help="kernel slug to watch (default: the epoch kernel)")
     ap.add_argument("--push-dir", default="kaggle/q10",
                     help="directory whose kernel-metadata.json gets pushed")
+    ap.add_argument("--then-push-dir", default=None,
+                    help="push this directory once the current stage reaches its "
+                         "final step (the decay pass hands off to S10)")
+    ap.add_argument("--then-minutes", type=int, default=0,
+                    help="kernel budget for that next stage, in minutes")
     ap.add_argument("--total-steps", type=int, default=None,
                     help="step at which this stage is done; the epoch by "
                          "default, the decay pass's own end otherwise")
@@ -493,6 +517,10 @@ def main() -> None:
     globals()["PUSH_DIR"] = Path(args.push_dir)
     if args.total_steps:
         globals()["EPOCH_STEPS"] = args.total_steps
+    if args.then_push_dir:
+        globals()["THEN_PUSH_DIR"] = Path(args.then_push_dir)
+    if args.then_minutes:
+        globals()["THEN_MINUTES"] = int(args.then_minutes)
     plan = [int(x) for x in args.minutes_plan.split(",") if x.strip()]
     session = args.session
     start = args.start_step
