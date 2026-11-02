@@ -47,6 +47,7 @@ MAIL = (Path.home() / ".config" / "opencode" / "skills" / "email-control"
 TOKENS_PER_STEP = 16_384
 EPOCH_STEPS = 172_273          # corpus v5: 2,822,521,746 tokens (drills in)
 MODEL_NAME = "DeepSeek V4.1 Flash"
+PUSH_DIR = Path("kaggle") / "q10"
 
 
 def log_path(session: int) -> Path:
@@ -385,7 +386,7 @@ def finish_one(session: int, start_step: int | None, hours: float, out: Path,
     if next_minutes:
         patch_minutes(next_minutes, session)
     say("pushing the next epoch session", session)
-    r = kaggle("kernels", "push", "-p", str(ROOT / "kaggle" / "q10"))
+    r = kaggle("kernels", "push", "-p", str(ROOT / PUSH_DIR))
     tail = ((r.stdout or "") + (r.stderr or "")).strip().splitlines()
     say(f"  push exit {r.returncode}: {tail[-1][:140] if tail else '-'}", session)
     if r.returncode != 0:
@@ -419,10 +420,22 @@ def main() -> None:
     ap.add_argument("--no-push", action="store_true")
     ap.add_argument("--chain", type=int, default=1,
                     help="how many sessions to finish back to back")
+    ap.add_argument("--kernel", default=None,
+                    help="kernel slug to watch (default: the epoch kernel)")
+    ap.add_argument("--push-dir", default="kaggle/q10",
+                    help="directory whose kernel-metadata.json gets pushed")
+    ap.add_argument("--total-steps", type=int, default=None,
+                    help="step at which this stage is done; the epoch by "
+                         "default, the decay pass's own end otherwise")
     ap.add_argument("--minutes-plan", default="",
                     help="comma list of kernel budgets, one per pushed session")
     args = ap.parse_args()
 
+    if args.kernel:
+        globals()["KERNEL"] = args.kernel
+    globals()["PUSH_DIR"] = Path(args.push_dir)
+    if args.total_steps:
+        globals()["EPOCH_STEPS"] = args.total_steps
     plan = [int(x) for x in args.minutes_plan.split(",") if x.strip()]
     session = args.session
     start = args.start_step

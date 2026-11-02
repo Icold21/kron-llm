@@ -41,20 +41,28 @@ SYSTEM = ("<|system|>You are KronLLM, a compact bilingual model.<|eot|>"
           "<|user|>Who are you?<|eot|><|assistant|>")
 
 PROMPTS = [
-    ("EN, продолжение прозы", "The history of the Roman Empire begins"),
-    ("RU, продолжение прозы", "История России начинается"),
-    ("EN, знание", "Photosynthesis is the process by which"),
-    ("RU, знание", "Фотосинтез — это процесс, при котором"),
-    ("EN, код", "def add(a, b):\n    return"),
+    ("EN, продолжение прозы",
+     "The Roman Empire was one of the largest and longest-lasting empires in "
+     "history, and"),
+    ("RU, продолжение прозы",
+     "Фотосинтез — это процесс, при котором растения используют энергию света, "
+     "чтобы"),
+    ("EN, код",
+     "def add(a, b):\n    \"\"\"Return the sum of two numbers.\"\"\"\n    return"),
     ("EN, арифметика столбиком",
      "<|user|>Compute 47 + 38 and show the carries.<|eot|><|assistant|>"),
     ("RU, арифметика столбиком",
      "<|user|>Вычисли 800 - 385 и покажи заёмы.<|eot|><|assistant|>"),
-    ("чат-формат", SYSTEM),
+    ("чат-формат (цель SFT)",
+     "<|system|>You are KronLLM, a compact bilingual model.<|eot|>"
+     "<|user|>Who are you?<|eot|><|assistant|>"),
 ]
 
-GREEDY = dict(temperature=1e-5, top_k=1, top_p=0.0, repetition_penalty=1.0)
-SAMPLED = dict(temperature=0.8, top_k=8, top_p=0.9, repetition_penalty=1.15)
+GREEDY = dict(temperature=1e-5, top_k=1, top_p=0.0, repetition_penalty=1.1,
+              rep_window=64)
+# 40 candidates, not 8: the narrow cap was making the model worse than it is.
+SAMPLED = dict(temperature=0.7, top_k=40, top_p=0.95, repetition_penalty=1.2,
+               rep_window=64)
 
 
 def run(model, tok, prompt: str, device, n: int, **kw) -> str:
@@ -70,7 +78,7 @@ def main() -> None:
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--label", default="")
-    ap.add_argument("--tokens", type=int, default=60)
+    ap.add_argument("--tokens", type=int, default=35)
     ap.add_argument("--device", default="cpu")
     args = ap.parse_args()
 
@@ -92,12 +100,18 @@ def main() -> None:
     tok = BPETokenizer(tok_path, cfg["data"]["vocab_size"],
                        bytes_per_token=1.0, eot_id=cfg["data"]["eot_id"])
 
+    def describe(d: dict) -> str:
+        parts = [f"`T={d['temperature']:g}`", f"`top_k={d['top_k']}`"]
+        if d.get("top_p"):
+            parts.append(f"`top_p={d['top_p']}`")
+        parts.append(f"штраф за повторы {d['repetition_penalty']:g}")
+        return ", ".join(parts)
+
     md = [f"## Тестовая генерация{(' — ' + args.label) if args.label else ''}", "",
           f"Чекпойнт `{Path(args.ckpt).name}`, шаг **{step:,}**, "
-          f"{sum(p.numel() for p in model.parameters()):,} параметров. "
-          f"Декодирование: жадное (`top_k=1`) и сэмплирование "
-          f"(`T=0.8`, `top_k=8`, `top_p=0.9`, штраф за повторы 1.15), "
-          f"по {args.tokens} токенов.", ""]
+          f"{sum(p.numel() for p in model.parameters()):,} параметров, "
+          f"по {args.tokens} токенов. Жадное: {describe(GREEDY)}. "
+          f"Сэмплирование: {describe(SAMPLED)}.", ""]
 
     t0 = time.time()
     for name, prompt in PROMPTS:
