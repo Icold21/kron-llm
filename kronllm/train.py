@@ -723,7 +723,13 @@ def train(cfg: Mapping[str, Any], run_dir: str | Path,
             x, y = train_ds.get_batch(bs, device, gen)
             with torch.amp.autocast("cuda", dtype=torch.float16, enabled=use_amp):
                 out = model(x, y)
-                loss = out["loss"] / accum
+                loss = out["loss"]
+                # Volume-deficit penalty on the Kron compositions (an A/B knob;
+                # the model returns None when it is off, so this costs nothing).
+                pen = out.get("det_pen")
+                if pen is not None:
+                    loss = loss + pen
+                loss = loss / accum
             if not torch.isfinite(loss):
                 raise FloatingPointError(f"non-finite loss at step {step}")
             scaler.scale(loss).backward()

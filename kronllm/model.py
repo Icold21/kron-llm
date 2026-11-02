@@ -929,8 +929,60 @@ class KronTransformer(nn.Module):
         # in the loss; SFT masks it, because there the prompt comes from the
         # harness and only the answer is a target.
         self.mask_user_turns = bool(mc.get("mask_user_turns", False))
+        # Volume-deficit penalty on the Kron compositions: ``logdet`` charges the
+        # total log-volume the composition loses when |det P|^(1/d) < 1,
+        # ``sigma_min`` charges the smallest singular value falling under
+        # ``det_penalty_floor`` (the direction that actually collapses first).
+        # 0 disables it and costs nothing.
+        self.det_pen_coef = float(mc.get("det_penalty", 0.0) or 0.0)
+        self.det_pen_mode = str(mc.get("det_penalty_mode", "logdet"))
+        self.det_pen_floor = float(mc.get("det_penalty_floor", 1.0) or 1.0)
 
     # -- init -------------------------------------------------------------
+    def _det_penalty(self, block: nn.Module, state: Dict[str, Optional[torch.Tensor]]
+                     ) -> Optional[torch.Tensor]:
+        """Volume deficit of one block's compositions, averaged over its roles.
+
+        Every block applies ``P x`` with ``P = W_L ... W_1``; a map whose
+        determinant is below 1 in modulus is losing volume, and the volume it
+        loses is rank it cannot use.  Two ways to charge for that:
+
+        * ``logdet`` -- ``relu(-log|det P|)``, the total log-volume deficit.  It
+          is exactly zero unless the *geometric mean* singular value is under 1,
+          so it only ever fires on a genuinely contracting map.
+        * ``sigma_min`` -- ``relu(floor - sigma_min(P))``.  The determinant can
+          stay above 1 while one direction has collapsed to 0.1; this one
+          charges for that direction.
+        """
+        if not self.det_pen_coef or not state:
+            return None
+        terms: List[torch.Tensor] = []
+        for role in ROLES:
+            D = state.get(role)
+            if D is None:
+                continue
+            if role == "f":
+                mod = getattr(block, "ffn", None)
+            elif role == "fg":
+                mod = getattr(block, "ffn_g", None)
+            else:
+                mod = getattr(block, role, None)
+            if not isinstance(mod, KronCompose):
+                continue
+            # float32: slogdet and svd of an fp16 matrix lose the small singular
+            # values, and those are the whole point of the penalty.
+            P = mod.compose(D).float()
+            if self.det_pen_mode == "sigma_min":
+                # svdvals is sorted descending, so the smallest direction is last.
+                sv = torch.linalg.svdvals(P)
+                terms.append(F.relu(self.det_pen_floor - sv[-1]))
+            else:
+                _, logabs = torch.linalg.slogdet(P)
+                terms.append(F.relu(-logabs))
+        if not terms:
+            return None
+        return torch.stack(terms).mean()
+
     def _init_weights(self, module: nn.Module) -> None:
         if isinstance(module, KronCompose):
             return                      # orthogonal init already applied
@@ -1151,6 +1203,10 @@ class KronTransformer(nn.Module):
         stats: Dict[str, float] = {}
 
         h_norms = [x.detach().norm().item()]
+        # Determinant penalty accumulator: one value per (layer, role) pair,
+        # summed here and averaged before it joins the loss.
+        det_acc: Optional[torch.Tensor] = None
+        det_n = 0
         new_kv: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = (
             [] if use_cache else None)
         # Residual lanes for the mHC band.  ``lanes`` is None outside the band
@@ -1201,6 +1257,11 @@ class KronTransformer(nn.Module):
                     mode=self.force_mode or "auto", P=P,
                     past_kv=past_kv[i] if past_kv is not None else None,
                     use_cache=use_cache)
+            if self.det_pen_coef and self.training:
+                pen = self._det_penalty(block, state)
+                if pen is not None:
+                    det_acc = pen if det_acc is None else det_acc + pen
+                    det_n += 1
             if new_kv is not None:
                 new_kv.append(kv)
             if collect:
@@ -1214,6 +1275,13 @@ class KronTransformer(nn.Module):
             h_norms.append(live.detach().norm().item())
         if lanes is not None:
             x = lanes.mean(-2)
+
+        # Volume deficit of the compositions, already weighted.  Returned next
+        # to ``loss`` rather than folded into it so the logged loss stays the
+        # language-modelling loss and the penalty is visible on its own.
+        det_pen: Optional[torch.Tensor] = None
+        if det_n and det_acc is not None:
+            det_pen = det_acc * (self.det_pen_coef / det_n)
 
         x = self.norm_f(x)
         emb = self.embed_table() if self.kron_embed is not None else None
@@ -1247,6 +1315,8 @@ class KronTransformer(nn.Module):
                                    else logits.sum() * 0.0)
                 else:
                     out["loss"] = per.mean()
+        if det_pen is not None:
+            out["det_pen"] = det_pen
         if collect:
             ratios = [(h_norms[i + 1] + 1e-9) / (h_norms[i] + 1e-9)
                       for i in range(len(h_norms) - 1)]
