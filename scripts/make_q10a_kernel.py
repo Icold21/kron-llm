@@ -39,7 +39,7 @@ PATCHES = [
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--code-version", type=int, default=22,
+    ap.add_argument("--code-version", type=int, default=23,
                     help="the kron-llm-code-vNN dataset this kernel mounts; it "
                          "carries the config, so bumping the step count or the "
                          "LR means bumping this")
