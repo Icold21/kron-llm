@@ -159,7 +159,7 @@ def run_generation(session: int, out: Path, minutes: int = 25) -> Path | None:
     step = ckpt_info(out).get("last.pt", {}).get("step", "?")
     cmd = [sys.executable, "-u", str(ROOT / "scripts" / "generate_samples.py"),
            "--ckpt", str(ckpt), "--out", str(dst),
-           "--label", f"сессия {session}, шаг {step}", "--tokens", "60"]
+           "--label", f"сессия {session}, шаг {step}"]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
                            errors="replace", timeout=minutes * 60)
@@ -193,6 +193,53 @@ def curve_table(val: list[dict], limit: int = 10) -> list[str]:
     return out
 
 
+OUT_ROOT = Path("E:/kron_out")
+
+SLICES = ["val_bpb_mixed", "val_bpb_en", "val_bpb_ru", "val_bpb_code",
+          "val_bpb_cs", "val_bpb_encyclopedic", "val_bpb_humour",
+          "val_bpb_identity", "val_bpb_literature", "val_bpb_logic",
+          "val_bpb_math", "val_bpb_ml", "val_bpb_science"]
+
+
+def previous_results(step: int):
+    """Newest results.json from an earlier step, as (step, dict)."""
+    best = None
+    for q in OUT_ROOT.glob("session*/**/results.json"):
+        try:
+            d = json.loads(q.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        st = int(d.get("steps") or 0)
+        if 0 < st < step and (best is None or st > best[0]):
+            best = (st, d)
+    return best
+
+
+def slice_table(step: int, current: dict) -> list[str]:
+    """Where the checkpoint moved against the previous one, per slice.
+
+    A mixed bpb can rise while several slices fall: that is a shift in where the
+    loss sits, not a uniform regression, and the table is the only place the
+    difference is visible.  Negative delta = better.
+    """
+    prev = previous_results(step)
+    if not prev:
+        return []
+    prev_step, prev_d = prev
+    rows = [f"| срез | шаг {prev_step:,} | шаг {step:,} | Δ |", "|---|---|---|---|"]
+    for key in SLICES:
+        a, b = prev_d.get(key), current.get(key)
+        if a is None or b is None:
+            continue
+        name = key.replace("val_bpb_", "") or "mixed"
+        rows.append(f"| {name} | {a:.4f} | {b:.4f} | {b - a:+.4f} |")
+    if len(rows) == 2:
+        return []
+    return (["## Что сдвинулось с прошлого чекпойнта", "",
+             "Δ < 0 — лучше. Разные знаки в одном столбце значат смену "
+             "распределения, а не общий регресс.", ""] + rows + [""])
+
+
 def mail_report(session: int, out: Path, train: list[dict], val: list[dict],
                 info: dict, start_step: int, samples: Path | None,
                 png: Path | None, minutes: int | None) -> None:
@@ -217,7 +264,7 @@ def mail_report(session: int, out: Path, train: list[dict], val: list[dict],
         f"| **val_bpb_mixed** | **{v.get('val_bpb_mixed') or v.get('bpb') or '—'}** |",
         f"| val_bpb_en / ru | {v.get('val_bpb_en', '—')} / "
         f"{v.get('val_bpb_ru', '—')} |",
-        f"| до конца эпохи | {max(0, EPOCH_STEPS - (step or start_step)):,} шагов "
+        f"| до конца прогона | {max(0, EPOCH_STEPS - (step or start_step)):,} шагов "
         f"({max(0, EPOCH_STEPS - (step or start_step)) / EPOCH_STEPS:.1%}) |",
         "",
         "## Кривые",
@@ -228,6 +275,7 @@ def mail_report(session: int, out: Path, train: list[dict], val: list[dict],
         "",
     ]
     md += curve_table(val)
+    md += slice_table(int(step or 0), v)
     md += [
         "",
         "График приложен к письму (`curve_q10.png`): сверху train loss, снизу "
