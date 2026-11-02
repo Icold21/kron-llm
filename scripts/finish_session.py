@@ -56,8 +56,13 @@ def log_path(session: int) -> Path:
 def say(msg: str, session: int) -> None:
     line = f"{time.strftime('%H:%M:%S')}  {msg}"
     print(line, flush=True)
-    with log_path(session).open("a", encoding="utf-8") as fh:
-        fh.write(line + "\n")
+    try:
+        with log_path(session).open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except OSError:
+        # The log file is a convenience; stdout is the record the harness keeps.
+        # A held-open file (Tee-Object does exactly that) must not end the run.
+        pass
 
 
 def kaggle(*argv: str, timeout: float = 180.0) -> subprocess.CompletedProcess:
