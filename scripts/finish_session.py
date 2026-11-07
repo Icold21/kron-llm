@@ -381,6 +381,36 @@ def notebook_minutes() -> int | None:
     return None
 
 
+def minutes_until(end_by: str, session: int, reserve: int = 35) -> int | None:
+    """Training budget that still ends the *kernel* by ``end_by`` (HH:MM).
+
+    A fixed ``--minutes-plan`` cannot honour a wall-clock deadline: the push is
+    followed by a Kaggle queue (25 min the first Saturday after a quota reset),
+    the notebook copies the bin before the trainer starts, and the checkpoint has
+    to be written before the kernel ends.  ``reserve`` covers those three, so the
+    budget is what is left of the clock after them.
+    """
+    try:
+        hh, mm = (int(x) for x in end_by.split(":"))
+    except ValueError:
+        say(f"  --end-by {end_by!r} is not HH:MM: ignoring it", session)
+        return None
+    now = datetime.now()
+    target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(days=1)
+    budget = int((target - now).total_seconds() // 60) - reserve
+    if budget > 700:
+        # The deadline is further away than one session can run (or it already
+        # passed and rolled to tomorrow): the platform cap is what applies.
+        say(f"  {end_by} is more than a session away: capping the budget at 700",
+            session)
+        budget = 700
+    say(f"  the next session must end by {end_by}: {budget} min of training "
+        f"after {reserve} min of queue, copy and teardown", session)
+    return budget
+
+
 def patch_minutes(minutes: int, session: int, push_dir: Path | None = None) -> bool:
     """Set ``MINUTES`` in the kernel notebook before pushing it.
 
@@ -409,7 +439,8 @@ def patch_minutes(minutes: int, session: int, push_dir: Path | None = None) -> b
 
 
 def finish_one(session: int, start_step: int | None, hours: float, out: Path,
-               push: bool, next_minutes: int | None) -> int | None:
+               push: bool, next_minutes: int | None,
+               end_by: str | None = None) -> int | None:
     """Wait, download, publish, report; return the step the run reached."""
     say(f"waiting for {KERNEL} (session {session}, "
         f"started at {('step ' + format(start_step, ',')) if start_step else 'an unknown step'})",
@@ -478,6 +509,14 @@ def finish_one(session: int, start_step: int | None, hours: float, out: Path,
     if "complete" not in kind.lower():
         say(f"the session did not complete ({kind}): not chaining", session)
         return None
+    if end_by:
+        budget = minutes_until(end_by, session)
+        if budget is not None and budget < 25:
+            say(f"  under 25 min before {end_by}: not pushing this session, it "
+                f"would start and be cut almost at once", session)
+            return None
+        if budget is not None:
+            next_minutes = budget
     if next_minutes:
         patch_minutes(next_minutes, session)
     say("pushing the next session", session)
@@ -538,6 +577,11 @@ def main() -> None:
                          "default, the decay pass's own end otherwise")
     ap.add_argument("--minutes-plan", default="",
                     help="comma list of kernel budgets, one per pushed session")
+    ap.add_argument("--end-by", default="",
+                    help="comma list of HH:MM deadlines, one per pushed session: "
+                         "the budget is then computed from the clock so the "
+                         "session cannot run past that hour (empty = use the "
+                         "minutes plan for that slot)")
     args = ap.parse_args()
 
     if args.kernel:
@@ -550,13 +594,18 @@ def main() -> None:
     if args.then_minutes:
         globals()["THEN_MINUTES"] = int(args.then_minutes)
     plan = [int(x) for x in args.minutes_plan.split(",") if x.strip()]
+    end_plan = ([x.strip() for x in args.end_by.split(",")]
+                if args.end_by else [])
     session = args.session
     start = args.start_step
     for turn in range(args.chain):
         out = Path(args.out) if args.out else Path(rf"E:\kron_out\session{session}")
         step = finish_one(session, start, args.hours, out,
                           push=not args.no_push,
-                          next_minutes=plan[turn] if turn < len(plan) else None)
+                          next_minutes=plan[turn] if turn < len(plan) else None,
+                          end_by=(end_plan[turn]
+                                  if turn < len(end_plan) and end_plan[turn]
+                                  else None))
         if step is None:
             break
         start = step
