@@ -1,4 +1,4 @@
-"""Generate the S10 (supervised fine-tuning) Kaggle kernel from the Q10 one.
+﻿"""Generate the S10 (supervised fine-tuning) Kaggle kernel from the Q10 one.
 
 SFT shares everything with pretraining except three things, and all three are
 visible in the notebook:
@@ -39,9 +39,21 @@ PATCHES = [
      "    cmd += ['--resume', resume[0]]\n"
      "    print('resuming from', resume[0])",
      "init = sorted(glob.glob('/kaggle/input/**/last.pt', recursive=True))\n"
-     "if init:\n"
-     "    cmd += ['--override', 'training.init_from=' + init[0]]\n"
-     "    print('initialising weights from', init[0])"),
+     "if not init:\n"
+     "    raise FileNotFoundError('/kaggle/input has no last.pt: S10 starts from the '\n"
+     "                            'decay pass, not from scratch')\n"
+     "# A stale dataset version is invisible in the training log and only shows up\n"
+     "# as a mysteriously worse model, so the step is checked instead of trusted.\n"
+     "_probe = torch.load(init[0], map_location='cpu', weights_only=False)\n"
+     "_step = int(_probe.get('step') or 0)\n"
+     "print('initialising weights from', init[0], '| step', _step)\n"
+     "del _probe\n"
+     "if _step < 108507:\n"
+     "    raise SystemExit(\n"
+     "        f'the mounted checkpoint is at step {_step:,}, the decay ends at '\n"
+     "        f'109,507 (>=108,507 accepted): this is a stale dataset version -- '\n"
+     "        f're-push S10 once kron-q10-ckpt shows the new version')\n"
+     "cmd += ['--override', 'training.init_from=' + init[0]]"),
 ]
 
 HEADER = """# KronLLM S10 — supervised fine-tuning

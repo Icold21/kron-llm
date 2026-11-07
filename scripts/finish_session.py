@@ -1,4 +1,4 @@
-"""Finish a Kaggle session without a human at the keyboard.
+﻿"""Finish a Kaggle session without a human at the keyboard.
 
 Sequence, each step gated on the previous one:
 
@@ -32,10 +32,12 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -48,6 +50,7 @@ TOKENS_PER_STEP = 16_384
 EPOCH_STEPS = 172_273          # corpus v5: 2,822,521,746 tokens (drills in)
 MODEL_NAME = "DeepSeek V4.1 Flash"
 PUSH_DIR = Path("kaggle") / "q10"
+MINUTES_RE = re.compile(r"^(\s*MINUTES\s*=\s*)(\d+)(.*)$")
 THEN_PUSH_DIR = None            # None means "the next stage is left to a human"
 THEN_MINUTES = 0
 
@@ -133,6 +136,8 @@ def publish_ckpt(info: dict, session: int) -> bool:
         "title": "Kron Q10 checkpoint", "id": CKPT_SLUG,
         "licenses": [{"name": "other"}]}), encoding="utf-8")
     step = info["last.pt"]["step"]
+    local_bytes = (STAGE / "last.pt").stat().st_size
+    upload_started = datetime.utcnow()
     say(f"uploading step {step:,} as a new version of {CKPT_SLUG}", session)
     r = kaggle("datasets", "version", "-p", str(STAGE), "--dir-mode", "zip",
                "-m", f"session {session}: step {step:,}")
@@ -140,13 +145,31 @@ def publish_ckpt(info: dict, session: int) -> bool:
     say(f"  upload exit {r.returncode}: {tail[-1][:120] if tail else '-'}", session)
     if r.returncode != 0:
         return False
-    for _ in range(40):
+    # "last.pt is listed" was already true before this upload and the listing
+    # lags the version, so the old check passed on the previous file.  Wait for
+    # the new row instead: same byte count, creation date after the upload began.
+    deadline = time.time() + 40 * 20
+    while time.time() < deadline:
         f = kaggle("datasets", "files", CKPT_SLUG)
-        if "last.pt" in (f.stdout or ""):
-            say("  dataset reports ready", session)
-            return True
+        for line in (f.stdout or "").splitlines():
+            if "last.pt" not in line:
+                continue
+            cols = line.split()
+            try:
+                size = int(cols[1])
+                stamp = datetime.strptime(f"{cols[2]} {cols[3]}",
+                                          "%Y-%m-%d %H:%M:%S.%f")
+            except (IndexError, ValueError):
+                continue
+            if size == local_bytes and stamp >= upload_started - timedelta(minutes=2):
+                say(f"  the new version is live ({size:,} bytes, {stamp} UTC)",
+                    session)
+                # The file listing can lead the version pointer by a moment, and
+                # the next stage mounts this dataset when it is pushed.
+                time.sleep(60)
+                return True
         time.sleep(20)
-    say("  dataset never reported ready", session)
+    say("  the new version never appeared in the file listing", session)
     return False
 
 
@@ -343,7 +366,7 @@ def download_output(out: Path, s: int, attempts: int = 4,
 
 def notebook_minutes() -> int | None:
     """The kernel budget this session was pushed with, for the report."""
-    nb_path = ROOT / "kaggle" / "q10" / "train.ipynb"
+    nb_path = ROOT / PUSH_DIR / "train.ipynb"
     try:
         nb = json.loads(nb_path.read_text(encoding="utf-8"))
     except OSError:
@@ -358,25 +381,30 @@ def notebook_minutes() -> int | None:
     return None
 
 
-def patch_minutes(minutes: int, session: int) -> bool:
+def patch_minutes(minutes: int, session: int, push_dir: Path | None = None) -> bool:
     """Set ``MINUTES`` in the kernel notebook before pushing it.
 
     The session is meant to end at a wall-clock hour, not after a fixed eleven;
     the notebook is the only place the budget lives, and the watcher is what
-    pushes it.
+    pushes it.  ``push_dir`` is the directory actually being pushed -- the decay
+    chain pushes ``kaggle/q10a``, and patching ``kaggle/q10`` while pushing the
+    other one silently keeps the old budget.
     """
-    nb_path = ROOT / "kaggle" / "q10" / "train.ipynb"
+    nb_path = ROOT / (push_dir or PUSH_DIR) / "train.ipynb"
     nb = json.loads(nb_path.read_text(encoding="utf-8"))
     hits = 0
     for cell in nb["cells"]:
         for i, line in enumerate(cell["source"]):
-            if line.strip().startswith("MINUTES ="):
-                cell["source"][i] = f"MINUTES = {minutes}\n"
+            m = MINUTES_RE.match(line.rstrip("\n"))
+            if m:
+                # Only the number changes: the explanation next to it stays.
+                cell["source"][i] = f"{m.group(1)}{minutes}{m.group(3)}\n"
                 hits += 1
     if hits:
         nb_path.write_text(json.dumps(nb, indent=1, ensure_ascii=False),
                            encoding="utf-8")
-    say(f"  kernel MINUTES -> {minutes} ({hits} cell)", session)
+    say(f"  {nb_path.relative_to(ROOT)} MINUTES -> {minutes} ({hits} cell)",
+        session)
     return bool(hits)
 
 
@@ -434,7 +462,7 @@ def finish_one(session: int, start_step: int | None, hours: float, out: Path,
         say(f"this stage is finished at step {step:,}: pushing the next stage "
             f"from {THEN_PUSH_DIR}", session)
         if THEN_MINUTES:
-            patch_minutes(THEN_MINUTES, session)
+            patch_minutes(THEN_MINUTES, session, THEN_PUSH_DIR)
         r = kaggle("kernels", "push", "-p", str(ROOT / THEN_PUSH_DIR))
         text = (r.stdout or "") + (r.stderr or "")
         tail = text.strip().splitlines()
