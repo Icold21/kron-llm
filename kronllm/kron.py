@@ -116,9 +116,17 @@ def cached_eye(d: int, device, dtype) -> torch.Tensor:
 
 
 def rms_norm_matrix(x: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
-    """Normalise every matrix in the trailing two dims to unit RMS."""
-    r = x.pow(2).mean(dim=(-2, -1), keepdim=True).clamp_min(eps).sqrt()
-    return x / r
+    """Normalise every matrix in the trailing two dims to unit RMS.
+
+    Multiply by the reciprocal instead of dividing: ``torch.div`` is one of the
+    ops autocast deliberately widens to fp32, so ``x / r`` silently promoted the
+    whole depth state -- (150, 4, 512, 512) at Q10 -- to fp32 under fp16
+    training, which the memory snapshot attributes to 3.8 GB of the 5.4 GB fixed
+    cost.  The mean and the reciprocal are still computed in fp32; only the
+    result is cast back to the input dtype.
+    """
+    ms = x.pow(2).mean(dim=(-2, -1), keepdim=True).clamp_min(eps)
+    return x * torch.rsqrt(ms).to(x.dtype)
 
 
 def _init_gain_value(mode: "str | float", K: int, d_in: int) -> float:
@@ -183,6 +191,7 @@ class KronCompose(nn.Module):
         nonlinear_mode: str = "replace",
         sigma_mode: str = "learned",
         sigma_value: float = 0.5,
+        compose_dtype: str = "auto",
     ) -> None:
         super().__init__()
         d_out = d_in if d_out is None else d_out
@@ -250,6 +259,18 @@ class KronCompose(nn.Module):
         self.sigma_mode = str(sigma_mode).lower()
         if self.sigma_mode not in {"learned", "fixed", "off"}:
             raise ValueError("sigma_mode must be 'learned', 'fixed' or 'off'")
+        # Precision of the composed d x d maps.  "auto" keeps the historical
+        # behaviour: the innovation is whatever autocast made it (fp16 under
+        # fp16 training) but ``sig``/``tau`` are fp32 parameters, so
+        # ``I + sig * prev`` promotes the whole depth state, the normalised
+        # copies of it and the L-fold product to fp32.  At d=512 that state is
+        # (150, 4, 512, 512) -- 629 MB per tensor, and the snapshot attributes
+        # 3.8 GB of the 5.4 GB fixed cost to it.  "fp16"/"bf16" keep it in the
+        # activation dtype instead, which is what the map is multiplied with
+        # anyway; "fp32" pins it explicitly for reproducibility checks.
+        self.compose_dtype = str(compose_dtype).lower()
+        if self.compose_dtype not in {"auto", "fp16", "bf16", "fp32"}:
+            raise ValueError("compose_dtype must be auto/fp16/bf16/fp32")
         self.sigma_value = float(sigma_value)
 
         self.A = nn.Parameter(torch.empty(L, K, n1_out, n1_in))
@@ -385,6 +406,18 @@ class KronCompose(nn.Module):
         I4 = outer.sum(dim=1)                               # (L,n1o,n1i,n2o,n2i)
         return I4.permute(0, 1, 3, 2, 4).reshape(
             self.L, n1o * n2o, n1i * n2i)
+
+    def work_dtype(self, ref: torch.Tensor) -> torch.dtype:
+        """Dtype the composition state is built and stored in.
+
+        ``auto`` returns whatever the innovation already is, which preserves the
+        historical behaviour exactly; the explicit choices exist so a run can
+        keep the d x d maps out of fp32 (see ``compose_dtype`` in __init__).
+        """
+        if self.compose_dtype == "auto":
+            return ref.dtype
+        return {"fp16": torch.float16, "bf16": torch.bfloat16,
+                "fp32": torch.float32}[self.compose_dtype]
 
     def apply_innovation(self, x: torch.Tensor, l: int = 0) -> torch.Tensor:
         """Apply ``I_l = sum_k A_k (x) B_k`` to ``x`` without building ``d x d``.
@@ -608,6 +641,9 @@ class KronCompose(nn.Module):
 
         # innovation (position independent: it is a weight, not an activation)
         I = self.innovation()                      # (L, d_out, d_in)
+        dt = self.work_dtype(I)
+        if I.dtype != dt:
+            I = I.to(dt)
 
         # recurrence, truncated at window boundaries
         in_window = prev_D is not None and not (
@@ -622,11 +658,11 @@ class KronCompose(nn.Module):
             if in_window:
                 prev = rms_norm_matrix(prev)
 
-        sig = self.sigma_values()                  # (L,)
+        sig = self.sigma_values().to(I.dtype)      # (L,)
         D = I + sig.view(self.L, 1, 1) * prev       # (L, d_out, d_in)
         if self.normalize_D:
             D = rms_norm_matrix(D)
-        D = self.tau.view(self.L, 1, 1) * D
+        D = self.tau.to(I.dtype).view(self.L, 1, 1) * D
 
         # y = gamma * W_L ... W_1 x
         # Two equivalent execution modes:
@@ -794,19 +830,23 @@ class KronBank:
         A = torch.stack([m.A for m in mods])            # (M,L,K,n1o,n1i)
         B = torch.stack([m.B for m in mods])            # (M,L,K,n2o,n2i)
         tau = torch.stack([m.tau for m in mods])        # (M,L)
-
         # innovation  I[m,l,i,j,m2,n2] = sum_k A[m,l,k,i,j] B[m,l,k,m2,n2]
         a = A.reshape(M * L, K, n1o * n1i).transpose(1, 2)
         b = B.reshape(M * L, K, n2o * n2i)
         I = torch.bmm(a, b).reshape(M, L, n1o, n1i, n2o, n2i)
         I = I.permute(0, 1, 2, 4, 3, 5).reshape(
             M, L, self.d_out, self.d_in).contiguous()
+        dt = self._m0.work_dtype(I)
+        if I.dtype != dt:
+            I = I.to(dt)
 
         if self.normalize_D:
             I = rms_norm_matrix(I)
 
-        sig = torch.stack([m.sigma_values() for m in mods]).view(M, L, 1, 1)
-        init = self._m0.initial_state(I.device, I.dtype)      # (L,d,d), cached
+        tau = tau.to(dt)
+        sig = torch.stack([m.sigma_values() for m in mods]).to(dt).view(
+            M, L, 1, 1)
+        init = self._m0.initial_state(I.device, dt)           # (L,d,d), cached
 
         Ds: List[torch.Tensor] = []
         for k, (layer, lo, hi) in enumerate(self.bounds):
@@ -829,14 +869,14 @@ class KronBank:
         D = torch.cat(Ds, dim=0)
 
         if self.composition == "sum":
-            alpha = torch.stack([m.alpha for m in mods])    # (M,L)
+            alpha = torch.stack([m.alpha for m in mods]).to(dt)   # (M,L)
             P = (alpha.view(M, L, 1, 1) * D).sum(dim=1)
             if self.anchor:
-                s = torch.stack([m.s for m in mods])       # (M,)
+                s = torch.stack([m.s for m in mods]).to(dt)   # (M,)
                 eye = cached_eye(self.d_in, D.device, D.dtype)
                 P = P + s.view(M, 1, 1) * eye
         elif self.anchor:
-            s = torch.stack([m.s for m in mods])           # (M,)
+            s = torch.stack([m.s for m in mods]).to(dt)   # (M,)
             eye = cached_eye(self.d_in, D.device, D.dtype)
             sI = s.view(M, 1, 1) * eye
             P = sI + D[:, 0]
@@ -849,6 +889,6 @@ class KronBank:
 
         gates = [m.gate for m in mods]
         if gates[0] is not None:
-            g = torch.stack(gates).view(M, 1, 1)
+            g = torch.stack(gates).to(dt).view(M, 1, 1)
             P = P * g
         return P, D

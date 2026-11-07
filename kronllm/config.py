@@ -156,6 +156,11 @@ DEFAULTS: Dict[str, Any] = {
             "sigma_mode": "learned",
             "sigma_value": 0.5,
             "rezero_eps": 0.0,
+            # Dtype the composed d x d maps are built and stored in.  "auto"
+            # follows the activation, which under fp16 training is fp16 -- the
+            # budget depends on it: in fp32 the depth state is (150, 4, 512,
+            # 512) and costs 3.8 GB of the 5.4 GB fixed training memory.
+            "compose_dtype": "auto",
         },
     },
     "training": {

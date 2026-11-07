@@ -561,6 +561,7 @@ class KronBlock(nn.Module):
             nonlinear_mode=str(kc.get("nonlinear_mode", "replace")),
             sigma_mode=str(kc.get("sigma_mode", "learned")),
             sigma_value=float(kc.get("sigma_value", 0.5)),
+            compose_dtype=str(kc.get("compose_dtype", "auto")),
         )
 
     def ffn_module(self) -> nn.Module:
@@ -577,7 +578,12 @@ class KronBlock(nn.Module):
             if not isinstance(mod, KronCompose):
                 return mod(inp), None
             if P is not None and P.get(role) is not None:
-                return torch.matmul(inp, P[role].transpose(0, 1)), None
+                # The bank builds every map in one dtype; the activation is
+                # whatever autocast produced, so match instead of failing.
+                p = P[role]
+                if p.dtype != inp.dtype:
+                    p = p.to(inp.dtype)
+                return torch.matmul(inp, p.transpose(0, 1)), None
             return mod(inp, state.get(role), layer_idx, mode=mode)
         return apply
 

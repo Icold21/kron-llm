@@ -453,6 +453,65 @@ cheaper per token. A `torch.compile`/Triton fused prelude and a factorised
 recurrence state are the obvious next steps, and neither exists on this setup
 (Windows PyTorch ships without Triton).
 
+### Training memory: what the prelude costs, and one bug in it
+
+Peak training memory is not set by the parameters. At `d=512, L=25` the same
+5.45 GB is held at batch 1 and at batch 2, and the cost is **quadratic in width
+and linear in depth** (`scripts/probe_vram.py`):
+
+| width (L=25) | peak | depth (d=512) | peak |
+|---|---:|---|---:|
+| 256 | 1.39 GB | L=6 | 1.34 GB |
+| 384 | 3.13 GB | L=12 | 2.64 GB |
+| 512 | 5.46 GB | L=25 | 5.46 GB |
+
+`scripts/probe_memory_sites.py` records a CUDA memory snapshot with the Python
+stack of every allocation, which turns "it scales with d²" into "these lines
+own it". At step 73,636 the answer was:
+
+| site | live bytes |
+|---|---:|
+| `rms_norm_matrix` outputs and their saved inputs | **1.56 GB** |
+| `KronBank.prelude`: the composed maps and the depth state | **1.80 GB** |
+| `h @ Pᵀ` outputs, RMSNorm activations | 0.35 GB |
+
+The cause was not the design but one line: `torch.div` is among the ops autocast
+**deliberately widens to fp32**, and `rms_norm_matrix` normalised with `x / r`.
+So under fp16 training the whole depth state — `(150, 4, 512, 512)`, i.e. 150
+(role, layer) pairs times `L=4` — was promoted to fp32, together with every
+normalised copy of it and the product that builds `P`. The state is declared
+fp16 upstream and then arrived at the product in fp32.
+
+`rms_norm_matrix` now multiplies by a reciprocal computed in fp32
+(`x * torch.rsqrt(ms).to(x.dtype)`), and `sigma`/`tau`/`s`/`gate`, which are
+fp32 parameters, are cast to the work dtype (`model.kron.compose_dtype`,
+`auto` = follow the activation). Measured on the same shape:
+
+| | before | after |
+|---|---:|---:|
+| batch 1, peak | 5.45 GB | **4.39 GB** |
+| d=384, peak | 3.13 GB | 2.51 GB (ratio 1.75 against 1.78 = d²) |
+| largest batch that fits 6 GB | 2 | **4** |
+
+`compose_dtype: fp32` restores the old numerics for a comparison run, and
+`fp16`/`bf16` pin them explicitly; `auto` is what Q10 would use.
+
+Does the reduction cost quality? Two seeds of the byte-level bench at matched
+compute (1,500 steps x batch 32, fp16 in both arms so the dtype of the maps is
+the only difference):
+
+| seed | composition fp32 | composition fp16 | Δ |
+|---|---:|---:|---:|
+| 42 | 1.9477 | 1.9483 | +0.0006 |
+| 43 | 1.9510 | 1.9499 | −0.0010 |
+
+The sign flips and the mean is −0.0002 against a seed spread of 0.0016, so the
+honest reading is "no detectable effect at this budget". `tests/test_compose_dtype.py`
+holds the line: the normalisation keeps its input dtype, including under CUDA
+autocast, so the promotion cannot creep back in unmeasured.
+
+
+
 ### Training setup
 
 | knob | value |
