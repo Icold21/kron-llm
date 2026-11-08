@@ -94,7 +94,7 @@ def main() -> None:
             color="#8a8a8a", lw=1.2, ls=":", zorder=2,
             label="earlier checkpoints (legacy metric, rescaled x1.444)")
     ax.plot([gb(s) for s in xs], list(mixed.values()),
-            color="#1f4e79", lw=1.6, marker="o", ms=1.8, zorder=3,
+            color="#1f4e79", lw=1.6, marker="o", ms=2.0, zorder=3,
             label="Q10 (9.9M params), held-out bits per byte")
     ax.axhline(GPT2, color="#b03a2e", ls="--", lw=1.2, zorder=2,
                label="GPT-2 124M, same text and metric: 1.554")
