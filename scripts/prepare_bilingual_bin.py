@@ -57,6 +57,80 @@ def load_mixed(mix_dir: Path) -> list[dict]:
     return docs
 
 
+def _iter_shard(path: Path):
+    """Yield documents from one shard, keeping the fields the bin needs."""
+    lang, domain = path.name.split(".jsonl")[0].split("_")[:2]
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rt", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            raw = json.loads(line)
+            yield {"text": raw["text"],
+                   "language": raw.get("language", lang),
+                   "domain": raw.get("domain", domain),
+                   "sha256": raw.get("sha256") or ""}
+
+
+def _count_lines(path: Path) -> int:
+    opener = gzip.open if path.suffix == ".gz" else open
+    n = 0
+    with opener(path, "rt", encoding="utf-8") as f:
+        for _ in f:
+            n += 1
+    return n
+
+
+def _sha(doc: dict) -> str:
+    return doc["sha256"] or hashlib.sha256(doc["text"].encode("utf-8")).hexdigest()
+
+
+def _bucket_train(path: Path, val_fraction: float) -> list[dict]:
+    """One (language, domain) shard minus its val slice, sorted like split_docs."""
+    docs = list(_iter_shard(path))
+    docs.sort(key=_sha)
+    n_val = max(1, int(len(docs) * val_fraction))
+    return docs[n_val:]
+
+
+def iter_mix_stream(mix_dir: Path, val_fraction: float,
+                    interleave: set[str]):
+    """Yield the mix in final bin order, one bucket in memory at a time."""
+    shards = sorted(list(mix_dir.glob("*.jsonl.gz")) + list(mix_dir.glob("*.jsonl")))
+    special_files = [p for p in shards
+                     if p.name.split(".jsonl")[0].split("_")[1] in interleave]
+    rest_files = [p for p in shards if p not in special_files]
+
+    special: list[dict] = []
+    for path in special_files:
+        special.extend(_bucket_train(path, val_fraction))
+    if interleave:
+        special.sort(key=_sha)
+
+    counts = {p: _count_lines(p) for p in rest_files}
+    rest_total = sum(max(0, counts[p] - max(1, int(counts[p] * val_fraction)))
+                     for p in rest_files)
+    step = max(1, rest_total // max(1, len(special))) if special else 0
+    print(f"[stream] {len(rest_files)} buckets, {rest_total:,} train docs, "
+          f"{len(special):,} interleaved, one inserted every {step or '-'} docs")
+
+    si = 0
+    pos = 0
+    for path in rest_files:
+        bucket = _bucket_train(path, val_fraction)
+        for doc in bucket:
+            yield doc
+            pos += 1
+            if special and si < len(special) and pos % step == 0:
+                yield special[si]
+                si += 1
+        bucket.clear()
+    while si < len(special):
+        yield special[si]
+        si += 1
+
+
 def stratified_sample(docs: list[dict], per_language_bytes: int) -> list[str]:
     """Sample text per language *and domain* so both sides shape the merges.
 
@@ -146,6 +220,10 @@ def main() -> None:
     ap.add_argument("--out-dir", default=str(ROOT))
     ap.add_argument("--vocab", type=int, default=8192)
     ap.add_argument("--val-fraction", type=float, default=0.02)
+    ap.add_argument("--stream", action="store_true",
+                    help="read the mix one (language, domain) bucket at a time "
+                         "instead of loading all of it; needs --reuse-val-dir "
+                         "because no val split is written")
     ap.add_argument("--merge-mb-per-language", type=float, default=10.0)
     ap.add_argument("--max-train-mb", type=float, default=0.0,
                     help="optional cap on the training text in MB; 0 means the "
@@ -185,13 +263,26 @@ def main() -> None:
 
     t0 = time.time()
     Path(args.out_dir).mkdir(parents=True, exist_ok=True)
-    docs = load_mixed(Path(args.mix_dir))
-    if not docs:
-        raise SystemExit("no mixed shards found; run `build` first")
-    train, val = split_docs(docs, args.val_fraction)
-    train = interleave_domains(
-        train, {d for d in (args.interleave or "").split(",") if d})
-    print(f"[split] {len(train):,} train docs, {len(val):,} val docs")
+    interleaved = {d for d in (args.interleave or "").split(",") if d}
+    if args.stream:
+        # One bucket at a time: this is what keeps the build inside a 35 GB
+        # commit limit on a box that is already using half of it.
+        if not args.reuse_val_dir:
+            raise SystemExit("--stream needs --reuse-val-dir: it writes no val")
+        if args.domain_prompts:
+            raise SystemExit("--stream needs --no-domain-prompts: the prompt "
+                             "pass annotates a list in memory")
+        train = iter_mix_stream(Path(args.mix_dir), args.val_fraction, interleaved)
+        val = []
+        n_train = 0
+    else:
+        docs = load_mixed(Path(args.mix_dir))
+        if not docs:
+            raise SystemExit("no mixed shards found; run `build` first")
+        train, val = split_docs(docs, args.val_fraction)
+        train = interleave_domains(train, interleaved)
+        n_train = len(train)
+        print(f"[split] {len(train):,} train docs, {len(val):,} val docs")
     # Domain system prompts: a share of the training documents is prefixed with
     # <|system|>...<|eot|> so the tag that SFT and the sampler always emit is
     # already warm, and the model learns which register follows which prompt.
@@ -206,7 +297,7 @@ def main() -> None:
               f"({stats['prompted']/max(1,stats['docs']):.0%}) carry a system "
               f"prompt; {already:,} already had one (chat); {coverage}")
     else:
-        stats = {"docs": len(train), "prompted": 0, "already": 0,
+        stats = {"docs": n_train, "prompted": 0, "already": 0,
                  "by_domain": {}}
     prompt_meta = {
         "enabled": bool(args.domain_prompts),
@@ -277,6 +368,8 @@ def main() -> None:
                      index_path=Path(args.out_dir) / "train_index.npy")
     print(f"[index] {tr['documents']:,} documents, {tr['skipped']:,} skipped "
           f"as seen -> {Path(args.out_dir) / 'train_index.npy'}")
+    # In stream mode the document count is only known once the bin is written.
+    prompt_meta["docs"] = int(tr["documents"])
     if args.reuse_val_dir:
         # The decay pass must be scored on the epoch-1 held-out set, otherwise
         # its bpb cannot be compared with the epoch-end checkpoint.
