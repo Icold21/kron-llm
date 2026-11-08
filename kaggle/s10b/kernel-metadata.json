@@ -1,0 +1,17 @@
+{
+  "id": "icold21/kron-s10b-sft-pass2",
+  "title": "Kron S10b second SFT pass",
+  "code_file": "train.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "icold21/kron-llm-code-v24",
+    "icold21/kron-sft-corpus",
+    "icold21/kron-s10-ckpt"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}

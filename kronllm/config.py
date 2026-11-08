@@ -844,6 +844,28 @@ EXPERIMENTS["S10"] = {
         "training.allow_data_change": True,
     },
 }
+# S10b: the second SFT pass, run only if S10's loss curve is still falling at
+# step 4,000 and exact-match arithmetic is above zero.  8,000 more steps take the
+# total exposure to 197M tokens (39 % of the 502.7M reservoir, 19.8 tokens per
+# parameter) -- the largest slice that stays clear of a full epoch, which at this
+# size buys memorisation rather than skill.  The LR starts an order of magnitude
+# below S10's: the format is already learned, so this pass is polish.
+EXPERIMENTS["S10b"] = {
+    "desc": "S10 continued: 8,000 more SFT steps (197M tokens in total)",
+    "overrides": {
+        **EXPERIMENTS["S10"]["overrides"],
+        # The kernel overrides this with the mounted S10 checkpoint; weights
+        # only, so the step counter restarts and the cosine covers the new span.
+        "training.init_from": "runs/S10/last.pt",
+        "training.max_steps": 8000,
+        "training.schedule_steps": 8000,
+        "training.lr": 1e-5,
+        "training.min_lr": 1e-6,
+        "training.warmup_steps": 50,
+        "training.save_every": 500,
+        "training.log_every": 50,
+    },
+}
 # Q8w: parameter-matched control for Q8g.  20 layers x 6 matrices is the same
 # block count and the same parameter count as Q6's 24 layers x 5 matrices, so
 # the only difference from Q6 is the gated FFN, not extra capacity.
