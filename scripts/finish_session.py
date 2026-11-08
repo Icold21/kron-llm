@@ -240,6 +240,21 @@ def previous_results(step: int):
     return best
 
 
+def _num(x) -> float | None:
+    """A log.csv cell or a results.json value as a float, or None.
+
+    ``read_logs`` hands back raw CSV strings while ``results.json`` holds
+    numbers, so any arithmetic across the two has to coerce -- the first version
+    of ``slice_table`` formatted ``b - a`` straight through and died with
+    "Unknown format code 'f' for object of type 'str'" the one time a slice
+    column was blank.
+    """
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
 def slice_table(step: int, current: dict) -> list[str]:
     """Where the checkpoint moved against the previous one, per slice.
 
@@ -253,11 +268,16 @@ def slice_table(step: int, current: dict) -> list[str]:
     prev_step, prev_d = prev
     rows = [f"| срез | шаг {prev_step:,} | шаг {step:,} | Δ |", "|---|---|---|---|"]
     for key in SLICES:
-        a, b = prev_d.get(key), current.get(key)
+        a, b = _num(prev_d.get(key)), _num(current.get(key))
         if a is None or b is None:
             continue
         name = key.replace("val_bpb_", "") or "mixed"
         rows.append(f"| {name} | {a:.4f} | {b:.4f} | {b - a:+.4f} |")
+    if len(rows) == 2:
+        return []
+    return (["## Что сдвинулось с прошлого чекпойнта", "",
+             "Δ < 0 — лучше. Разные знаки в одном столбце значат смену "
+             "распределения, а не общий регресс.", ""] + rows + [""])
     if len(rows) == 2:
         return []
     return (["## Что сдвинулось с прошлого чекпойнта", "",
@@ -438,6 +458,25 @@ def patch_minutes(minutes: int, session: int, push_dir: Path | None = None) -> b
     return bool(hits)
 
 
+def _state_path() -> Path:
+    return ROOT / "data" / "finish_state.json"
+
+
+def load_state() -> dict:
+    try:
+        return json.loads(_state_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def save_state(state: dict) -> None:
+    p = _state_path()
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n",
+                   encoding="utf-8")
+    tmp.replace(p)
+
+
 def finish_one(session: int, start_step: int | None, hours: float, out: Path,
                push: bool, next_minutes: int | None,
                end_by: str | None = None) -> int | None:
@@ -474,14 +513,62 @@ def finish_one(session: int, start_step: int | None, hours: float, out: Path,
         say(f"  start step inferred from log.csv: {start_step:,}", session)
     say(f"log rows: {len(train)} train / {len(val)} val | last.pt step {step}", session)
 
-    published = publish_ckpt(info, session)
-    samples = run_generation(session, out)
-    png = run_plot(session)
-    mail_report(session, out, train, val, info, start_step, samples,
-                png, notebook_minutes())
+    # A watch that is restarted (a reboot, a killed process, or the repeating
+    # trigger this task uses) finds the same finished run on disk.  Publishing
+    # it again uploads 115 MB and mails a second report; on 2026-11-08 a report
+    # that kept raising did exactly that every 15 minutes for five hours.  So a
+    # step that was already handled is not handled twice, and a step that was
+    # already pushed does not get a second session.
+    state = load_state()
+    done = state.get(KERNEL) or {}
+    same_step = bool(step) and int(done.get("step") or 0) == int(step)
+    if same_step:
+        attempts = int(done.get("attempts") or 0)
+        if attempts >= 3 and not done.get("pushed"):
+            say(f"step {step:,} has been retried {attempts} times without "
+                f"getting past the report: stopping the watch so it cannot "
+                f"loop.  Read this log, fix the failure, re-arm", session)
+            return None
+        done["attempts"] = attempts + 1
+    else:
+        done = {"step": int(step or 0), "attempts": 1, "pushed": False}
+    state[KERNEL] = done
+    save_state(state)
+
+    if same_step and done.get("published") and done.get("reported"):
+        say(f"step {step:,} is already published and reported: skipping the "
+            f"upload, the generation and the mail", session)
+        published = True
+        samples = png = None
+    elif same_step and done.get("published"):
+        # The upload went through but the report did not (a crash in the middle
+        # of it).  Re-sending 115 MB would be the wrong repair; the report is.
+        say(f"step {step:,} is published but was never reported: redoing only "
+            f"the generation and the mail", session)
+        published = True
+        samples = run_generation(session, out)
+        png = run_plot(session)
+        mail_report(session, out, train, val, info, start_step, samples,
+                    png, notebook_minutes())
+        done["reported"] = True
+        save_state(state)
+    else:
+        published = publish_ckpt(info, session)
+        done["published"] = bool(published)
+        save_state(state)
+        samples = run_generation(session, out)
+        png = run_plot(session)
+        mail_report(session, out, train, val, info, start_step, samples,
+                    png, notebook_minutes())
+        done["reported"] = True
+        save_state(state)
 
     if not push:
         say("--no-push: stopping here", session)
+        return None
+    if done.get("pushed") and same_step:
+        say(f"step {step:,} was already pushed as the next session: stopping "
+            f"instead of starting a second one", session)
         return None
     if not published:
         say("checkpoint not published: refusing to start the next session", session)
@@ -503,6 +590,9 @@ def finish_one(session: int, start_step: int | None, hours: float, out: Path,
         if r.returncode != 0 or "error" in low or "quota" in low:
             say("  the next stage was NOT pushed: stopping here", session)
             return None
+        done["pushed"] = True
+        state[KERNEL] = done
+        save_state(state)
         say(f"  {THEN_PUSH_DIR} pushed; it is a different kernel, so this watch "
             f"ends here -- start a watcher for it", session)
         return None
@@ -533,6 +623,9 @@ def finish_one(session: int, start_step: int | None, hours: float, out: Path,
                 session)
         say("  the next session was NOT pushed: stopping the chain", session)
         return None
+    done["pushed"] = True
+    state[KERNEL] = done
+    save_state(state)
     if not wait_for_restart(session):
         return None
     return step
