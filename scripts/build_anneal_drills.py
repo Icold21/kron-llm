@@ -55,6 +55,10 @@ def main() -> None:
                     help="per-language pool size in MB of rendered text")
     ap.add_argument("--out-dir", default=str(MIX))
     ap.add_argument("--seed", type=int, default=20261101)
+    ap.add_argument("--bare-share", type=float, default=0.25,
+                    help="fraction of the pool written as plain 'a op b = c' "
+                         "lines instead of chat drills: the bare arithmetic "
+                         "probe feeds a raw continuation, not a chat turn")
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -84,7 +88,9 @@ def main() -> None:
             tail = "Answer" if lang == "en" else "Ответ"
             messages = [
                 {"role": "user", "content": question},
-                {"role": "assistant", "content": f"{cot}\n\n{tail}: {answer}"},
+                {"role": "assistant",
+                 "content": (str(answer) if not cot.strip()
+                             else f"{cot}\n\n{tail}: {answer}")},
             ]
             text, _ = render(messages)
             if not (MIN_CHARS <= len(text) <= MAX_CHARS):
@@ -113,6 +119,33 @@ def main() -> None:
             kept += 1
             if kept % 20_000 == 0:
                 print(f"  [{lang}] {kept:,} records, {used/1e6:.1f} MB")
+
+        # Plain equation lists.  The probe prompt is "67 + 75 = " with no frame,
+        # so the continuation shape has to exist as text, not only inside a chat
+        # turn -- that is the difference between 1/60 and the drill's 41/60.
+        bare_target = int(target * args.bare_share)
+        bare_used = 0
+        while bare_used < bare_target:
+            lines = []
+            for _ in range(rng.randint(6, 20)):
+                a, b = rng.randint(10, 999), rng.randint(10, 999)
+                op = rng.choice(["+", "-"])
+                if op == "-" and b > a:
+                    a, b = b, a
+                value = a + b if op == "+" else a - b
+                lines.append(f"{a} {op} {b} = {value}")
+            text = "\n".join(lines)
+            digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            if digest in seen:
+                continue
+            seen.add(digest)
+            docs.append({"title": "", "text": text, "language": lang,
+                         "domain": "drills", "source": "synthetic:arith_bare",
+                         "licence": "CC0-1.0", "url": "", "sha256": digest,
+                         "family": "bare_equations"})
+            bare_used += len(text.encode("utf-8"))
+            used += len(text.encode("utf-8"))
+            kept += 1
 
         path = out_dir / f"{lang}_drills.jsonl.gz"
         with gzip.open(path, "wt", encoding="utf-8", compresslevel=6) as fh:

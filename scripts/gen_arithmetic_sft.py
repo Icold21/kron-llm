@@ -552,18 +552,52 @@ def ru_mul_columns(rng: random.Random) -> Case:
     return q, cot, str(result)
 
 
+# ---------------------------------------------------------------------------
+# The bare form.  Every family above answers with a procedure, and the model
+# learned exactly that: 41/60 in the drill format, 1/60 on "67 + 75 = ", which
+# never appears as a question anywhere in the corpus.  An empty chain of thought
+# means "render question -> number", and the renderers honour it.
+# ---------------------------------------------------------------------------
+def en_bare(rng: random.Random) -> Case:
+    """Expression in, number out.  The expression itself is language-neutral."""
+    kind = rng.random()
+    if kind < 0.45:
+        a, b = rng.randint(10, 99), rng.randint(10, 99)
+        op = rng.choice(["+", "-"])
+    elif kind < 0.75:
+        a, b = rng.randint(100, 999), rng.randint(10, 999)
+        op = rng.choice(["+", "-"])
+    else:
+        a, b = rng.randint(2, 12), rng.randint(2, 9)
+        op = "*"
+    if op == "-" and b > a:
+        a, b = b, a
+    value = a + b if op == "+" else (a - b if op == "-" else a * b)
+    return f"{a} {op} {b} =", "", str(value)
+
+
+ru_bare = en_bare
+
+
+def is_direct(cot: str) -> bool:
+    """An empty chain of thought marks the short answer form."""
+    return not cot.strip()
+
+
 FAMILIES: Dict[str, Tuple[List[Callable[[random.Random], Case]], str]] = {
     "en": ([(f, 1) for f in
             (en_add, en_sub, en_mul, en_div, en_mul_add, en_paren,
              en_percent, en_avg, en_fraction, en_speed, en_money, en_gcd,
              en_sequence)] +
-           [(en_add_columns, 2), (en_sub_columns, 2), (en_mul_columns, 2)],
+           [(en_add_columns, 2), (en_sub_columns, 2), (en_mul_columns, 2),
+            (en_bare, 3)],
            "en"),
     "ru": ([(f, 1) for f in
             (ru_add, ru_sub, ru_mul, ru_div, ru_mul_add, ru_paren,
              ru_percent, ru_avg, ru_fraction, ru_speed, ru_money, ru_gcd,
              ru_sequence)] +
-           [(ru_add_columns, 2), (ru_sub_columns, 2), (ru_mul_columns, 2)],
+           [(ru_add_columns, 2), (ru_sub_columns, 2), (ru_mul_columns, 2),
+            (ru_bare, 3)],
            "ru"),
 }
 
@@ -608,8 +642,9 @@ def main() -> None:
                     "messages": [
                         {"role": "user", "content": question},
                         {"role": "assistant",
-                         "content": f"{cot}\n\nAnswer: {answer}"
-                         if lang == "en" else f"{cot}\n\nОтвет: {answer}"},
+                         "content": str(answer) if is_direct(cot) else
+                         (f"{cot}\n\nAnswer: {answer}" if lang == "en"
+                          else f"{cot}\n\nОтвет: {answer}")},
                     ],
                     "lang": lang, "domain": "math", "task": "math_arith",
                     "source": SOURCE_NAME[lang], "licence": "CC0-1.0",
