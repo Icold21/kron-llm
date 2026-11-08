@@ -21,6 +21,7 @@ become single ids while rare byte triples stay split.
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 from pathlib import Path
 from typing import Any, List, Mapping, Optional, Sequence
@@ -318,9 +319,15 @@ def encode_docs(docs: Sequence[dict], tok: BPETokenizer,
     index: list[tuple[int, int, int]] = []
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    # ``docs`` may be a generator: the bin build streams one domain bucket at a
+    # time so that peak memory is the largest bucket instead of the whole mix
+    # (9.5 GB of text as Python strings is 12 GB+, and the box has 32).
+    source = iter(docs)
     with open(out_path, "wb") as fh:
-        for start in range(0, len(docs), chunk):
-            batch = docs[start:start + chunk]
+        while True:
+            batch = list(itertools.islice(source, chunk))
+            if not batch:
+                break
             texts = []
             sizes = []
             for doc in batch:

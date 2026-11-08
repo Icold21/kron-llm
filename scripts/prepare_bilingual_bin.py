@@ -33,6 +33,12 @@ def load_mixed(mix_dir: Path) -> list[dict]:
 
     Accepts both gzipped shards (the corpus build) and plain ``.jsonl`` (the
     curated decay mix, which is consumed once and does not pay for gzip).
+
+    Only ``text``/``language``/``domain`` survive the parse: the shards also
+    carry ``title``, ``url``, ``sha256``, ``source``, ``licence`` and ``family``,
+    and at ~880k documents those extra keys are another gigabyte of dict slots on
+    top of the text itself.  Nothing downstream reads them -- the bin needs the
+    text, the index needs the span, and the meta counts documents per domain.
     """
     docs: list[dict] = []
     shards = sorted(list(mix_dir.glob("*.jsonl.gz")) + list(mix_dir.glob("*.jsonl")))
@@ -44,10 +50,10 @@ def load_mixed(mix_dir: Path) -> list[dict]:
                 line = line.strip()
                 if not line:
                     continue
-                doc = json.loads(line)
-                doc.setdefault("language", lang)
-                doc.setdefault("domain", domain)
-                docs.append(doc)
+                raw = json.loads(line)
+                docs.append({"text": raw["text"],
+                             "language": raw.get("language", lang),
+                             "domain": raw.get("domain", domain)})
     return docs
 
 
