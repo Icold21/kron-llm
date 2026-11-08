@@ -54,8 +54,38 @@ def column_families(arith, lang: str):
     return [fn for fn, _ in families if "column" in fn.__name__]
 
 
+ROW_RE = re.compile(r"(\d+)\s*([+\-×*])\s*(\d+)\s*=\s*(-?\d+)")
+
+
+def answer_value(answer) -> int:
+    """The families format the answer for display; the metric needs the number.
+
+    Comparing ``int(matched) == answer`` with ``answer`` still a string is always
+    False, which is how this evaluator reported 0/60 arithmetic on every
+    checkpoint it was ever run on.
+    """
+    return int(str(answer).replace(",", "").replace(" ", "").strip())
+
+
+def first_row_ok(text: str) -> bool:
+    """Is the first computed row arithmetically true?
+
+    The previous check compared the first ``=`` value with the *final answer*.
+    For a column drill those are different things by construction -- ``3 + 3 =
+    6`` against ``1276`` -- so it reported 0/60 even when every row was right.
+    This one checks the equation the model actually wrote.
+    """
+    for m in ROW_RE.finditer(text):
+        a, op, b, c = (int(m.group(1)), m.group(2), int(m.group(3)),
+                       int(m.group(4)))
+        want = a + b if op == "+" else (a - b if op == "-" else a * b)
+        return want == c
+    return False
+
+
 @torch.no_grad()
-def run(model, tok, arith, build_sft, per_lang: int, seed: int = 11) -> dict:
+def run(model, tok, arith, build_sft, per_lang: int, seed: int = 11,
+        max_new_tokens: int = 90) -> dict:
     rng = random.Random(seed)
     out: dict = {"per_language": {}, "answer_line": 0, "first_row": 0,
                  "total": 0, "examples": []}
@@ -65,6 +95,7 @@ def run(model, tok, arith, build_sft, per_lang: int, seed: int = 11) -> dict:
         hits_line = hits_row = 0
         for i in range(per_lang):
             question, cot, answer = fams[i % len(fams)](rng)
+            want = answer_value(answer)
             messages = [
                 {"role": "system", "content": build_sft.SYSTEM},
                 {"role": "user", "content": question},
@@ -73,20 +104,20 @@ def run(model, tok, arith, build_sft, per_lang: int, seed: int = 11) -> dict:
             ]
             _, prompt = build_sft.render(messages)
             ids = torch.tensor([tok.encode(prompt)])
-            gen = model.generate(ids, max_new_tokens=90, temperature=0.0,
+            gen = model.generate(ids, max_new_tokens=max_new_tokens,
+                                 temperature=0.0,
                                  top_k=1, top_p=1.0, repetition_penalty=1.0)
             text = tok.decode(gen[0, ids.shape[1]:].tolist())
             m = re.search(word + r"\s*(-?\d+)", text)
-            line_ok = bool(m) and int(m.group(1)) == answer
-            rows = re.findall(r"=\s*(-?\d+)", text)
-            row_ok = bool(rows) and int(rows[0]) == answer
+            line_ok = bool(m) and int(m.group(1)) == want
+            row_ok = first_row_ok(text)
             hits_line += int(line_ok)
             hits_row += int(row_ok)
             out["total"] += 1
             out["answer_line"] += int(line_ok)
             out["first_row"] += int(row_ok)
             if len(out["examples"]) < 3:
-                out["examples"].append({"prompt": question, "want": answer,
+                out["examples"].append({"prompt": question, "want": want,
                                         "got": text[:300], "ok": line_ok})
         out["per_language"][lang] = {"n": per_lang, "answer_line": hits_line,
                                      "first_row": hits_row}
@@ -98,6 +129,9 @@ def main() -> None:
     ap.add_argument("--ckpt", type=Path, required=True)
     ap.add_argument("--n", type=int, default=60, help="examples, split EN/RU")
     ap.add_argument("--device", default="cpu")
+    ap.add_argument("--max-new-tokens", type=int, default=90,
+                    help="a 3-digit column drill runs ~70 tokens; the answer "
+                         "line is the last thing the model writes")
     ap.add_argument("--out", type=Path, default=Path("data/eval_arith_drill.json"))
     args = ap.parse_args()
 
@@ -116,7 +150,8 @@ def main() -> None:
     step = int(state.get("step") or 0)
     print(f"[load] step {step:,} on {args.device}")
 
-    report = run(model, tok, arith, build_sft, args.n // 2)
+    report = run(model, tok, arith, build_sft, args.n // 2,
+                  max_new_tokens=args.max_new_tokens)
     report["step"] = step
     header = {"n": report["total"],
               "answer_line": report["answer_line"] / max(1, report["total"]),
