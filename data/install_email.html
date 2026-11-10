@@ -1,0 +1,26 @@
+<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1b1b1b"><h1 style="font-size:20px;margin:18px 0 6px">URL не тот: это страница репозитория, а не архив</h1>
+<p style="margin:8px 0"><code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">pip</code> умеет ставить только из архива (<code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">.zip</code>/<code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">.tar.gz</code>) или из VCS-ссылки. <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">https://github.com/Icold21/kron-llm</code> — это HTML-страница репозитория, поэтому pip честно скачал 468 КБ разметки и сказал <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">cannot detect archive format</code>. Дело не в репозитории и не в сети: пакет собирается нормально, я проверил прямо сейчас — <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">pip install --dry-run</code> отвечает <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">Would install kronllm-2.0.0</code>.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Три правильных варианта</h2>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace"># 1. архив, git не нужен
+pip install https://github.com/Icold21/kron-llm/archive/refs/heads/main.zip
+
+# 2. через git (git должен быть установлен)
+pip install "git+https://github.com/Icold21/kron-llm.git"
+
+# 3. для разработки: клон + редактируемая установка
+git clone https://github.com/Icold21/kron-llm.git
+cd kron-llm
+pip install -e ".[dev]"</pre>
+<p style="margin:8px 0">Разница между 1 и 2 только в том, чем pip качает: zip по HTTPS или git-протокол. Пункт 3 — то, что нужно, если собираешься что-то править.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Две ловушки, которые ждут дальше</h2>
+<p style="margin:8px 0"><strong>Torch.</strong> В <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">pyproject.toml</code> зависимость <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">torch&gt;=2.4</code>, и на Windows pip по умолчанию тянет сборку с CUDA — это ~2.5 ГБ. Если на ноуте нет NVIDIA, сначала поставь CPU-колесо, потом остальное:</p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install https://github.com/Icold21/kron-llm/archive/refs/heads/main.zip</pre>
+<p style="margin:8px 0">Второй pip увидит, что torch уже есть, и не будет его перекачивать.</p>
+<p style="margin:8px 0"><strong>Твои таймауты.</strong> В логе дважды <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">Connection to github.com timed out</code> — канал до GitHub нестабильный. Архивная ссылка редиректит на <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">codeload.github.com</code>, так что проверь, что и он открывается; если сеть совсем плохая, добавь <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">--timeout 60 --retries 5</code>.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Что теперь есть в README</h2>
+<p style="margin:8px 0">Дописал в раздел «6. Running» все три формы установки и отдельно — именно эту ловушку с URL, чтобы она не повторялась. Плюс команда <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">kronllm</code> после установки доступна как обычный CLI (<code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">kronllm train --exp ...</code>).</p>
+<p style="margin:8px 0">Если после установки хочется просто проверить, что всё живое:</p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">python -c "import kronllm, kronllm.cli; print(kronllm.__version__ if hasattr(kronllm,'__version__') else 'ok')"
+python -m kronllm.cli budget</pre>
+<p style="margin:8px 0"><code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">budget</code> печатает таблицу параметров по конфигурациям и падает с кодом 1, если конфигурация вылезает за 10M — быстрый способ убедиться, что пакет собран и конфиги читаются.</p></div>

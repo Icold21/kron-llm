@@ -1,45 +1,47 @@
 {
   "mixed": {
     "en": {
-      "code": 143000163,
-      "logic": 52035748,
-      "science": 117119976,
-      "math": 338018777,
-      "literature": 195536549,
-      "encyclopedic": 208004932,
-      "ml": 91001032,
-      "cs": 130001236,
+      "code": 550002013,
+      "logic": 131474336,
+      "science": 450000332,
+      "math": 1258492181,
+      "literature": 750247356,
+      "encyclopedic": 800002627,
+      "ml": 350000288,
+      "cs": 500000510,
       "humour": 11404092,
       "identity": 954636
     },
     "ru": {
-      "math": 195007579,
-      "science": 150035895,
-      "logic": 30100274,
-      "literature": 225054516,
-      "encyclopedic": 510005260,
-      "ml": 15004863,
-      "cs": 315001261,
+      "math": 637095136,
+      "science": 490063117,
+      "logic": 98009637,
+      "literature": 735005606,
+      "encyclopedic": 1666001130,
+      "ml": 17421718,
+      "cs": 1029001239,
       "identity": 1439448,
       "code": 19981874
     }
   },
-  "mixed_total_bytes": 2748708111,
-  "ru_share": 0.5318,
+  "mixed_total_bytes": 9496597276,
+  "ru_share": 0.4943,
   "documents": {
-    "en": 96882,
-    "ru": 93031
+    "en": 565885,
+    "ru": 313050
   },
   "shortfalls": [
-    "en/humour: 11 of 13 MB",
-    "en/identity: 1 of 13 MB",
-    "ru/code: 20 of 45 MB",
+    "en/logic: 131 of 200 MB",
+    "en/humour: 11 of 50 MB",
+    "en/identity: 1 of 50 MB",
+    "ru/code: 20 of 147 MB",
+    "ru/ml: 17 of 49 MB",
     "ru/humour: nothing available",
-    "ru/identity: 1 of 8 MB"
+    "ru/identity: 1 of 24 MB"
   ],
   "budgets_mb": {
-    "en": 1300.0,
-    "ru": 1500.0
+    "en": 5000.0,
+    "ru": 4900.0
   },
   "dedupe": "exact sha256 + 2 KB prefix"
 }

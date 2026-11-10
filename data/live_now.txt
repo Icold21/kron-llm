@@ -1,0 +1,6 @@
+﻿me":"stderr","time":30108.87351036,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":30110.002613522,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":30110.115100402,"data":"[NbConvertApp] Writing 48568 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":30112.77384039,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":30113.638979625,"data":"[NbConvertApp] Writing 328127 bytes to __results__.html\n"}
+]

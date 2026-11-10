@@ -1,0 +1,95 @@
+{
+  "type": "bpe",
+  "tokenizer": "data/bilingual/tokenizer.json",
+  "vocab_size": 8192,
+  "eot_id": 8191,
+  "chat_tokens": {
+    "system": 8187,
+    "user": 8188,
+    "assistant": 8189,
+    "eot": 8190
+  },
+  "endoftext_id": 8191,
+  "bytes_per_token": 3.6942873873459674,
+  "train_tokens": 2368625438,
+  "val_tokens": 46197636,
+  "train_bytes": 8889828371,
+  "val_bytes": 170667344,
+  "merge_docs": 7462,
+  "merge_bytes": 29022231,
+  "language": {
+    "en": {
+      "bytes": 83436425,
+      "tokens": 28604250,
+      "bytes_per_token": 2.917
+    },
+    "ru": {
+      "bytes": 87230919,
+      "tokens": 17574174,
+      "bytes_per_token": 4.964
+    }
+  },
+  "token_share": {
+    "en": 0.6194,
+    "ru": 0.3806
+  },
+  "byte_share": {
+    "en": 0.4889,
+    "ru": 0.5111
+  },
+  "val_fraction": 0.02,
+  "anneal": false,
+  "phase": "epoch",
+  "anneal_source": "data/bilingual",
+  "domain_prompts": {
+    "enabled": true,
+    "rate": 1.0,
+    "prompted_docs": 964626,
+    "already_prompted_docs": 63744,
+    "docs": 1028370,
+    "by_domain": {
+      "en/code": 65156,
+      "en/cs": 13364,
+      "en/encyclopedic": 95796,
+      "en/humour": 32,
+      "en/identity": 12936,
+      "en/literature": 6110,
+      "en/logic": 11255,
+      "en/math": 172374,
+      "en/ml": 190481,
+      "en/science": 43102,
+      "ru/cs": 1996,
+      "ru/encyclopedic": 202907,
+      "ru/identity": 12936,
+      "ru/literature": 105566,
+      "ru/logic": 3227,
+      "ru/math": 14773,
+      "ru/ml": 904,
+      "ru/science": 11711
+    },
+    "variants": {
+      "en/math": 6,
+      "en/science": 6,
+      "en/code": 6,
+      "en/logic": 6,
+      "en/literature": 6,
+      "en/encyclopedic": 6,
+      "en/cs": 6,
+      "en/ml": 6,
+      "en/humour": 3,
+      "en/identity": 3,
+      "en/chat": 6,
+      "ru/math": 6,
+      "ru/science": 6,
+      "ru/code": 6,
+      "ru/logic": 6,
+      "ru/literature": 6,
+      "ru/encyclopedic": 6,
+      "ru/cs": 6,
+      "ru/ml": 6,
+      "ru/humour": 3,
+      "ru/identity": 3,
+      "ru/chat": 6
+    }
+  }
+}

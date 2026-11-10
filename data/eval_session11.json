@@ -1,0 +1,90 @@
+{
+  "ckpt": "E:\\kron_out\\session11\\q10a\\last.pt",
+  "step": 88936,
+  "device": "cuda",
+  "seq": 256,
+  "continuation": {
+    "blocks": 64,
+    "bpb": 1.118370626902522,
+    "per_language": {
+      "en": 1.2870480235923913,
+      "ru": 0.9634452569685609
+    },
+    "counts": {
+      "en": 40,
+      "ru": 24
+    }
+  },
+  "ranking": {
+    "prefixes": 64,
+    "distractors": 8,
+    "accuracy": 0.328125,
+    "mean_rank": 2.96875,
+    "chance_accuracy": 0.1111111111111111
+  },
+  "arithmetic": {
+    "n": 60,
+    "exact_match": 0.016666666666666666,
+    "examples": [
+      {
+        "prompt": "51 - 29 = ",
+        "got": "111.\n\n",
+        "want": 22,
+        "ok": false
+      },
+      {
+        "prompt": "93 + 16 = ",
+        "got": "10 -> write ",
+        "want": 109,
+        "ok": false
+      },
+      {
+        "prompt": "78 - 22 = ",
+        "got": "124\nКол",
+        "want": 56,
+        "ok": false
+      },
+      {
+        "prompt": "84 + 17 = ",
+        "got": "101\nКол",
+        "want": 101,
+        "ok": true
+      },
+      {
+        "prompt": "14 - 21 = ",
+        "got": "11, so the s",
+        "want": -7,
+        "ok": false
+      },
+      {
+        "prompt": "63 + 18 = ",
+        "got": "101\nКол",
+        "want": 81,
+        "ok": false
+      },
+      {
+        "prompt": "21 - 80 = ",
+        "got": "122.\n\n",
+        "want": -59,
+        "ok": false
+      },
+      {
+        "prompt": "17 + 82 = ",
+        "got": "161\nКол",
+        "want": 99,
+        "ok": false
+      }
+    ]
+  },
+  "longform": {
+    "samples": 24,
+    "repeat_4gram": 0.08674863387978142,
+    "distinct_2": 0.8399470899470899,
+    "examples": [
+      "ml} for details.\n\"\"\"\n\nfrom __future__ import print_function\n\nimport re\n\nimport logging\nimport datetime\nimport time\nimport time\nimport time\nimport boto\nimport os\nimport datetime\nimport urll",
+      "f_spec} for details.\n\n\n\"\"\"\nimport torch\n    import re\n    import re\nfrom datetime import dtypes as dtypes, dtypes\nfrom sdk import RuntimeError\nfrom dtypes import DESCRIPTION, DE",
+      "xt} for details\n\"\"\"\n\nfrom django.contrib import util\nimport time\nimport time\nimport subprocess\nimport numpy as np\n\nfrom django.core.highlight_exception import STATICK_SIZE",
+      "imer} for further details.\n\"\"\"\nfrom __future__ import absolute_import, print_function\n\nimport sys\n    import os\nimport parsing import subprocess\n\n\nclass ConfigError(Exception):\n    \"\"\"Configure this module.\n\n    @"
+    ]
+  }
+}

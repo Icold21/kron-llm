@@ -1,0 +1,90 @@
+{
+  "ckpt": "data\\kaggle_out\\q10\\last.pt",
+  "step": 43895,
+  "device": "cuda",
+  "seq": 256,
+  "continuation": {
+    "blocks": 64,
+    "bpb": 1.1212076209514505,
+    "per_language": {
+      "en": 1.2908054828288313,
+      "ru": 0.9760361475558135
+    },
+    "counts": {
+      "en": 40,
+      "ru": 24
+    }
+  },
+  "ranking": {
+    "prefixes": 64,
+    "distractors": 8,
+    "accuracy": 0.390625,
+    "mean_rank": 2.625,
+    "chance_accuracy": 0.1111111111111111
+  },
+  "arithmetic": {
+    "n": 60,
+    "exact_match": 0.016666666666666666,
+    "examples": [
+      {
+        "prompt": "51 - 29 = ",
+        "got": "200000",
+        "want": 22,
+        "ok": false
+      },
+      {
+        "prompt": "93 + 16 = ",
+        "got": "100000",
+        "want": 109,
+        "ok": false
+      },
+      {
+        "prompt": "78 - 22 = ",
+        "got": "200000",
+        "want": 56,
+        "ok": false
+      },
+      {
+        "prompt": "84 + 17 = ",
+        "got": "200000",
+        "want": 101,
+        "ok": false
+      },
+      {
+        "prompt": "14 - 21 = ",
+        "got": "200000",
+        "want": -7,
+        "ok": false
+      },
+      {
+        "prompt": "63 + 18 = ",
+        "got": "0.05 + ",
+        "want": 81,
+        "ok": false
+      },
+      {
+        "prompt": "21 - 80 = ",
+        "got": "0.0000",
+        "want": -59,
+        "ok": false
+      },
+      {
+        "prompt": "17 + 82 = ",
+        "got": "100000",
+        "want": 99,
+        "ok": false
+      }
+    ]
+  },
+  "longform": {
+    "samples": 24,
+    "repeat_4gram": 0.0942622950819672,
+    "distinct_2": 0.8128306878306878,
+    "examples": [
+      "el:diff\n\n# The following is the standard LABLIST API:\n\n1. Runtime Visuals\n2. Postel LLC\n3. Additional LLC\n4. Additional LLC\n5. Match Part of",
+      "ab_doc_mode} for details.\n\n\"\"\"\n\nimport os\n\n# TODO:\n# TODO: INSTORUCE OF THE AUTHOR: WHITE FROAD AND R",
+      "pf} for a MACE_LASS.\n\"\"\"\n\nimport os\n\nimport os\nimport csv\nimport csv\nfrom functools import Function\nimport csv.util\nimport logging\n\nfrom scripts import PlugF",
+      "fsgmdz} to make it easy to copy a separate copy of the Dispatch Session\n\n\"\"\"\n\nimport pkgip\nimport os\nimport unittest\n\n\nfrom test_exit import test_reload, test_name\nfrom test_"
+    ]
+  }
+}

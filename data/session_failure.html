@@ -1,0 +1,34 @@
+<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1b1b1b"><p style="margin:8px 0">﻿# Q10: session failed, no progress</p>
+<p style="margin:8px 0">The kernel ended with status <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">icold21/kron-q10-10m-bilingual-pretraining has status "KernelWorkerStatus.COMPLETE"</code>, but the output has no step beyond 35100. No new checkpoint was written, so nothing is published and nothing is resumed.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Log tail</h2>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">C:\Users\Icold\Desktop\kron_llm\scripts\chain_q10.ps1:138 знак:9
++         python scripts\kaggle_log.py "" 20 4000 &gt; data\session_failur ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Exception in thread Thread-1 (worker)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "C:\Users\Icold\AppData\Local\Programs\Python\Python311\Lib\threading.py", line 1038, in _bootstrap_inner
+    self.run()
+  File "C:\Users\Icold\AppData\Local\Programs\Python\Python311\Lib\threading.py", line 975, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\Icold\Desktop\kron_llm\scripts\kaggle_log.py", line 58, in worker
+    resp = k.kernels.kernels_api_client.get_kernel_session_logs_stream(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Icold\AppData\Local\Programs\Python\Python311\Lib\site-packages\kagglesdk\kernels\services\kernels_api
+_service.py", line 170, in get_kernel_session_logs_stream
+    return self._client.call("kernels.KernelsApiService", "GetKernelSessionLogsStream", request, FileDownload)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Icold\AppData\Local\Programs\Python\Python311\Lib\site-packages\kagglesdk\kaggle_http_client.py", line
+ 106, in call
+    response = self._prepare_response(response_type, http_response)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Icold\AppData\Local\Programs\Python\Python311\Lib\site-packages\kagglesdk\kaggle_http_client.py", line
+ 134, in _prepare_response
+    http_response.raise_for_status()
+  File "C:\Users\Icold\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\models.py", line 1167, in rai
+se_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 404 Client Error: Not Found for url: https://api.kaggle.com/v1/kernels.KernelsApiService
+/GetKernelSessionLogsStream
+[log] no data (session may not have started)</pre></div>

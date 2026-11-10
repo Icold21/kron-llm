@@ -1,0 +1,7190 @@
+{
+ "source": "gpt2",
+ "blocks": 1024,
+ "span": "uniform",
+ "bytes": 1932427,
+ "nats": 2081554.5372489095,
+ "bpb": 1.554029419082285,
+ "by_language": {
+  "en": {
+   "blocks": 636,
+   "bytes": 945781,
+   "bpb": 1.306069344568795
+  },
+  "ru": {
+   "blocks": 388,
+   "bytes": 986646,
+   "bpb": 1.7917194591102619
+  }
+ },
+ "per_block": [
+  {
+   "start": 0,
+   "lang": "en",
+   "bytes": 1371,
+   "nats": 1573.298542022705,
+   "gpt2_tokens": 514
+  },
+  {
+   "start": 45056,
+   "lang": "en",
+   "bytes": 553,
+   "nats": 882.3460328578949,
+   "gpt2_tokens": 459
+  },
+  {
+   "start": 90112,
+   "lang": "en",
+   "bytes": 1588,
+   "nats": 1438.4730055332184,
+   "gpt2_tokens": 603
+  },
+  {
+   "start": 135680,
+   "lang": "en",
+   "bytes": 1773,
+   "nats": 1688.1222295761108,
+   "gpt2_tokens": 627
+  },
+  {
+   "start": 180736,
+   "lang": "en",
+   "bytes": 1136,
+   "nats": 3178.9565768241882,
+   "gpt2_tokens": 449
+  },
+  {
+   "start": 225792,
+   "lang": "en",
+   "bytes": 1349,
+   "nats": 1035.3528742790222,
+   "gpt2_tokens": 669
+  },
+  {
+   "start": 270848,
+   "lang": "en",
+   "bytes": 1551,
+   "nats": 1379.8673458099365,
+   "gpt2_tokens": 696
+  },
+  {
+   "start": 315904,
+   "lang": "en",
+   "bytes": 1368,
+   "nats": 1331.9163966178894,
+   "gpt2_tokens": 551
+  },
+  {
+   "start": 361472,
+   "lang": "en",
+   "bytes": 986,
+   "nats": 1256.0745875835419,
+   "gpt2_tokens": 499
+  },
+  {
+   "start": 406528,
+   "lang": "en",
+   "bytes": 1518,
+   "nats": 1516.7836685180664,
+   "gpt2_tokens": 788
+  },
+  {
+   "start": 451584,
+   "lang": "en",
+   "bytes": 1587,
+   "nats": 1180.8076095581055,
+   "gpt2_tokens": 740
+  },
+  {
+   "start": 496640,
+   "lang": "en",
+   "bytes": 1469,
+   "nats": 1465.7639784812927,
+   "gpt2_tokens": 619
+  },
+  {
+   "start": 541696,
+   "lang": "en",
+   "bytes": 1680,
+   "nats": 1701.538571357727,
+   "gpt2_tokens": 649
+  },
+  {
+   "start": 587264,
+   "lang": "en",
+   "bytes": 1305,
+   "nats": 885.3195538520813,
+   "gpt2_tokens": 362
+  },
+  {
+   "start": 632320,
+   "lang": "en",
+   "bytes": 1370,
+   "nats": 1191.5568180084229,
+   "gpt2_tokens": 561
+  },
+  {
+   "start": 677376,
+   "lang": "en",
+   "bytes": 1173,
+   "nats": 359.9909391403198,
+   "gpt2_tokens": 503
+  },
+  {
+   "start": 722432,
+   "lang": "en",
+   "bytes": 1331,
+   "nats": 1362.5322725772858,
+   "gpt2_tokens": 613
+  },
+  {
+   "start": 767488,
+   "lang": "en",
+   "bytes": 1407,
+   "nats": 1456.5987026691437,
+   "gpt2_tokens": 691
+  },
+  {
+   "start": 813056,
+   "lang": "en",
+   "bytes": 1732,
+   "nats": 1487.7610787153244,
+   "gpt2_tokens": 779
+  },
+  {
+   "start": 858112,
+   "lang": "en",
+   "bytes": 1612,
+   "nats": 1465.912353515625,
+   "gpt2_tokens": 681
+  },
+  {
+   "start": 903168,
+   "lang": "en",
+   "bytes": 1414,
+   "nats": 1378.4125499725342,
+   "gpt2_tokens": 486
+  },
+  {
+   "start": 948224,
+   "lang": "en",
+   "bytes": 1550,
+   "nats": 1611.4334230422974,
+   "gpt2_tokens": 703
+  },
+  {
+   "start": 993280,
+   "lang": "en",
+   "bytes": 1299,
+   "nats": 1557.5659923553467,
+   "gpt2_tokens": 526
+  },
+  {
+   "start": 1038848,
+   "lang": "en",
+   "bytes": 1221,
+   "nats": 1304.229701757431,
+   "gpt2_tokens": 555
+  },
+  {
+   "start": 1083904,
+   "lang": "en",
+   "bytes": 1575,
+   "nats": 1593.9502182006836,
+   "gpt2_tokens": 788
+  },
+  {
+   "start": 1128960,
+   "lang": "en",
+   "bytes": 1654,
+   "nats": 960.6070736646652,
+   "gpt2_tokens": 693
+  },
+  {
+   "start": 1174016,
+   "lang": "en",
+   "bytes": 1444,
+   "nats": 1509.075105190277,
+   "gpt2_tokens": 730
+  },
+  {
+   "start": 1219072,
+   "lang": "en",
+   "bytes": 1472,
+   "nats": 876.2278254032135,
+   "gpt2_tokens": 607
+  },
+  {
+   "start": 1264640,
+   "lang": "en",
+   "bytes": 1625,
+   "nats": 1119.3179845809937,
+   "gpt2_tokens": 724
+  },
+  {
+   "start": 1309696,
+   "lang": "en",
+   "bytes": 1570,
+   "nats": 1503.4773507118225,
+   "gpt2_tokens": 718
+  },
+  {
+   "start": 1354752,
+   "lang": "en",
+   "bytes": 1626,
+   "nats": 1210.6194895505905,
+   "gpt2_tokens": 785
+  },
+  {
+   "start": 1399808,
+   "lang": "en",
+   "bytes": 1525,
+   "nats": 1290.6410175561905,
+   "gpt2_tokens": 735
+  },
+  {
+   "start": 1444864,
+   "lang": "en",
+   "bytes": 1435,
+   "nats": 1039.1017091274261,
+   "gpt2_tokens": 582
+  },
+  {
+   "start": 1490432,
+   "lang": "en",
+   "bytes": 1549,
+   "nats": 1839.6805272102356,
+   "gpt2_tokens": 594
+  },
+  {
+   "start": 1535488,
+   "lang": "en",
+   "bytes": 1537,
+   "nats": 1607.7391285896301,
+   "gpt2_tokens": 542
+  },
+  {
+   "start": 1580544,
+   "lang": "en",
+   "bytes": 1542,
+   "nats": 1104.2549991607666,
+   "gpt2_tokens": 610
+  },
+  {
+   "start": 1625600,
+   "lang": "en",
+   "bytes": 926,
+   "nats": 846.4773230552673,
+   "gpt2_tokens": 393
+  },
+  {
+   "start": 1670656,
+   "lang": "en",
+   "bytes": 1591,
+   "nats": 1513.6940507888794,
+   "gpt2_tokens": 734
+  },
+  {
+   "start": 1716224,
+   "lang": "en",
+   "bytes": 1345,
+   "nats": 1508.544476032257,
+   "gpt2_tokens": 535
+  },
+  {
+   "start": 1761280,
+   "lang": "en",
+   "bytes": 970,
+   "nats": 850.3276262283325,
+   "gpt2_tokens": 518
+  },
+  {
+   "start": 1806336,
+   "lang": "en",
+   "bytes": 877,
+   "nats": 670.5656313896179,
+   "gpt2_tokens": 370
+  },
+  {
+   "start": 1851392,
+   "lang": "en",
+   "bytes": 1311,
+   "nats": 1759.5994937419891,
+   "gpt2_tokens": 455
+  },
+  {
+   "start": 1896448,
+   "lang": "en",
+   "bytes": 1464,
+   "nats": 1234.0794936418533,
+   "gpt2_tokens": 747
+  },
+  {
+   "start": 1942016,
+   "lang": "en",
+   "bytes": 1137,
+   "nats": 1097.560704946518,
+   "gpt2_tokens": 465
+  },
+  {
+   "start": 1987072,
+   "lang": "en",
+   "bytes": 1265,
+   "nats": 978.002600312233,
+   "gpt2_tokens": 763
+  },
+  {
+   "start": 2032128,
+   "lang": "en",
+   "bytes": 1357,
+   "nats": 1563.6566290855408,
+   "gpt2_tokens": 661
+  },
+  {
+   "start": 2077184,
+   "lang": "en",
+   "bytes": 1656,
+   "nats": 1478.4855976104736,
+   "gpt2_tokens": 968
+  },
+  {
+   "start": 2122240,
+   "lang": "en",
+   "bytes": 1437,
+   "nats": 1022.7809090614319,
+   "gpt2_tokens": 812
+  },
+  {
+   "start": 2167808,
+   "lang": "en",
+   "bytes": 1229,
+   "nats": 1057.3019189834595,
+   "gpt2_tokens": 454
+  },
+  {
+   "start": 2212864,
+   "lang": "en",
+   "bytes": 1257,
+   "nats": 1150.3359503746033,
+   "gpt2_tokens": 606
+  },
+  {
+   "start": 2257920,
+   "lang": "en",
+   "bytes": 1107,
+   "nats": 1106.20534324646,
+   "gpt2_tokens": 538
+  },
+  {
+   "start": 2302976,
+   "lang": "en",
+   "bytes": 1438,
+   "nats": 1431.4800386428833,
+   "gpt2_tokens": 628
+  },
+  {
+   "start": 2348032,
+   "lang": "en",
+   "bytes": 1613,
+   "nats": 818.2975788116455,
+   "gpt2_tokens": 744
+  },
+  {
+   "start": 2393600,
+   "lang": "en",
+   "bytes": 1527,
+   "nats": 1513.4945170879364,
+   "gpt2_tokens": 509
+  },
+  {
+   "start": 2438656,
+   "lang": "en",
+   "bytes": 1393,
+   "nats": 1466.2785937786102,
+   "gpt2_tokens": 619
+  },
+  {
+   "start": 2483712,
+   "lang": "en",
+   "bytes": 1350,
+   "nats": 1436.3457970619202,
+   "gpt2_tokens": 467
+  },
+  {
+   "start": 2528768,
+   "lang": "en",
+   "bytes": 1283,
+   "nats": 1587.5241317749023,
+   "gpt2_tokens": 494
+  },
+  {
+   "start": 2573824,
+   "lang": "en",
+   "bytes": 1302,
+   "nats": 1093.5470261573792,
+   "gpt2_tokens": 691
+  },
+  {
+   "start": 2619392,
+   "lang": "en",
+   "bytes": 1172,
+   "nats": 1196.8025949001312,
+   "gpt2_tokens": 659
+  },
+  {
+   "start": 2664448,
+   "lang": "en",
+   "bytes": 1308,
+   "nats": 1030.5622398853302,
+   "gpt2_tokens": 769
+  },
+  {
+   "start": 2709504,
+   "lang": "en",
+   "bytes": 1840,
+   "nats": 1521.649117052555,
+   "gpt2_tokens": 1295
+  },
+  {
+   "start": 2754560,
+   "lang": "en",
+   "bytes": 1548,
+   "nats": 1510.171091556549,
+   "gpt2_tokens": 890
+  },
+  {
+   "start": 2799616,
+   "lang": "en",
+   "bytes": 1559,
+   "nats": 1419.2825174331665,
+   "gpt2_tokens": 660
+  },
+  {
+   "start": 2845184,
+   "lang": "en",
+   "bytes": 1389,
+   "nats": 1314.9777116775513,
+   "gpt2_tokens": 619
+  },
+  {
+   "start": 2890240,
+   "lang": "en",
+   "bytes": 1373,
+   "nats": 1620.942421913147,
+   "gpt2_tokens": 548
+  },
+  {
+   "start": 2935296,
+   "lang": "en",
+   "bytes": 1562,
+   "nats": 1439.9813404083252,
+   "gpt2_tokens": 724
+  },
+  {
+   "start": 2980352,
+   "lang": "en",
+   "bytes": 847,
+   "nats": 971.6429829597473,
+   "gpt2_tokens": 525
+  },
+  {
+   "start": 3025408,
+   "lang": "en",
+   "bytes": 1162,
+   "nats": 1313.4060173034668,
+   "gpt2_tokens": 792
+  },
+  {
+   "start": 3070464,
+   "lang": "en",
+   "bytes": 1388,
+   "nats": 683.383806347847,
+   "gpt2_tokens": 746
+  },
+  {
+   "start": 3116032,
+   "lang": "en",
+   "bytes": 1698,
+   "nats": 1525.9300210475922,
+   "gpt2_tokens": 894
+  },
+  {
+   "start": 3161088,
+   "lang": "en",
+   "bytes": 1829,
+   "nats": 1288.509460926056,
+   "gpt2_tokens": 638
+  },
+  {
+   "start": 3206144,
+   "lang": "en",
+   "bytes": 1280,
+   "nats": 361.7580301761627,
+   "gpt2_tokens": 421
+  },
+  {
+   "start": 3251200,
+   "lang": "en",
+   "bytes": 1556,
+   "nats": 1208.1707772016525,
+   "gpt2_tokens": 749
+  },
+  {
+   "start": 3296256,
+   "lang": "en",
+   "bytes": 1475,
+   "nats": 1282.7634394168854,
+   "gpt2_tokens": 697
+  },
+  {
+   "start": 3341824,
+   "lang": "en",
+   "bytes": 1680,
+   "nats": 1186.6872755289078,
+   "gpt2_tokens": 811
+  },
+  {
+   "start": 3386880,
+   "lang": "en",
+   "bytes": 1456,
+   "nats": 1212.7254514694214,
+   "gpt2_tokens": 788
+  },
+  {
+   "start": 3431936,
+   "lang": "en",
+   "bytes": 1931,
+   "nats": 1094.8045068979263,
+   "gpt2_tokens": 1198
+  },
+  {
+   "start": 3476992,
+   "lang": "en",
+   "bytes": 1437,
+   "nats": 1525.7463812828064,
+   "gpt2_tokens": 407
+  },
+  {
+   "start": 3522048,
+   "lang": "en",
+   "bytes": 1453,
+   "nats": 1295.2806664705276,
+   "gpt2_tokens": 679
+  },
+  {
+   "start": 3567616,
+   "lang": "en",
+   "bytes": 1692,
+   "nats": 1526.7185872793198,
+   "gpt2_tokens": 831
+  },
+  {
+   "start": 3612672,
+   "lang": "en",
+   "bytes": 1126,
+   "nats": 1454.3634910583496,
+   "gpt2_tokens": 642
+  },
+  {
+   "start": 3657728,
+   "lang": "en",
+   "bytes": 1155,
+   "nats": 1303.3907606601715,
+   "gpt2_tokens": 577
+  },
+  {
+   "start": 3702784,
+   "lang": "en",
+   "bytes": 1286,
+   "nats": 2179.8086738586426,
+   "gpt2_tokens": 451
+  },
+  {
+   "start": 3747840,
+   "lang": "en",
+   "bytes": 1300,
+   "nats": 1470.4661102294922,
+   "gpt2_tokens": 458
+  },
+  {
+   "start": 3793408,
+   "lang": "en",
+   "bytes": 1283,
+   "nats": 827.4052820205688,
+   "gpt2_tokens": 696
+  },
+  {
+   "start": 3838464,
+   "lang": "en",
+   "bytes": 1245,
+   "nats": 1338.0253643989563,
+   "gpt2_tokens": 458
+  },
+  {
+   "start": 3883520,
+   "lang": "en",
+   "bytes": 1513,
+   "nats": 1321.5900194644928,
+   "gpt2_tokens": 595
+  },
+  {
+   "start": 3928576,
+   "lang": "en",
+   "bytes": 1135,
+   "nats": 1023.9619817733765,
+   "gpt2_tokens": 473
+  },
+  {
+   "start": 3973632,
+   "lang": "en",
+   "bytes": 1590,
+   "nats": 1537.5154099464417,
+   "gpt2_tokens": 577
+  },
+  {
+   "start": 4019200,
+   "lang": "en",
+   "bytes": 1509,
+   "nats": 1518.6119401454926,
+   "gpt2_tokens": 799
+  },
+  {
+   "start": 4064256,
+   "lang": "en",
+   "bytes": 1812,
+   "nats": 1252.4241924285889,
+   "gpt2_tokens": 715
+  },
+  {
+   "start": 4109312,
+   "lang": "en",
+   "bytes": 1339,
+   "nats": 1513.5553426742554,
+   "gpt2_tokens": 686
+  },
+  {
+   "start": 4154368,
+   "lang": "en",
+   "bytes": 1634,
+   "nats": 1540.7292623519897,
+   "gpt2_tokens": 748
+  },
+  {
+   "start": 4199424,
+   "lang": "en",
+   "bytes": 1367,
+   "nats": 1426.2269878387451,
+   "gpt2_tokens": 533
+  },
+  {
+   "start": 4244992,
+   "lang": "en",
+   "bytes": 1454,
+   "nats": 1280.6891479492188,
+   "gpt2_tokens": 592
+  },
+  {
+   "start": 4290048,
+   "lang": "en",
+   "bytes": 1429,
+   "nats": 1328.3034992218018,
+   "gpt2_tokens": 476
+  },
+  {
+   "start": 4335104,
+   "lang": "en",
+   "bytes": 963,
+   "nats": 1247.1344919204712,
+   "gpt2_tokens": 388
+  },
+  {
+   "start": 4380160,
+   "lang": "en",
+   "bytes": 848,
+   "nats": 1002.3533195257187,
+   "gpt2_tokens": 591
+  },
+  {
+   "start": 4425216,
+   "lang": "en",
+   "bytes": 1266,
+   "nats": 1499.7768919467926,
+   "gpt2_tokens": 391
+  },
+  {
+   "start": 4470784,
+   "lang": "en",
+   "bytes": 710,
+   "nats": 1957.1709423065186,
+   "gpt2_tokens": 396
+  },
+  {
+   "start": 4515840,
+   "lang": "en",
+   "bytes": 1374,
+   "nats": 1442.6220479011536,
+   "gpt2_tokens": 598
+  },
+  {
+   "start": 4560896,
+   "lang": "en",
+   "bytes": 1595,
+   "nats": 1013.1662130355835,
+   "gpt2_tokens": 520
+  },
+  {
+   "start": 4605952,
+   "lang": "en",
+   "bytes": 1211,
+   "nats": 917.2797716856003,
+   "gpt2_tokens": 583
+  },
+  {
+   "start": 4651008,
+   "lang": "en",
+   "bytes": 1595,
+   "nats": 1572.3478581905365,
+   "gpt2_tokens": 553
+  },
+  {
+   "start": 4696576,
+   "lang": "en",
+   "bytes": 1327,
+   "nats": 1393.8137197494507,
+   "gpt2_tokens": 570
+  },
+  {
+   "start": 4741632,
+   "lang": "en",
+   "bytes": 1284,
+   "nats": 1026.5692234039307,
+   "gpt2_tokens": 560
+  },
+  {
+   "start": 4786688,
+   "lang": "en",
+   "bytes": 1262,
+   "nats": 1371.3531422615051,
+   "gpt2_tokens": 391
+  },
+  {
+   "start": 4831744,
+   "lang": "en",
+   "bytes": 1251,
+   "nats": 845.4507675170898,
+   "gpt2_tokens": 656
+  },
+  {
+   "start": 4876800,
+   "lang": "en",
+   "bytes": 1398,
+   "nats": 1473.156593322754,
+   "gpt2_tokens": 569
+  },
+  {
+   "start": 4922368,
+   "lang": "en",
+   "bytes": 1560,
+   "nats": 1298.1743483543396,
+   "gpt2_tokens": 812
+  },
+  {
+   "start": 4967424,
+   "lang": "en",
+   "bytes": 1345,
+   "nats": 1303.0239536762238,
+   "gpt2_tokens": 658
+  },
+  {
+   "start": 5012480,
+   "lang": "en",
+   "bytes": 1260,
+   "nats": 554.0824613571167,
+   "gpt2_tokens": 957
+  },
+  {
+   "start": 5057536,
+   "lang": "en",
+   "bytes": 1527,
+   "nats": 970.2013195753098,
+   "gpt2_tokens": 669
+  },
+  {
+   "start": 5102592,
+   "lang": "en",
+   "bytes": 1046,
+   "nats": 1084.1240572929382,
+   "gpt2_tokens": 498
+  },
+  {
+   "start": 5148160,
+   "lang": "en",
+   "bytes": 1360,
+   "nats": 1478.7832825183868,
+   "gpt2_tokens": 419
+  },
+  {
+   "start": 5193216,
+   "lang": "en",
+   "bytes": 1571,
+   "nats": 965.327427148819,
+   "gpt2_tokens": 429
+  },
+  {
+   "start": 5238272,
+   "lang": "en",
+   "bytes": 1862,
+   "nats": 1232.1362085342407,
+   "gpt2_tokens": 372
+  },
+  {
+   "start": 5283328,
+   "lang": "en",
+   "bytes": 899,
+   "nats": 1154.0119547843933,
+   "gpt2_tokens": 374
+  },
+  {
+   "start": 5328384,
+   "lang": "en",
+   "bytes": 1459,
+   "nats": 1507.4279308319092,
+   "gpt2_tokens": 375
+  },
+  {
+   "start": 5373952,
+   "lang": "en",
+   "bytes": 1536,
+   "nats": 1558.0412225723267,
+   "gpt2_tokens": 361
+  },
+  {
+   "start": 5419008,
+   "lang": "en",
+   "bytes": 1473,
+   "nats": 1345.9840507507324,
+   "gpt2_tokens": 322
+  },
+  {
+   "start": 5464064,
+   "lang": "en",
+   "bytes": 1692,
+   "nats": 1459.4854545593262,
+   "gpt2_tokens": 370
+  },
+  {
+   "start": 5509120,
+   "lang": "en",
+   "bytes": 1784,
+   "nats": 1509.2382011413574,
+   "gpt2_tokens": 371
+  },
+  {
+   "start": 5554176,
+   "lang": "en",
+   "bytes": 905,
+   "nats": 760.4928731918335,
+   "gpt2_tokens": 245
+  },
+  {
+   "start": 5599744,
+   "lang": "en",
+   "bytes": 1683,
+   "nats": 1119.6632375717163,
+   "gpt2_tokens": 326
+  },
+  {
+   "start": 5644800,
+   "lang": "en",
+   "bytes": 1649,
+   "nats": 1236.9693846702576,
+   "gpt2_tokens": 359
+  },
+  {
+   "start": 5689856,
+   "lang": "en",
+   "bytes": 1548,
+   "nats": 993.050594329834,
+   "gpt2_tokens": 324
+  },
+  {
+   "start": 5734912,
+   "lang": "en",
+   "bytes": 2059,
+   "nats": 1391.0227060317993,
+   "gpt2_tokens": 362
+  },
+  {
+   "start": 5779968,
+   "lang": "en",
+   "bytes": 1427,
+   "nats": 1470.3969268798828,
+   "gpt2_tokens": 354
+  },
+  {
+   "start": 5825536,
+   "lang": "en",
+   "bytes": 1308,
+   "nats": 1406.245403289795,
+   "gpt2_tokens": 340
+  },
+  {
+   "start": 5870592,
+   "lang": "en",
+   "bytes": 910,
+   "nats": 1261.6463885307312,
+   "gpt2_tokens": 291
+  },
+  {
+   "start": 5915648,
+   "lang": "en",
+   "bytes": 1327,
+   "nats": 1165.2492589950562,
+   "gpt2_tokens": 331
+  },
+  {
+   "start": 5960704,
+   "lang": "en",
+   "bytes": 1382,
+   "nats": 1548.8846282958984,
+   "gpt2_tokens": 352
+  },
+  {
+   "start": 6005760,
+   "lang": "en",
+   "bytes": 1578,
+   "nats": 1447.5281772613525,
+   "gpt2_tokens": 392
+  },
+  {
+   "start": 6051328,
+   "lang": "en",
+   "bytes": 1068,
+   "nats": 1071.495587348938,
+   "gpt2_tokens": 316
+  },
+  {
+   "start": 6096384,
+   "lang": "en",
+   "bytes": 1239,
+   "nats": 1459.1152431964874,
+   "gpt2_tokens": 381
+  },
+  {
+   "start": 6141440,
+   "lang": "en",
+   "bytes": 1583,
+   "nats": 1256.5185842514038,
+   "gpt2_tokens": 348
+  },
+  {
+   "start": 6186496,
+   "lang": "en",
+   "bytes": 2087,
+   "nats": 1348.3278379440308,
+   "gpt2_tokens": 382
+  },
+  {
+   "start": 6231552,
+   "lang": "en",
+   "bytes": 1678,
+   "nats": 1505.4307870864868,
+   "gpt2_tokens": 404
+  },
+  {
+   "start": 6277120,
+   "lang": "en",
+   "bytes": 1059,
+   "nats": 1181.9172048568726,
+   "gpt2_tokens": 396
+  },
+  {
+   "start": 6322176,
+   "lang": "en",
+   "bytes": 1583,
+   "nats": 1281.514127254486,
+   "gpt2_tokens": 378
+  },
+  {
+   "start": 6367232,
+   "lang": "en",
+   "bytes": 1540,
+   "nats": 1339.6453742980957,
+   "gpt2_tokens": 336
+  },
+  {
+   "start": 6412288,
+   "lang": "en",
+   "bytes": 1632,
+   "nats": 1247.55260181427,
+   "gpt2_tokens": 372
+  },
+  {
+   "start": 6457344,
+   "lang": "en",
+   "bytes": 1582,
+   "nats": 1307.3700881004333,
+   "gpt2_tokens": 374
+  },
+  {
+   "start": 6502912,
+   "lang": "en",
+   "bytes": 1435,
+   "nats": 1336.3640093803406,
+   "gpt2_tokens": 383
+  },
+  {
+   "start": 6547968,
+   "lang": "en",
+   "bytes": 1624,
+   "nats": 1417.579505443573,
+   "gpt2_tokens": 355
+  },
+  {
+   "start": 6593024,
+   "lang": "en",
+   "bytes": 1471,
+   "nats": 1345.1937017440796,
+   "gpt2_tokens": 366
+  },
+  {
+   "start": 6638080,
+   "lang": "en",
+   "bytes": 1882,
+   "nats": 1196.2067985534668,
+   "gpt2_tokens": 345
+  },
+  {
+   "start": 6683136,
+   "lang": "en",
+   "bytes": 1416,
+   "nats": 1473.5451691150665,
+   "gpt2_tokens": 397
+  },
+  {
+   "start": 6728704,
+   "lang": "en",
+   "bytes": 1319,
+   "nats": 1594.6771907806396,
+   "gpt2_tokens": 340
+  },
+  {
+   "start": 6773760,
+   "lang": "en",
+   "bytes": 1524,
+   "nats": 1250.7667183876038,
+   "gpt2_tokens": 337
+  },
+  {
+   "start": 6818816,
+   "lang": "en",
+   "bytes": 1569,
+   "nats": 1030.2383708953857,
+   "gpt2_tokens": 324
+  },
+  {
+   "start": 6863872,
+   "lang": "en",
+   "bytes": 1350,
+   "nats": 1114.3637742996216,
+   "gpt2_tokens": 311
+  },
+  {
+   "start": 6908928,
+   "lang": "en",
+   "bytes": 1786,
+   "nats": 1216.931297302246,
+   "gpt2_tokens": 344
+  },
+  {
+   "start": 6954496,
+   "lang": "en",
+   "bytes": 1404,
+   "nats": 1135.1981220245361,
+   "gpt2_tokens": 316
+  },
+  {
+   "start": 6999552,
+   "lang": "en",
+   "bytes": 1386,
+   "nats": 1291.6984186172485,
+   "gpt2_tokens": 313
+  },
+  {
+   "start": 7044608,
+   "lang": "en",
+   "bytes": 1627,
+   "nats": 1163.963262796402,
+   "gpt2_tokens": 353
+  },
+  {
+   "start": 7089664,
+   "lang": "en",
+   "bytes": 1101,
+   "nats": 1299.148041009903,
+   "gpt2_tokens": 325
+  },
+  {
+   "start": 7134720,
+   "lang": "en",
+   "bytes": 1495,
+   "nats": 1081.0596890449524,
+   "gpt2_tokens": 346
+  },
+  {
+   "start": 7180288,
+   "lang": "en",
+   "bytes": 1141,
+   "nats": 1037.0361652374268,
+   "gpt2_tokens": 338
+  },
+  {
+   "start": 7225344,
+   "lang": "en",
+   "bytes": 1557,
+   "nats": 1014.6106245517731,
+   "gpt2_tokens": 323
+  },
+  {
+   "start": 7270400,
+   "lang": "en",
+   "bytes": 1354,
+   "nats": 999.799072265625,
+   "gpt2_tokens": 309
+  },
+  {
+   "start": 7315456,
+   "lang": "en",
+   "bytes": 1261,
+   "nats": 1381.0337505340576,
+   "gpt2_tokens": 327
+  },
+  {
+   "start": 7360512,
+   "lang": "en",
+   "bytes": 1408,
+   "nats": 1056.8121457099915,
+   "gpt2_tokens": 302
+  },
+  {
+   "start": 7406080,
+   "lang": "en",
+   "bytes": 1415,
+   "nats": 1158.447284936905,
+   "gpt2_tokens": 319
+  },
+  {
+   "start": 7451136,
+   "lang": "en",
+   "bytes": 1558,
+   "nats": 1125.2742590904236,
+   "gpt2_tokens": 318
+  },
+  {
+   "start": 7496192,
+   "lang": "en",
+   "bytes": 1627,
+   "nats": 1289.0568466186523,
+   "gpt2_tokens": 336
+  },
+  {
+   "start": 7541248,
+   "lang": "en",
+   "bytes": 1402,
+   "nats": 1485.8664321899414,
+   "gpt2_tokens": 355
+  },
+  {
+   "start": 7586304,
+   "lang": "en",
+   "bytes": 1861,
+   "nats": 1292.1318364143372,
+   "gpt2_tokens": 365
+  },
+  {
+   "start": 7631872,
+   "lang": "en",
+   "bytes": 1470,
+   "nats": 1407.3455686569214,
+   "gpt2_tokens": 378
+  },
+  {
+   "start": 7676928,
+   "lang": "en",
+   "bytes": 1557,
+   "nats": 1263.0147037506104,
+   "gpt2_tokens": 314
+  },
+  {
+   "start": 7721984,
+   "lang": "en",
+   "bytes": 1479,
+   "nats": 1090.514910697937,
+   "gpt2_tokens": 332
+  },
+  {
+   "start": 7767040,
+   "lang": "en",
+   "bytes": 1277,
+   "nats": 1365.996930360794,
+   "gpt2_tokens": 353
+  },
+  {
+   "start": 7812096,
+   "lang": "en",
+   "bytes": 1293,
+   "nats": 1130.2426948547363,
+   "gpt2_tokens": 292
+  },
+  {
+   "start": 7857664,
+   "lang": "en",
+   "bytes": 1522,
+   "nats": 1142.1227731704712,
+   "gpt2_tokens": 321
+  },
+  {
+   "start": 7902720,
+   "lang": "en",
+   "bytes": 1534,
+   "nats": 1174.3809452056885,
+   "gpt2_tokens": 332
+  },
+  {
+   "start": 7947776,
+   "lang": "en",
+   "bytes": 1146,
+   "nats": 1043.411865234375,
+   "gpt2_tokens": 303
+  },
+  {
+   "start": 7992832,
+   "lang": "en",
+   "bytes": 1162,
+   "nats": 1004.4007453918457,
+   "gpt2_tokens": 307
+  },
+  {
+   "start": 8037888,
+   "lang": "en",
+   "bytes": 1116,
+   "nats": 1185.221881866455,
+   "gpt2_tokens": 370
+  },
+  {
+   "start": 8083456,
+   "lang": "en",
+   "bytes": 1150,
+   "nats": 977.4903588294983,
+   "gpt2_tokens": 309
+  },
+  {
+   "start": 8128512,
+   "lang": "en",
+   "bytes": 1398,
+   "nats": 1098.6315836906433,
+   "gpt2_tokens": 322
+  },
+  {
+   "start": 8173568,
+   "lang": "en",
+   "bytes": 1515,
+   "nats": 1118.0401244163513,
+   "gpt2_tokens": 319
+  },
+  {
+   "start": 8218624,
+   "lang": "en",
+   "bytes": 1032,
+   "nats": 958.247688293457,
+   "gpt2_tokens": 352
+  },
+  {
+   "start": 8263680,
+   "lang": "en",
+   "bytes": 1550,
+   "nats": 1021.0184659957886,
+   "gpt2_tokens": 326
+  },
+  {
+   "start": 8309248,
+   "lang": "en",
+   "bytes": 1365,
+   "nats": 860.3324267864227,
+   "gpt2_tokens": 291
+  },
+  {
+   "start": 8354304,
+   "lang": "en",
+   "bytes": 1279,
+   "nats": 1207.5785870552063,
+   "gpt2_tokens": 307
+  },
+  {
+   "start": 8399360,
+   "lang": "en",
+   "bytes": 1309,
+   "nats": 1206.9452993869781,
+   "gpt2_tokens": 343
+  },
+  {
+   "start": 8444416,
+   "lang": "en",
+   "bytes": 1291,
+   "nats": 1377.3863353729248,
+   "gpt2_tokens": 327
+  },
+  {
+   "start": 8489472,
+   "lang": "en",
+   "bytes": 1348,
+   "nats": 1520.1740856170654,
+   "gpt2_tokens": 351
+  },
+  {
+   "start": 8535040,
+   "lang": "en",
+   "bytes": 1313,
+   "nats": 1110.8185007572174,
+   "gpt2_tokens": 313
+  },
+  {
+   "start": 8580096,
+   "lang": "en",
+   "bytes": 1555,
+   "nats": 1204.8653440475464,
+   "gpt2_tokens": 332
+  },
+  {
+   "start": 8625152,
+   "lang": "en",
+   "bytes": 1289,
+   "nats": 1052.0815563201904,
+   "gpt2_tokens": 280
+  },
+  {
+   "start": 8670208,
+   "lang": "en",
+   "bytes": 1311,
+   "nats": 1371.236711025238,
+   "gpt2_tokens": 317
+  },
+  {
+   "start": 8715264,
+   "lang": "en",
+   "bytes": 1703,
+   "nats": 1214.6038508415222,
+   "gpt2_tokens": 343
+  },
+  {
+   "start": 8760320,
+   "lang": "en",
+   "bytes": 1455,
+   "nats": 1217.1347694396973,
+   "gpt2_tokens": 312
+  },
+  {
+   "start": 8805888,
+   "lang": "en",
+   "bytes": 1770,
+   "nats": 1161.8973574638367,
+   "gpt2_tokens": 331
+  },
+  {
+   "start": 8850944,
+   "lang": "en",
+   "bytes": 1950,
+   "nats": 1379.3806309700012,
+   "gpt2_tokens": 358
+  },
+  {
+   "start": 8896000,
+   "lang": "en",
+   "bytes": 1426,
+   "nats": 1245.2584021091461,
+   "gpt2_tokens": 347
+  },
+  {
+   "start": 8941056,
+   "lang": "en",
+   "bytes": 1401,
+   "nats": 1175.0736186504364,
+   "gpt2_tokens": 323
+  },
+  {
+   "start": 8986112,
+   "lang": "en",
+   "bytes": 1337,
+   "nats": 1190.0876116752625,
+   "gpt2_tokens": 331
+  },
+  {
+   "start": 9031680,
+   "lang": "en",
+   "bytes": 1363,
+   "nats": 1145.0263621807098,
+   "gpt2_tokens": 349
+  },
+  {
+   "start": 9076736,
+   "lang": "en",
+   "bytes": 1851,
+   "nats": 1226.7546281814575,
+   "gpt2_tokens": 362
+  },
+  {
+   "start": 9121792,
+   "lang": "en",
+   "bytes": 1393,
+   "nats": 1075.2978575229645,
+   "gpt2_tokens": 335
+  },
+  {
+   "start": 9166848,
+   "lang": "en",
+   "bytes": 1585,
+   "nats": 1227.1883702278137,
+   "gpt2_tokens": 355
+  },
+  {
+   "start": 9211904,
+   "lang": "en",
+   "bytes": 1117,
+   "nats": 1467.3428320884705,
+   "gpt2_tokens": 345
+  },
+  {
+   "start": 9257472,
+   "lang": "en",
+   "bytes": 1717,
+   "nats": 1327.1694660186768,
+   "gpt2_tokens": 372
+  },
+  {
+   "start": 9302528,
+   "lang": "en",
+   "bytes": 1176,
+   "nats": 1379.8204727172852,
+   "gpt2_tokens": 308
+  },
+  {
+   "start": 9347584,
+   "lang": "en",
+   "bytes": 1529,
+   "nats": 1127.9390635490417,
+   "gpt2_tokens": 329
+  },
+  {
+   "start": 9392640,
+   "lang": "en",
+   "bytes": 1839,
+   "nats": 1095.3510344028473,
+   "gpt2_tokens": 335
+  },
+  {
+   "start": 9437696,
+   "lang": "en",
+   "bytes": 1536,
+   "nats": 1145.871600151062,
+   "gpt2_tokens": 343
+  },
+  {
+   "start": 9483264,
+   "lang": "en",
+   "bytes": 1033,
+   "nats": 1012.7162098884583,
+   "gpt2_tokens": 367
+  },
+  {
+   "start": 9528320,
+   "lang": "en",
+   "bytes": 2120,
+   "nats": 905.6136145591736,
+   "gpt2_tokens": 402
+  },
+  {
+   "start": 9573376,
+   "lang": "en",
+   "bytes": 1563,
+   "nats": 1341.9192810058594,
+   "gpt2_tokens": 384
+  },
+  {
+   "start": 9618432,
+   "lang": "en",
+   "bytes": 1584,
+   "nats": 1388.2836699485779,
+   "gpt2_tokens": 417
+  },
+  {
+   "start": 9663488,
+   "lang": "en",
+   "bytes": 1473,
+   "nats": 1536.7053451538086,
+   "gpt2_tokens": 408
+  },
+  {
+   "start": 9709056,
+   "lang": "en",
+   "bytes": 1610,
+   "nats": 1528.6221873760223,
+   "gpt2_tokens": 445
+  },
+  {
+   "start": 9754112,
+   "lang": "en",
+   "bytes": 1557,
+   "nats": 1374.1934509277344,
+   "gpt2_tokens": 411
+  },
+  {
+   "start": 9799168,
+   "lang": "en",
+   "bytes": 1526,
+   "nats": 1508.78493142128,
+   "gpt2_tokens": 397
+  },
+  {
+   "start": 9844224,
+   "lang": "en",
+   "bytes": 1591,
+   "nats": 1495.1051273345947,
+   "gpt2_tokens": 427
+  },
+  {
+   "start": 9889280,
+   "lang": "en",
+   "bytes": 1571,
+   "nats": 1434.0302941799164,
+   "gpt2_tokens": 401
+  },
+  {
+   "start": 9934848,
+   "lang": "en",
+   "bytes": 1490,
+   "nats": 1441.1333022117615,
+   "gpt2_tokens": 386
+  },
+  {
+   "start": 9979904,
+   "lang": "en",
+   "bytes": 1581,
+   "nats": 1659.2016546726227,
+   "gpt2_tokens": 439
+  },
+  {
+   "start": 10024960,
+   "lang": "en",
+   "bytes": 1481,
+   "nats": 1432.958357334137,
+   "gpt2_tokens": 393
+  },
+  {
+   "start": 10070016,
+   "lang": "en",
+   "bytes": 1587,
+   "nats": 1526.1263675689697,
+   "gpt2_tokens": 439
+  },
+  {
+   "start": 10115072,
+   "lang": "en",
+   "bytes": 1535,
+   "nats": 1415.8655834197998,
+   "gpt2_tokens": 420
+  },
+  {
+   "start": 10160640,
+   "lang": "en",
+   "bytes": 1449,
+   "nats": 1509.1523241996765,
+   "gpt2_tokens": 410
+  },
+  {
+   "start": 10205696,
+   "lang": "en",
+   "bytes": 1640,
+   "nats": 1480.5563163757324,
+   "gpt2_tokens": 392
+  },
+  {
+   "start": 10250752,
+   "lang": "en",
+   "bytes": 1213,
+   "nats": 1192.8804988861084,
+   "gpt2_tokens": 366
+  },
+  {
+   "start": 10295808,
+   "lang": "en",
+   "bytes": 1431,
+   "nats": 1247.2049474716187,
+   "gpt2_tokens": 385
+  },
+  {
+   "start": 10340864,
+   "lang": "en",
+   "bytes": 1509,
+   "nats": 1326.8502447605133,
+   "gpt2_tokens": 383
+  },
+  {
+   "start": 10386432,
+   "lang": "en",
+   "bytes": 1590,
+   "nats": 1329.964349269867,
+   "gpt2_tokens": 418
+  },
+  {
+   "start": 10431488,
+   "lang": "en",
+   "bytes": 1533,
+   "nats": 1383.506965637207,
+   "gpt2_tokens": 400
+  },
+  {
+   "start": 10476544,
+   "lang": "en",
+   "bytes": 1497,
+   "nats": 1362.3790304660797,
+   "gpt2_tokens": 399
+  },
+  {
+   "start": 10521600,
+   "lang": "en",
+   "bytes": 1505,
+   "nats": 1595.7218194007874,
+   "gpt2_tokens": 395
+  },
+  {
+   "start": 10566656,
+   "lang": "en",
+   "bytes": 1491,
+   "nats": 1475.5504522323608,
+   "gpt2_tokens": 418
+  },
+  {
+   "start": 10612224,
+   "lang": "en",
+   "bytes": 1579,
+   "nats": 1544.8938417434692,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 10657280,
+   "lang": "en",
+   "bytes": 1662,
+   "nats": 1403.2890930175781,
+   "gpt2_tokens": 404
+  },
+  {
+   "start": 10702336,
+   "lang": "en",
+   "bytes": 1562,
+   "nats": 1512.4395310878754,
+   "gpt2_tokens": 399
+  },
+  {
+   "start": 10747392,
+   "lang": "en",
+   "bytes": 1417,
+   "nats": 1176.7514724731445,
+   "gpt2_tokens": 371
+  },
+  {
+   "start": 10792448,
+   "lang": "en",
+   "bytes": 1465,
+   "nats": 1514.5711481571198,
+   "gpt2_tokens": 401
+  },
+  {
+   "start": 10838016,
+   "lang": "en",
+   "bytes": 1335,
+   "nats": 1462.5985219478607,
+   "gpt2_tokens": 377
+  },
+  {
+   "start": 10883072,
+   "lang": "en",
+   "bytes": 1495,
+   "nats": 1646.9383535385132,
+   "gpt2_tokens": 381
+  },
+  {
+   "start": 10928128,
+   "lang": "en",
+   "bytes": 1499,
+   "nats": 1560.3283004760742,
+   "gpt2_tokens": 382
+  },
+  {
+   "start": 10973184,
+   "lang": "en",
+   "bytes": 1434,
+   "nats": 1273.2953646183014,
+   "gpt2_tokens": 411
+  },
+  {
+   "start": 11018240,
+   "lang": "en",
+   "bytes": 1475,
+   "nats": 1301.9795188903809,
+   "gpt2_tokens": 392
+  },
+  {
+   "start": 11063808,
+   "lang": "en",
+   "bytes": 1531,
+   "nats": 1133.7198615074158,
+   "gpt2_tokens": 405
+  },
+  {
+   "start": 11108864,
+   "lang": "en",
+   "bytes": 1513,
+   "nats": 1180.5095100402832,
+   "gpt2_tokens": 397
+  },
+  {
+   "start": 11153920,
+   "lang": "en",
+   "bytes": 1455,
+   "nats": 1263.5487327575684,
+   "gpt2_tokens": 402
+  },
+  {
+   "start": 11198976,
+   "lang": "en",
+   "bytes": 1453,
+   "nats": 1302.6912791728973,
+   "gpt2_tokens": 377
+  },
+  {
+   "start": 11244032,
+   "lang": "en",
+   "bytes": 1434,
+   "nats": 1544.5701475143433,
+   "gpt2_tokens": 428
+  },
+  {
+   "start": 11289600,
+   "lang": "en",
+   "bytes": 1584,
+   "nats": 1510.7666029930115,
+   "gpt2_tokens": 417
+  },
+  {
+   "start": 11334656,
+   "lang": "en",
+   "bytes": 1396,
+   "nats": 1336.3334827423096,
+   "gpt2_tokens": 392
+  },
+  {
+   "start": 11379712,
+   "lang": "en",
+   "bytes": 1565,
+   "nats": 1317.2087149620056,
+   "gpt2_tokens": 422
+  },
+  {
+   "start": 11424768,
+   "lang": "en",
+   "bytes": 1687,
+   "nats": 1634.3846201896667,
+   "gpt2_tokens": 418
+  },
+  {
+   "start": 11469824,
+   "lang": "en",
+   "bytes": 1521,
+   "nats": 1419.604609489441,
+   "gpt2_tokens": 394
+  },
+  {
+   "start": 11515392,
+   "lang": "en",
+   "bytes": 1478,
+   "nats": 1511.713505744934,
+   "gpt2_tokens": 402
+  },
+  {
+   "start": 11560448,
+   "lang": "en",
+   "bytes": 1414,
+   "nats": 1270.0369143486023,
+   "gpt2_tokens": 415
+  },
+  {
+   "start": 11605504,
+   "lang": "en",
+   "bytes": 1593,
+   "nats": 1390.3569655418396,
+   "gpt2_tokens": 406
+  },
+  {
+   "start": 11650560,
+   "lang": "en",
+   "bytes": 1544,
+   "nats": 1341.8396100997925,
+   "gpt2_tokens": 406
+  },
+  {
+   "start": 11695616,
+   "lang": "en",
+   "bytes": 1376,
+   "nats": 1285.400619506836,
+   "gpt2_tokens": 380
+  },
+  {
+   "start": 11741184,
+   "lang": "en",
+   "bytes": 1521,
+   "nats": 1439.5132026672363,
+   "gpt2_tokens": 432
+  },
+  {
+   "start": 11786240,
+   "lang": "en",
+   "bytes": 1508,
+   "nats": 1516.0382261276245,
+   "gpt2_tokens": 388
+  },
+  {
+   "start": 11831296,
+   "lang": "en",
+   "bytes": 1582,
+   "nats": 1407.9184305667877,
+   "gpt2_tokens": 399
+  },
+  {
+   "start": 11876352,
+   "lang": "en",
+   "bytes": 1401,
+   "nats": 1370.1763582229614,
+   "gpt2_tokens": 379
+  },
+  {
+   "start": 11921408,
+   "lang": "en",
+   "bytes": 1487,
+   "nats": 1494.7292346954346,
+   "gpt2_tokens": 408
+  },
+  {
+   "start": 11966976,
+   "lang": "en",
+   "bytes": 1617,
+   "nats": 1453.1844177246094,
+   "gpt2_tokens": 416
+  },
+  {
+   "start": 12012032,
+   "lang": "en",
+   "bytes": 1548,
+   "nats": 1363.0419845581055,
+   "gpt2_tokens": 399
+  },
+  {
+   "start": 12057088,
+   "lang": "en",
+   "bytes": 1367,
+   "nats": 1580.2221908569336,
+   "gpt2_tokens": 408
+  },
+  {
+   "start": 12102144,
+   "lang": "en",
+   "bytes": 1533,
+   "nats": 1277.8803606033325,
+   "gpt2_tokens": 414
+  },
+  {
+   "start": 12147200,
+   "lang": "en",
+   "bytes": 1503,
+   "nats": 1534.0534210205078,
+   "gpt2_tokens": 412
+  },
+  {
+   "start": 12192768,
+   "lang": "en",
+   "bytes": 1543,
+   "nats": 1434.3767356872559,
+   "gpt2_tokens": 410
+  },
+  {
+   "start": 12237824,
+   "lang": "en",
+   "bytes": 1505,
+   "nats": 1550.4084134101868,
+   "gpt2_tokens": 395
+  },
+  {
+   "start": 12282880,
+   "lang": "en",
+   "bytes": 1608,
+   "nats": 1517.5594046115875,
+   "gpt2_tokens": 401
+  },
+  {
+   "start": 12327936,
+   "lang": "en",
+   "bytes": 1563,
+   "nats": 1406.9516229629517,
+   "gpt2_tokens": 362
+  },
+  {
+   "start": 12372992,
+   "lang": "en",
+   "bytes": 1141,
+   "nats": 1312.6979484558105,
+   "gpt2_tokens": 422
+  },
+  {
+   "start": 12418560,
+   "lang": "en",
+   "bytes": 1618,
+   "nats": 1375.5179357528687,
+   "gpt2_tokens": 365
+  },
+  {
+   "start": 12463616,
+   "lang": "en",
+   "bytes": 1441,
+   "nats": 1277.2148761749268,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 12508672,
+   "lang": "en",
+   "bytes": 1422,
+   "nats": 1436.9531722068787,
+   "gpt2_tokens": 406
+  },
+  {
+   "start": 12553728,
+   "lang": "en",
+   "bytes": 1635,
+   "nats": 1081.759515762329,
+   "gpt2_tokens": 328
+  },
+  {
+   "start": 12598784,
+   "lang": "en",
+   "bytes": 1529,
+   "nats": 1333.2246308326721,
+   "gpt2_tokens": 382
+  },
+  {
+   "start": 12644352,
+   "lang": "en",
+   "bytes": 1549,
+   "nats": 1452.7017407417297,
+   "gpt2_tokens": 418
+  },
+  {
+   "start": 12689408,
+   "lang": "en",
+   "bytes": 1656,
+   "nats": 1477.5901255607605,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 12734464,
+   "lang": "en",
+   "bytes": 1492,
+   "nats": 1469.870994091034,
+   "gpt2_tokens": 365
+  },
+  {
+   "start": 12779520,
+   "lang": "en",
+   "bytes": 1368,
+   "nats": 2116.0098123550415,
+   "gpt2_tokens": 609
+  },
+  {
+   "start": 12824576,
+   "lang": "en",
+   "bytes": 1297,
+   "nats": 1681.3849449157715,
+   "gpt2_tokens": 496
+  },
+  {
+   "start": 12870144,
+   "lang": "en",
+   "bytes": 1056,
+   "nats": 1836.815071105957,
+   "gpt2_tokens": 560
+  },
+  {
+   "start": 12915200,
+   "lang": "en",
+   "bytes": 1168,
+   "nats": 1093.1189045906067,
+   "gpt2_tokens": 507
+  },
+  {
+   "start": 12960256,
+   "lang": "en",
+   "bytes": 1217,
+   "nats": 1918.9314994812012,
+   "gpt2_tokens": 597
+  },
+  {
+   "start": 13005312,
+   "lang": "en",
+   "bytes": 1191,
+   "nats": 1820.7058532238007,
+   "gpt2_tokens": 549
+  },
+  {
+   "start": 13050368,
+   "lang": "en",
+   "bytes": 1469,
+   "nats": 1705.5678367614746,
+   "gpt2_tokens": 436
+  },
+  {
+   "start": 13095936,
+   "lang": "en",
+   "bytes": 1214,
+   "nats": 1451.0644834041595,
+   "gpt2_tokens": 519
+  },
+  {
+   "start": 13140992,
+   "lang": "en",
+   "bytes": 1669,
+   "nats": 1637.046082496643,
+   "gpt2_tokens": 382
+  },
+  {
+   "start": 13186048,
+   "lang": "en",
+   "bytes": 1357,
+   "nats": 1993.984802722931,
+   "gpt2_tokens": 526
+  },
+  {
+   "start": 13231104,
+   "lang": "en",
+   "bytes": 1337,
+   "nats": 1806.9221935272217,
+   "gpt2_tokens": 723
+  },
+  {
+   "start": 13276160,
+   "lang": "en",
+   "bytes": 958,
+   "nats": 1355.7600588798523,
+   "gpt2_tokens": 518
+  },
+  {
+   "start": 13321728,
+   "lang": "en",
+   "bytes": 1176,
+   "nats": 2069.040819168091,
+   "gpt2_tokens": 554
+  },
+  {
+   "start": 13366784,
+   "lang": "en",
+   "bytes": 1067,
+   "nats": 1682.547333240509,
+   "gpt2_tokens": 495
+  },
+  {
+   "start": 13411840,
+   "lang": "en",
+   "bytes": 1128,
+   "nats": 1667.0554203987122,
+   "gpt2_tokens": 506
+  },
+  {
+   "start": 13456896,
+   "lang": "en",
+   "bytes": 1673,
+   "nats": 1302.3439877033234,
+   "gpt2_tokens": 337
+  },
+  {
+   "start": 13501952,
+   "lang": "en",
+   "bytes": 1331,
+   "nats": 1820.3139972686768,
+   "gpt2_tokens": 584
+  },
+  {
+   "start": 13547520,
+   "lang": "en",
+   "bytes": 1174,
+   "nats": 1037.496416568756,
+   "gpt2_tokens": 470
+  },
+  {
+   "start": 13592576,
+   "lang": "en",
+   "bytes": 1081,
+   "nats": 1429.0363788604736,
+   "gpt2_tokens": 500
+  },
+  {
+   "start": 13637632,
+   "lang": "en",
+   "bytes": 1025,
+   "nats": 1875.602626800537,
+   "gpt2_tokens": 472
+  },
+  {
+   "start": 13682688,
+   "lang": "en",
+   "bytes": 1419,
+   "nats": 941.8336343765259,
+   "gpt2_tokens": 340
+  },
+  {
+   "start": 13727744,
+   "lang": "en",
+   "bytes": 1290,
+   "nats": 1778.5460124015808,
+   "gpt2_tokens": 431
+  },
+  {
+   "start": 13773312,
+   "lang": "en",
+   "bytes": 1310,
+   "nats": 1179.4132289886475,
+   "gpt2_tokens": 357
+  },
+  {
+   "start": 13818368,
+   "lang": "en",
+   "bytes": 1913,
+   "nats": 1496.7306785583496,
+   "gpt2_tokens": 364
+  },
+  {
+   "start": 13863424,
+   "lang": "en",
+   "bytes": 1714,
+   "nats": 1571.4703488349915,
+   "gpt2_tokens": 410
+  },
+  {
+   "start": 13908480,
+   "lang": "en",
+   "bytes": 1141,
+   "nats": 1255.4514255523682,
+   "gpt2_tokens": 402
+  },
+  {
+   "start": 13953536,
+   "lang": "en",
+   "bytes": 1427,
+   "nats": 1569.9723377227783,
+   "gpt2_tokens": 356
+  },
+  {
+   "start": 13999104,
+   "lang": "en",
+   "bytes": 1606,
+   "nats": 1585.9038276672363,
+   "gpt2_tokens": 378
+  },
+  {
+   "start": 14044160,
+   "lang": "en",
+   "bytes": 1707,
+   "nats": 1849.2145385742188,
+   "gpt2_tokens": 436
+  },
+  {
+   "start": 14089216,
+   "lang": "en",
+   "bytes": 1155,
+   "nats": 987.2474216222763,
+   "gpt2_tokens": 519
+  },
+  {
+   "start": 14134272,
+   "lang": "en",
+   "bytes": 1123,
+   "nats": 1508.6661357879639,
+   "gpt2_tokens": 424
+  },
+  {
+   "start": 14179328,
+   "lang": "en",
+   "bytes": 1351,
+   "nats": 1265.2278127670288,
+   "gpt2_tokens": 373
+  },
+  {
+   "start": 14224896,
+   "lang": "en",
+   "bytes": 1057,
+   "nats": 1037.9697713851929,
+   "gpt2_tokens": 434
+  },
+  {
+   "start": 14269952,
+   "lang": "en",
+   "bytes": 1608,
+   "nats": 1258.294924736023,
+   "gpt2_tokens": 436
+  },
+  {
+   "start": 14315008,
+   "lang": "en",
+   "bytes": 1513,
+   "nats": 1801.6377773284912,
+   "gpt2_tokens": 406
+  },
+  {
+   "start": 14360064,
+   "lang": "en",
+   "bytes": 1720,
+   "nats": 1619.1860990524292,
+   "gpt2_tokens": 382
+  },
+  {
+   "start": 14405120,
+   "lang": "en",
+   "bytes": 1609,
+   "nats": 944.4245386123657,
+   "gpt2_tokens": 353
+  },
+  {
+   "start": 14450176,
+   "lang": "en",
+   "bytes": 1807,
+   "nats": 2103.0676617622375,
+   "gpt2_tokens": 403
+  },
+  {
+   "start": 14495744,
+   "lang": "en",
+   "bytes": 962,
+   "nats": 1027.283935546875,
+   "gpt2_tokens": 348
+  },
+  {
+   "start": 14540800,
+   "lang": "en",
+   "bytes": 1139,
+   "nats": 1500.9318466186523,
+   "gpt2_tokens": 356
+  },
+  {
+   "start": 14585856,
+   "lang": "en",
+   "bytes": 1759,
+   "nats": 1527.5519828796387,
+   "gpt2_tokens": 366
+  },
+  {
+   "start": 14630912,
+   "lang": "en",
+   "bytes": 916,
+   "nats": 819.2159628868103,
+   "gpt2_tokens": 351
+  },
+  {
+   "start": 14675968,
+   "lang": "en",
+   "bytes": 1647,
+   "nats": 1423.8324213027954,
+   "gpt2_tokens": 364
+  },
+  {
+   "start": 14721536,
+   "lang": "en",
+   "bytes": 1200,
+   "nats": 1556.8060655593872,
+   "gpt2_tokens": 378
+  },
+  {
+   "start": 14766592,
+   "lang": "en",
+   "bytes": 1330,
+   "nats": 1302.4333333969116,
+   "gpt2_tokens": 435
+  },
+  {
+   "start": 14811648,
+   "lang": "en",
+   "bytes": 1708,
+   "nats": 1416.5755634307861,
+   "gpt2_tokens": 408
+  },
+  {
+   "start": 14856704,
+   "lang": "en",
+   "bytes": 1406,
+   "nats": 1314.4367952346802,
+   "gpt2_tokens": 452
+  },
+  {
+   "start": 14901760,
+   "lang": "en",
+   "bytes": 1060,
+   "nats": 535.4088739156723,
+   "gpt2_tokens": 347
+  },
+  {
+   "start": 14947328,
+   "lang": "en",
+   "bytes": 1796,
+   "nats": 1630.6528358459473,
+   "gpt2_tokens": 386
+  },
+  {
+   "start": 14992384,
+   "lang": "en",
+   "bytes": 1432,
+   "nats": 1448.0401813983917,
+   "gpt2_tokens": 425
+  },
+  {
+   "start": 15037440,
+   "lang": "en",
+   "bytes": 1450,
+   "nats": 1316.3074629306793,
+   "gpt2_tokens": 381
+  },
+  {
+   "start": 15082496,
+   "lang": "en",
+   "bytes": 1288,
+   "nats": 1075.9770722389221,
+   "gpt2_tokens": 317
+  },
+  {
+   "start": 15127552,
+   "lang": "en",
+   "bytes": 1856,
+   "nats": 1533.997790336609,
+   "gpt2_tokens": 388
+  },
+  {
+   "start": 15173120,
+   "lang": "en",
+   "bytes": 1734,
+   "nats": 1232.961042881012,
+   "gpt2_tokens": 363
+  },
+  {
+   "start": 15218176,
+   "lang": "en",
+   "bytes": 1167,
+   "nats": 1026.7501695156097,
+   "gpt2_tokens": 429
+  },
+  {
+   "start": 15263232,
+   "lang": "en",
+   "bytes": 1771,
+   "nats": 1505.857082605362,
+   "gpt2_tokens": 405
+  },
+  {
+   "start": 15308288,
+   "lang": "en",
+   "bytes": 1343,
+   "nats": 1374.3477766513824,
+   "gpt2_tokens": 363
+  },
+  {
+   "start": 15353344,
+   "lang": "en",
+   "bytes": 1253,
+   "nats": 1425.103672027588,
+   "gpt2_tokens": 417
+  },
+  {
+   "start": 15398912,
+   "lang": "en",
+   "bytes": 1171,
+   "nats": 1113.5796761512756,
+   "gpt2_tokens": 355
+  },
+  {
+   "start": 15443968,
+   "lang": "en",
+   "bytes": 1305,
+   "nats": 1503.0428624153137,
+   "gpt2_tokens": 385
+  },
+  {
+   "start": 15489024,
+   "lang": "en",
+   "bytes": 1620,
+   "nats": 1572.0008850097656,
+   "gpt2_tokens": 400
+  },
+  {
+   "start": 15534080,
+   "lang": "en",
+   "bytes": 1906,
+   "nats": 1797.6374797821045,
+   "gpt2_tokens": 382
+  },
+  {
+   "start": 15579136,
+   "lang": "en",
+   "bytes": 1467,
+   "nats": 1524.6153359413147,
+   "gpt2_tokens": 363
+  },
+  {
+   "start": 15624704,
+   "lang": "en",
+   "bytes": 1568,
+   "nats": 1135.574963092804,
+   "gpt2_tokens": 339
+  },
+  {
+   "start": 15669760,
+   "lang": "en",
+   "bytes": 1387,
+   "nats": 1202.2944343090057,
+   "gpt2_tokens": 431
+  },
+  {
+   "start": 15714816,
+   "lang": "en",
+   "bytes": 1817,
+   "nats": 1277.511248588562,
+   "gpt2_tokens": 343
+  },
+  {
+   "start": 15759872,
+   "lang": "en",
+   "bytes": 965,
+   "nats": 1238.0927305221558,
+   "gpt2_tokens": 388
+  },
+  {
+   "start": 15804928,
+   "lang": "en",
+   "bytes": 1833,
+   "nats": 1452.1545867919922,
+   "gpt2_tokens": 407
+  },
+  {
+   "start": 15850496,
+   "lang": "en",
+   "bytes": 1491,
+   "nats": 1361.3996784687042,
+   "gpt2_tokens": 353
+  },
+  {
+   "start": 15895552,
+   "lang": "en",
+   "bytes": 933,
+   "nats": 1494.7034912109375,
+   "gpt2_tokens": 384
+  },
+  {
+   "start": 15940608,
+   "lang": "en",
+   "bytes": 1151,
+   "nats": 1215.0838871002197,
+   "gpt2_tokens": 344
+  },
+  {
+   "start": 15985664,
+   "lang": "en",
+   "bytes": 1744,
+   "nats": 1375.8877172470093,
+   "gpt2_tokens": 417
+  },
+  {
+   "start": 16030720,
+   "lang": "en",
+   "bytes": 1270,
+   "nats": 1754.5500755310059,
+   "gpt2_tokens": 425
+  },
+  {
+   "start": 16076288,
+   "lang": "en",
+   "bytes": 1451,
+   "nats": 1235.2455730438232,
+   "gpt2_tokens": 386
+  },
+  {
+   "start": 16121344,
+   "lang": "en",
+   "bytes": 1781,
+   "nats": 1165.3143405914307,
+   "gpt2_tokens": 395
+  },
+  {
+   "start": 16166400,
+   "lang": "en",
+   "bytes": 1623,
+   "nats": 1684.4365334510803,
+   "gpt2_tokens": 430
+  },
+  {
+   "start": 16211456,
+   "lang": "en",
+   "bytes": 1108,
+   "nats": 1182.3429822921753,
+   "gpt2_tokens": 345
+  },
+  {
+   "start": 16256512,
+   "lang": "en",
+   "bytes": 1601,
+   "nats": 1589.4528608322144,
+   "gpt2_tokens": 331
+  },
+  {
+   "start": 16302080,
+   "lang": "en",
+   "bytes": 1930,
+   "nats": 1418.704800605774,
+   "gpt2_tokens": 413
+  },
+  {
+   "start": 16347136,
+   "lang": "en",
+   "bytes": 538,
+   "nats": 446.03082847595215,
+   "gpt2_tokens": 316
+  },
+  {
+   "start": 16392192,
+   "lang": "en",
+   "bytes": 931,
+   "nats": 1703.1659440994263,
+   "gpt2_tokens": 403
+  },
+  {
+   "start": 16437248,
+   "lang": "en",
+   "bytes": 913,
+   "nats": 813.5732173919678,
+   "gpt2_tokens": 456
+  },
+  {
+   "start": 16482304,
+   "lang": "en",
+   "bytes": 1540,
+   "nats": 1373.6306326389313,
+   "gpt2_tokens": 459
+  },
+  {
+   "start": 16527872,
+   "lang": "en",
+   "bytes": 1733,
+   "nats": 1279.8804478645325,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 16572928,
+   "lang": "en",
+   "bytes": 1144,
+   "nats": 1085.5470056533813,
+   "gpt2_tokens": 306
+  },
+  {
+   "start": 16617984,
+   "lang": "en",
+   "bytes": 1619,
+   "nats": 1360.8892421722412,
+   "gpt2_tokens": 373
+  },
+  {
+   "start": 16663040,
+   "lang": "en",
+   "bytes": 1927,
+   "nats": 1348.413963317871,
+   "gpt2_tokens": 410
+  },
+  {
+   "start": 16708096,
+   "lang": "en",
+   "bytes": 1101,
+   "nats": 1011.8227958679199,
+   "gpt2_tokens": 450
+  },
+  {
+   "start": 16753664,
+   "lang": "en",
+   "bytes": 1880,
+   "nats": 1477.9606590270996,
+   "gpt2_tokens": 381
+  },
+  {
+   "start": 16798720,
+   "lang": "en",
+   "bytes": 999,
+   "nats": 855.056489944458,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 16843776,
+   "lang": "en",
+   "bytes": 1076,
+   "nats": 1164.8653695583344,
+   "gpt2_tokens": 313
+  },
+  {
+   "start": 16888832,
+   "lang": "en",
+   "bytes": 1789,
+   "nats": 1280.391936302185,
+   "gpt2_tokens": 410
+  },
+  {
+   "start": 16933888,
+   "lang": "en",
+   "bytes": 1713,
+   "nats": 1211.1167106628418,
+   "gpt2_tokens": 342
+  },
+  {
+   "start": 16979456,
+   "lang": "en",
+   "bytes": 1332,
+   "nats": 1257.8898849487305,
+   "gpt2_tokens": 322
+  },
+  {
+   "start": 17024512,
+   "lang": "en",
+   "bytes": 1339,
+   "nats": 1430.53373336792,
+   "gpt2_tokens": 432
+  },
+  {
+   "start": 17069568,
+   "lang": "en",
+   "bytes": 1216,
+   "nats": 1048.7466568946838,
+   "gpt2_tokens": 443
+  },
+  {
+   "start": 17114624,
+   "lang": "en",
+   "bytes": 1287,
+   "nats": 1362.21976852417,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 17159680,
+   "lang": "en",
+   "bytes": 1682,
+   "nats": 1117.3113119602203,
+   "gpt2_tokens": 435
+  },
+  {
+   "start": 17205248,
+   "lang": "en",
+   "bytes": 589,
+   "nats": 1088.145736694336,
+   "gpt2_tokens": 368
+  },
+  {
+   "start": 17250304,
+   "lang": "en",
+   "bytes": 1509,
+   "nats": 1522.4695491790771,
+   "gpt2_tokens": 380
+  },
+  {
+   "start": 17295360,
+   "lang": "en",
+   "bytes": 1209,
+   "nats": 1102.0850021839142,
+   "gpt2_tokens": 441
+  },
+  {
+   "start": 17340416,
+   "lang": "en",
+   "bytes": 1963,
+   "nats": 1560.38401222229,
+   "gpt2_tokens": 426
+  },
+  {
+   "start": 17385472,
+   "lang": "en",
+   "bytes": 1103,
+   "nats": 1380.408504486084,
+   "gpt2_tokens": 332
+  },
+  {
+   "start": 17431040,
+   "lang": "en",
+   "bytes": 1386,
+   "nats": 1344.5688080787659,
+   "gpt2_tokens": 458
+  },
+  {
+   "start": 17476096,
+   "lang": "en",
+   "bytes": 1546,
+   "nats": 1265.0607633590698,
+   "gpt2_tokens": 349
+  },
+  {
+   "start": 17521152,
+   "lang": "en",
+   "bytes": 1346,
+   "nats": 1531.3479385375977,
+   "gpt2_tokens": 368
+  },
+  {
+   "start": 17566208,
+   "lang": "en",
+   "bytes": 1132,
+   "nats": 1149.5501828193665,
+   "gpt2_tokens": 361
+  },
+  {
+   "start": 17611264,
+   "lang": "en",
+   "bytes": 1874,
+   "nats": 1271.70308303833,
+   "gpt2_tokens": 396
+  },
+  {
+   "start": 17656832,
+   "lang": "en",
+   "bytes": 1035,
+   "nats": 982.2449283599854,
+   "gpt2_tokens": 328
+  },
+  {
+   "start": 17701888,
+   "lang": "en",
+   "bytes": 1403,
+   "nats": 1385.7532467842102,
+   "gpt2_tokens": 442
+  },
+  {
+   "start": 17746944,
+   "lang": "en",
+   "bytes": 1161,
+   "nats": 1359.8389778137207,
+   "gpt2_tokens": 408
+  },
+  {
+   "start": 17792000,
+   "lang": "en",
+   "bytes": 1558,
+   "nats": 1245.0246987342834,
+   "gpt2_tokens": 401
+  },
+  {
+   "start": 17837056,
+   "lang": "en",
+   "bytes": 1519,
+   "nats": 1229.4402000904083,
+   "gpt2_tokens": 351
+  },
+  {
+   "start": 17882624,
+   "lang": "en",
+   "bytes": 1576,
+   "nats": 1283.8893821239471,
+   "gpt2_tokens": 393
+  },
+  {
+   "start": 17927680,
+   "lang": "en",
+   "bytes": 1322,
+   "nats": 1053.7794198989868,
+   "gpt2_tokens": 396
+  },
+  {
+   "start": 17972736,
+   "lang": "en",
+   "bytes": 1590,
+   "nats": 1371.750961303711,
+   "gpt2_tokens": 339
+  },
+  {
+   "start": 18017792,
+   "lang": "en",
+   "bytes": 1772,
+   "nats": 1264.4162483215332,
+   "gpt2_tokens": 358
+  },
+  {
+   "start": 18062848,
+   "lang": "en",
+   "bytes": 1407,
+   "nats": 1072.1461176872253,
+   "gpt2_tokens": 290
+  },
+  {
+   "start": 18108416,
+   "lang": "en",
+   "bytes": 976,
+   "nats": 1304.063880443573,
+   "gpt2_tokens": 345
+  },
+  {
+   "start": 18153472,
+   "lang": "en",
+   "bytes": 1508,
+   "nats": 1337.7617678642273,
+   "gpt2_tokens": 431
+  },
+  {
+   "start": 18198528,
+   "lang": "en",
+   "bytes": 1063,
+   "nats": 1494.3989491462708,
+   "gpt2_tokens": 395
+  },
+  {
+   "start": 18243584,
+   "lang": "en",
+   "bytes": 1361,
+   "nats": 1596.2044730186462,
+   "gpt2_tokens": 418
+  },
+  {
+   "start": 18288640,
+   "lang": "en",
+   "bytes": 892,
+   "nats": 1617.6793384552002,
+   "gpt2_tokens": 440
+  },
+  {
+   "start": 18334208,
+   "lang": "en",
+   "bytes": 1766,
+   "nats": 1494.0714311599731,
+   "gpt2_tokens": 366
+  },
+  {
+   "start": 18379264,
+   "lang": "en",
+   "bytes": 1368,
+   "nats": 1456.4789652824402,
+   "gpt2_tokens": 433
+  },
+  {
+   "start": 18424320,
+   "lang": "en",
+   "bytes": 1442,
+   "nats": 1510.4753744602203,
+   "gpt2_tokens": 415
+  },
+  {
+   "start": 18469376,
+   "lang": "en",
+   "bytes": 1187,
+   "nats": 1539.0737330913544,
+   "gpt2_tokens": 409
+  },
+  {
+   "start": 18514432,
+   "lang": "en",
+   "bytes": 1799,
+   "nats": 1341.5412788391113,
+   "gpt2_tokens": 406
+  },
+  {
+   "start": 18560000,
+   "lang": "en",
+   "bytes": 1643,
+   "nats": 1278.6714971065521,
+   "gpt2_tokens": 381
+  },
+  {
+   "start": 18605056,
+   "lang": "en",
+   "bytes": 1661,
+   "nats": 995.2031421661377,
+   "gpt2_tokens": 396
+  },
+  {
+   "start": 18650112,
+   "lang": "en",
+   "bytes": 1410,
+   "nats": 1386.2817270755768,
+   "gpt2_tokens": 421
+  },
+  {
+   "start": 18695168,
+   "lang": "en",
+   "bytes": 1596,
+   "nats": 1278.582374572754,
+   "gpt2_tokens": 376
+  },
+  {
+   "start": 18740224,
+   "lang": "en",
+   "bytes": 1912,
+   "nats": 1319.209924697876,
+   "gpt2_tokens": 451
+  },
+  {
+   "start": 18785792,
+   "lang": "en",
+   "bytes": 1683,
+   "nats": 1353.8737757205963,
+   "gpt2_tokens": 401
+  },
+  {
+   "start": 18830848,
+   "lang": "en",
+   "bytes": 1739,
+   "nats": 1406.9442415237427,
+   "gpt2_tokens": 380
+  },
+  {
+   "start": 18875904,
+   "lang": "en",
+   "bytes": 1541,
+   "nats": 1660.7325553894043,
+   "gpt2_tokens": 382
+  },
+  {
+   "start": 18920960,
+   "lang": "en",
+   "bytes": 1920,
+   "nats": 1273.0913066864014,
+   "gpt2_tokens": 415
+  },
+  {
+   "start": 18966016,
+   "lang": "en",
+   "bytes": 1321,
+   "nats": 1413.7487568855286,
+   "gpt2_tokens": 422
+  },
+  {
+   "start": 19011584,
+   "lang": "en",
+   "bytes": 1399,
+   "nats": 1377.232826948166,
+   "gpt2_tokens": 415
+  },
+  {
+   "start": 19056640,
+   "lang": "en",
+   "bytes": 1538,
+   "nats": 1360.8765921592712,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 19101696,
+   "lang": "en",
+   "bytes": 1410,
+   "nats": 1089.686143875122,
+   "gpt2_tokens": 359
+  },
+  {
+   "start": 19146752,
+   "lang": "en",
+   "bytes": 1260,
+   "nats": 1270.2466568946838,
+   "gpt2_tokens": 443
+  },
+  {
+   "start": 19191808,
+   "lang": "en",
+   "bytes": 1446,
+   "nats": 1362.8788146972656,
+   "gpt2_tokens": 408
+  },
+  {
+   "start": 19237376,
+   "lang": "en",
+   "bytes": 1521,
+   "nats": 1401.4581081867218,
+   "gpt2_tokens": 431
+  },
+  {
+   "start": 19282432,
+   "lang": "en",
+   "bytes": 1694,
+   "nats": 1706.9208884239197,
+   "gpt2_tokens": 415
+  },
+  {
+   "start": 19327488,
+   "lang": "en",
+   "bytes": 1591,
+   "nats": 1230.6424975395203,
+   "gpt2_tokens": 391
+  },
+  {
+   "start": 19372544,
+   "lang": "en",
+   "bytes": 1561,
+   "nats": 1444.4903509616852,
+   "gpt2_tokens": 377
+  },
+  {
+   "start": 19417600,
+   "lang": "en",
+   "bytes": 1370,
+   "nats": 1293.809557914734,
+   "gpt2_tokens": 444
+  },
+  {
+   "start": 19463168,
+   "lang": "en",
+   "bytes": 1469,
+   "nats": 1315.522871017456,
+   "gpt2_tokens": 390
+  },
+  {
+   "start": 19508224,
+   "lang": "en",
+   "bytes": 1054,
+   "nats": 1174.3669188022614,
+   "gpt2_tokens": 361
+  },
+  {
+   "start": 19553280,
+   "lang": "en",
+   "bytes": 1191,
+   "nats": 942.4382059574127,
+   "gpt2_tokens": 401
+  },
+  {
+   "start": 19598336,
+   "lang": "en",
+   "bytes": 1578,
+   "nats": 1691.2622737884521,
+   "gpt2_tokens": 370
+  },
+  {
+   "start": 19643392,
+   "lang": "en",
+   "bytes": 1172,
+   "nats": 1116.1428422927856,
+   "gpt2_tokens": 357
+  },
+  {
+   "start": 19688960,
+   "lang": "en",
+   "bytes": 1514,
+   "nats": 1388.9745335578918,
+   "gpt2_tokens": 442
+  },
+  {
+   "start": 19734016,
+   "lang": "en",
+   "bytes": 986,
+   "nats": 1054.2318139076233,
+   "gpt2_tokens": 374
+  },
+  {
+   "start": 19779072,
+   "lang": "en",
+   "bytes": 1163,
+   "nats": 1032.0051238536835,
+   "gpt2_tokens": 377
+  },
+  {
+   "start": 19824128,
+   "lang": "en",
+   "bytes": 940,
+   "nats": 1384.0199410915375,
+   "gpt2_tokens": 375
+  },
+  {
+   "start": 19869184,
+   "lang": "en",
+   "bytes": 1176,
+   "nats": 1136.348593711853,
+   "gpt2_tokens": 492
+  },
+  {
+   "start": 19914752,
+   "lang": "en",
+   "bytes": 1287,
+   "nats": 1313.4206342697144,
+   "gpt2_tokens": 404
+  },
+  {
+   "start": 19959808,
+   "lang": "en",
+   "bytes": 1250,
+   "nats": 1610.9185817241669,
+   "gpt2_tokens": 433
+  },
+  {
+   "start": 20004864,
+   "lang": "en",
+   "bytes": 958,
+   "nats": 1484.683871269226,
+   "gpt2_tokens": 330
+  },
+  {
+   "start": 20049920,
+   "lang": "en",
+   "bytes": 1453,
+   "nats": 1157.3792638778687,
+   "gpt2_tokens": 446
+  },
+  {
+   "start": 20094976,
+   "lang": "en",
+   "bytes": 903,
+   "nats": 1053.8894219398499,
+   "gpt2_tokens": 499
+  },
+  {
+   "start": 20140544,
+   "lang": "en",
+   "bytes": 1517,
+   "nats": 1394.1233758926392,
+   "gpt2_tokens": 356
+  },
+  {
+   "start": 20185600,
+   "lang": "en",
+   "bytes": 1297,
+   "nats": 1087.7842020988464,
+   "gpt2_tokens": 410
+  },
+  {
+   "start": 20230656,
+   "lang": "en",
+   "bytes": 1255,
+   "nats": 1324.1888408660889,
+   "gpt2_tokens": 408
+  },
+  {
+   "start": 20275712,
+   "lang": "en",
+   "bytes": 1877,
+   "nats": 2018.7295217514038,
+   "gpt2_tokens": 371
+  },
+  {
+   "start": 20320768,
+   "lang": "en",
+   "bytes": 1108,
+   "nats": 960.8368098735809,
+   "gpt2_tokens": 425
+  },
+  {
+   "start": 20365824,
+   "lang": "en",
+   "bytes": 1460,
+   "nats": 1671.159839630127,
+   "gpt2_tokens": 402
+  },
+  {
+   "start": 20411392,
+   "lang": "en",
+   "bytes": 1460,
+   "nats": 1651.7552890777588,
+   "gpt2_tokens": 348
+  },
+  {
+   "start": 20456448,
+   "lang": "en",
+   "bytes": 1822,
+   "nats": 1861.543779373169,
+   "gpt2_tokens": 396
+  },
+  {
+   "start": 20501504,
+   "lang": "en",
+   "bytes": 1326,
+   "nats": 1533.301956653595,
+   "gpt2_tokens": 393
+  },
+  {
+   "start": 20546560,
+   "lang": "en",
+   "bytes": 1517,
+   "nats": 1177.84268116951,
+   "gpt2_tokens": 337
+  },
+  {
+   "start": 20591616,
+   "lang": "en",
+   "bytes": 1672,
+   "nats": 1444.386694908142,
+   "gpt2_tokens": 396
+  },
+  {
+   "start": 20637184,
+   "lang": "en",
+   "bytes": 1282,
+   "nats": 1392.2452764511108,
+   "gpt2_tokens": 371
+  },
+  {
+   "start": 20682240,
+   "lang": "en",
+   "bytes": 1070,
+   "nats": 1065.343017578125,
+   "gpt2_tokens": 340
+  },
+  {
+   "start": 20727296,
+   "lang": "en",
+   "bytes": 1781,
+   "nats": 1556.2815074920654,
+   "gpt2_tokens": 392
+  },
+  {
+   "start": 20772352,
+   "lang": "en",
+   "bytes": 1296,
+   "nats": 1448.14701461792,
+   "gpt2_tokens": 432
+  },
+  {
+   "start": 20817408,
+   "lang": "en",
+   "bytes": 1775,
+   "nats": 1365.8793606758118,
+   "gpt2_tokens": 394
+  },
+  {
+   "start": 20862976,
+   "lang": "en",
+   "bytes": 1537,
+   "nats": 1148.298602104187,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 20908032,
+   "lang": "en",
+   "bytes": 1625,
+   "nats": 1243.5942418575287,
+   "gpt2_tokens": 439
+  },
+  {
+   "start": 20953088,
+   "lang": "en",
+   "bytes": 1113,
+   "nats": 1230.406047821045,
+   "gpt2_tokens": 376
+  },
+  {
+   "start": 20998144,
+   "lang": "en",
+   "bytes": 918,
+   "nats": 1123.9637432098389,
+   "gpt2_tokens": 411
+  },
+  {
+   "start": 21043200,
+   "lang": "en",
+   "bytes": 1660,
+   "nats": 1507.3490295410156,
+   "gpt2_tokens": 384
+  },
+  {
+   "start": 21088768,
+   "lang": "en",
+   "bytes": 1277,
+   "nats": 1363.197147846222,
+   "gpt2_tokens": 375
+  },
+  {
+   "start": 21133824,
+   "lang": "en",
+   "bytes": 1197,
+   "nats": 1307.0172481536865,
+   "gpt2_tokens": 374
+  },
+  {
+   "start": 21178880,
+   "lang": "en",
+   "bytes": 1239,
+   "nats": 1489.7660551071167,
+   "gpt2_tokens": 367
+  },
+  {
+   "start": 21223936,
+   "lang": "en",
+   "bytes": 1393,
+   "nats": 1296.9915657043457,
+   "gpt2_tokens": 394
+  },
+  {
+   "start": 21268992,
+   "lang": "en",
+   "bytes": 1545,
+   "nats": 980.0314009189606,
+   "gpt2_tokens": 325
+  },
+  {
+   "start": 21314560,
+   "lang": "en",
+   "bytes": 1913,
+   "nats": 1179.210605621338,
+   "gpt2_tokens": 340
+  },
+  {
+   "start": 21359616,
+   "lang": "en",
+   "bytes": 1706,
+   "nats": 1079.9101915359497,
+   "gpt2_tokens": 323
+  },
+  {
+   "start": 21404672,
+   "lang": "en",
+   "bytes": 1576,
+   "nats": 1022.5686893463135,
+   "gpt2_tokens": 318
+  },
+  {
+   "start": 21449728,
+   "lang": "en",
+   "bytes": 1758,
+   "nats": 1015.6377787590027,
+   "gpt2_tokens": 293
+  },
+  {
+   "start": 21494784,
+   "lang": "en",
+   "bytes": 1766,
+   "nats": 1299.6484575271606,
+   "gpt2_tokens": 329
+  },
+  {
+   "start": 21540352,
+   "lang": "en",
+   "bytes": 1859,
+   "nats": 1001.478893995285,
+   "gpt2_tokens": 307
+  },
+  {
+   "start": 21585408,
+   "lang": "en",
+   "bytes": 1826,
+   "nats": 1049.3740103244781,
+   "gpt2_tokens": 307
+  },
+  {
+   "start": 21630464,
+   "lang": "en",
+   "bytes": 1920,
+   "nats": 1145.8846199512482,
+   "gpt2_tokens": 345
+  },
+  {
+   "start": 21675520,
+   "lang": "en",
+   "bytes": 1770,
+   "nats": 1119.4630193710327,
+   "gpt2_tokens": 326
+  },
+  {
+   "start": 21720576,
+   "lang": "en",
+   "bytes": 1743,
+   "nats": 1002.7998442649841,
+   "gpt2_tokens": 322
+  },
+  {
+   "start": 21766144,
+   "lang": "en",
+   "bytes": 1886,
+   "nats": 1013.698655128479,
+   "gpt2_tokens": 332
+  },
+  {
+   "start": 21811200,
+   "lang": "en",
+   "bytes": 1624,
+   "nats": 1159.8782694339752,
+   "gpt2_tokens": 305
+  },
+  {
+   "start": 21856256,
+   "lang": "en",
+   "bytes": 1836,
+   "nats": 1131.923687696457,
+   "gpt2_tokens": 321
+  },
+  {
+   "start": 21901312,
+   "lang": "en",
+   "bytes": 1999,
+   "nats": 1575.7930445671082,
+   "gpt2_tokens": 389
+  },
+  {
+   "start": 21946368,
+   "lang": "en",
+   "bytes": 2129,
+   "nats": 1569.0401315689087,
+   "gpt2_tokens": 405
+  },
+  {
+   "start": 21991936,
+   "lang": "en",
+   "bytes": 1856,
+   "nats": 994.2243759632111,
+   "gpt2_tokens": 329
+  },
+  {
+   "start": 22036992,
+   "lang": "en",
+   "bytes": 1576,
+   "nats": 1522.8644309043884,
+   "gpt2_tokens": 371
+  },
+  {
+   "start": 22082048,
+   "lang": "en",
+   "bytes": 1777,
+   "nats": 1782.461139678955,
+   "gpt2_tokens": 444
+  },
+  {
+   "start": 22127104,
+   "lang": "en",
+   "bytes": 1778,
+   "nats": 1550.9837176799774,
+   "gpt2_tokens": 419
+  },
+  {
+   "start": 22172160,
+   "lang": "en",
+   "bytes": 1578,
+   "nats": 1015.3953504562378,
+   "gpt2_tokens": 290
+  },
+  {
+   "start": 22217728,
+   "lang": "en",
+   "bytes": 1531,
+   "nats": 1547.1757292747498,
+   "gpt2_tokens": 381
+  },
+  {
+   "start": 22262784,
+   "lang": "en",
+   "bytes": 1811,
+   "nats": 1643.400827407837,
+   "gpt2_tokens": 372
+  },
+  {
+   "start": 22307840,
+   "lang": "en",
+   "bytes": 874,
+   "nats": 950.2035295963287,
+   "gpt2_tokens": 383
+  },
+  {
+   "start": 22352896,
+   "lang": "en",
+   "bytes": 1510,
+   "nats": 1202.8321206569672,
+   "gpt2_tokens": 325
+  },
+  {
+   "start": 22397952,
+   "lang": "en",
+   "bytes": 1992,
+   "nats": 1525.3493790626526,
+   "gpt2_tokens": 386
+  },
+  {
+   "start": 22443520,
+   "lang": "en",
+   "bytes": 1705,
+   "nats": 1336.1703848838806,
+   "gpt2_tokens": 479
+  },
+  {
+   "start": 22488576,
+   "lang": "en",
+   "bytes": 1182,
+   "nats": 1484.5515251159668,
+   "gpt2_tokens": 400
+  },
+  {
+   "start": 22533632,
+   "lang": "en",
+   "bytes": 1716,
+   "nats": 1719.2757053375244,
+   "gpt2_tokens": 378
+  },
+  {
+   "start": 22578688,
+   "lang": "en",
+   "bytes": 1614,
+   "nats": 1488.0367712974548,
+   "gpt2_tokens": 462
+  },
+  {
+   "start": 22623744,
+   "lang": "en",
+   "bytes": 1379,
+   "nats": 1396.2520880699158,
+   "gpt2_tokens": 438
+  },
+  {
+   "start": 22669312,
+   "lang": "en",
+   "bytes": 1793,
+   "nats": 1686.4136219024658,
+   "gpt2_tokens": 380
+  },
+  {
+   "start": 22714368,
+   "lang": "en",
+   "bytes": 1983,
+   "nats": 1630.780191898346,
+   "gpt2_tokens": 413
+  },
+  {
+   "start": 22759424,
+   "lang": "en",
+   "bytes": 1624,
+   "nats": 1666.2125735282898,
+   "gpt2_tokens": 377
+  },
+  {
+   "start": 22804480,
+   "lang": "en",
+   "bytes": 1983,
+   "nats": 1773.5565848350525,
+   "gpt2_tokens": 417
+  },
+  {
+   "start": 22849536,
+   "lang": "en",
+   "bytes": 1794,
+   "nats": 1675.537874698639,
+   "gpt2_tokens": 419
+  },
+  {
+   "start": 22895104,
+   "lang": "en",
+   "bytes": 1525,
+   "nats": 1809.4552898406982,
+   "gpt2_tokens": 389
+  },
+  {
+   "start": 22940160,
+   "lang": "en",
+   "bytes": 1923,
+   "nats": 1146.5843772888184,
+   "gpt2_tokens": 344
+  },
+  {
+   "start": 22985216,
+   "lang": "en",
+   "bytes": 1950,
+   "nats": 1691.3847336769104,
+   "gpt2_tokens": 407
+  },
+  {
+   "start": 23030272,
+   "lang": "en",
+   "bytes": 1846,
+   "nats": 836.911379814148,
+   "gpt2_tokens": 337
+  },
+  {
+   "start": 23075328,
+   "lang": "en",
+   "bytes": 2019,
+   "nats": 1472.3327255249023,
+   "gpt2_tokens": 395
+  },
+  {
+   "start": 23120896,
+   "lang": "en",
+   "bytes": 1601,
+   "nats": 1423.8110773563385,
+   "gpt2_tokens": 443
+  },
+  {
+   "start": 23165952,
+   "lang": "en",
+   "bytes": 1157,
+   "nats": 1256.7760231494904,
+   "gpt2_tokens": 437
+  },
+  {
+   "start": 23211008,
+   "lang": "en",
+   "bytes": 1855,
+   "nats": 1684.255301952362,
+   "gpt2_tokens": 395
+  },
+  {
+   "start": 23256064,
+   "lang": "en",
+   "bytes": 1384,
+   "nats": 1222.3457946777344,
+   "gpt2_tokens": 326
+  },
+  {
+   "start": 23301120,
+   "lang": "en",
+   "bytes": 1833,
+   "nats": 1750.79949426651,
+   "gpt2_tokens": 413
+  },
+  {
+   "start": 23346688,
+   "lang": "en",
+   "bytes": 1851,
+   "nats": 1595.7818756103516,
+   "gpt2_tokens": 391
+  },
+  {
+   "start": 23391744,
+   "lang": "en",
+   "bytes": 1953,
+   "nats": 1560.4927253723145,
+   "gpt2_tokens": 360
+  },
+  {
+   "start": 23436800,
+   "lang": "en",
+   "bytes": 1832,
+   "nats": 1442.5084311962128,
+   "gpt2_tokens": 447
+  },
+  {
+   "start": 23481856,
+   "lang": "en",
+   "bytes": 1820,
+   "nats": 1407.2797403335571,
+   "gpt2_tokens": 337
+  },
+  {
+   "start": 23526912,
+   "lang": "en",
+   "bytes": 1663,
+   "nats": 1156.3456118106842,
+   "gpt2_tokens": 325
+  },
+  {
+   "start": 23572480,
+   "lang": "en",
+   "bytes": 1507,
+   "nats": 1479.4498715400696,
+   "gpt2_tokens": 517
+  },
+  {
+   "start": 23617536,
+   "lang": "en",
+   "bytes": 2018,
+   "nats": 1875.5223655700684,
+   "gpt2_tokens": 392
+  },
+  {
+   "start": 23662592,
+   "lang": "en",
+   "bytes": 1914,
+   "nats": 1469.8616962432861,
+   "gpt2_tokens": 362
+  },
+  {
+   "start": 23707648,
+   "lang": "en",
+   "bytes": 1784,
+   "nats": 1191.601718902588,
+   "gpt2_tokens": 336
+  },
+  {
+   "start": 23752704,
+   "lang": "en",
+   "bytes": 1440,
+   "nats": 1228.71728348732,
+   "gpt2_tokens": 341
+  },
+  {
+   "start": 23798272,
+   "lang": "en",
+   "bytes": 1995,
+   "nats": 1822.680588722229,
+   "gpt2_tokens": 427
+  },
+  {
+   "start": 23843328,
+   "lang": "en",
+   "bytes": 1842,
+   "nats": 1612.4189958572388,
+   "gpt2_tokens": 402
+  },
+  {
+   "start": 23888384,
+   "lang": "en",
+   "bytes": 1787,
+   "nats": 1678.1463088989258,
+   "gpt2_tokens": 368
+  },
+  {
+   "start": 23933440,
+   "lang": "en",
+   "bytes": 1367,
+   "nats": 1696.8463439941406,
+   "gpt2_tokens": 416
+  },
+  {
+   "start": 23978496,
+   "lang": "en",
+   "bytes": 1757,
+   "nats": 1804.8283066749573,
+   "gpt2_tokens": 409
+  },
+  {
+   "start": 24024064,
+   "lang": "en",
+   "bytes": 1525,
+   "nats": 1169.6268525123596,
+   "gpt2_tokens": 354
+  },
+  {
+   "start": 24069120,
+   "lang": "en",
+   "bytes": 1838,
+   "nats": 1586.7781343460083,
+   "gpt2_tokens": 394
+  },
+  {
+   "start": 24114176,
+   "lang": "en",
+   "bytes": 1592,
+   "nats": 1904.929443359375,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 24159232,
+   "lang": "en",
+   "bytes": 1552,
+   "nats": 1219.1428542137146,
+   "gpt2_tokens": 375
+  },
+  {
+   "start": 24204288,
+   "lang": "en",
+   "bytes": 1751,
+   "nats": 1164.5286626815796,
+   "gpt2_tokens": 382
+  },
+  {
+   "start": 24249856,
+   "lang": "en",
+   "bytes": 1618,
+   "nats": 986.5011901855469,
+   "gpt2_tokens": 328
+  },
+  {
+   "start": 24294912,
+   "lang": "en",
+   "bytes": 1489,
+   "nats": 1610.2054495811462,
+   "gpt2_tokens": 478
+  },
+  {
+   "start": 24339968,
+   "lang": "en",
+   "bytes": 1723,
+   "nats": 1604.6844663619995,
+   "gpt2_tokens": 453
+  },
+  {
+   "start": 24385024,
+   "lang": "en",
+   "bytes": 1826,
+   "nats": 1662.6576957702637,
+   "gpt2_tokens": 443
+  },
+  {
+   "start": 24430080,
+   "lang": "en",
+   "bytes": 1765,
+   "nats": 1718.5679750442505,
+   "gpt2_tokens": 443
+  },
+  {
+   "start": 24475648,
+   "lang": "en",
+   "bytes": 1825,
+   "nats": 1765.0782222747803,
+   "gpt2_tokens": 444
+  },
+  {
+   "start": 24520704,
+   "lang": "en",
+   "bytes": 1648,
+   "nats": 1263.2572212219238,
+   "gpt2_tokens": 353
+  },
+  {
+   "start": 24565760,
+   "lang": "en",
+   "bytes": 1572,
+   "nats": 1485.0070905685425,
+   "gpt2_tokens": 442
+  },
+  {
+   "start": 24610816,
+   "lang": "en",
+   "bytes": 1775,
+   "nats": 1618.5624918937683,
+   "gpt2_tokens": 401
+  },
+  {
+   "start": 24655872,
+   "lang": "en",
+   "bytes": 1268,
+   "nats": 1449.2614316940308,
+   "gpt2_tokens": 342
+  },
+  {
+   "start": 24701440,
+   "lang": "en",
+   "bytes": 1550,
+   "nats": 948.4631717205048,
+   "gpt2_tokens": 315
+  },
+  {
+   "start": 24746496,
+   "lang": "en",
+   "bytes": 1916,
+   "nats": 1599.4473838806152,
+   "gpt2_tokens": 408
+  },
+  {
+   "start": 24791552,
+   "lang": "en",
+   "bytes": 1698,
+   "nats": 1302.4969539642334,
+   "gpt2_tokens": 354
+  },
+  {
+   "start": 24836608,
+   "lang": "en",
+   "bytes": 1950,
+   "nats": 1543.8265399932861,
+   "gpt2_tokens": 408
+  },
+  {
+   "start": 24881664,
+   "lang": "en",
+   "bytes": 1963,
+   "nats": 1632.5744540691376,
+   "gpt2_tokens": 449
+  },
+  {
+   "start": 24927232,
+   "lang": "en",
+   "bytes": 1740,
+   "nats": 1524.4813721179962,
+   "gpt2_tokens": 421
+  },
+  {
+   "start": 24972288,
+   "lang": "en",
+   "bytes": 1789,
+   "nats": 1599.388646364212,
+   "gpt2_tokens": 421
+  },
+  {
+   "start": 25017344,
+   "lang": "en",
+   "bytes": 1489,
+   "nats": 1235.9721400737762,
+   "gpt2_tokens": 331
+  },
+  {
+   "start": 25062400,
+   "lang": "en",
+   "bytes": 1766,
+   "nats": 1322.841272354126,
+   "gpt2_tokens": 383
+  },
+  {
+   "start": 25107456,
+   "lang": "en",
+   "bytes": 1679,
+   "nats": 1022.5424900054932,
+   "gpt2_tokens": 344
+  },
+  {
+   "start": 25153024,
+   "lang": "en",
+   "bytes": 1545,
+   "nats": 1316.3583092689514,
+   "gpt2_tokens": 418
+  },
+  {
+   "start": 25198080,
+   "lang": "en",
+   "bytes": 1687,
+   "nats": 1654.4980087280273,
+   "gpt2_tokens": 412
+  },
+  {
+   "start": 25243136,
+   "lang": "en",
+   "bytes": 1767,
+   "nats": 1433.6923699378967,
+   "gpt2_tokens": 462
+  },
+  {
+   "start": 25288192,
+   "lang": "en",
+   "bytes": 995,
+   "nats": 1109.594970703125,
+   "gpt2_tokens": 384
+  },
+  {
+   "start": 25333248,
+   "lang": "en",
+   "bytes": 2201,
+   "nats": 1598.6916089057922,
+   "gpt2_tokens": 414
+  },
+  {
+   "start": 25378816,
+   "lang": "en",
+   "bytes": 1860,
+   "nats": 1728.4798307418823,
+   "gpt2_tokens": 438
+  },
+  {
+   "start": 25423872,
+   "lang": "en",
+   "bytes": 1653,
+   "nats": 1648.918965101242,
+   "gpt2_tokens": 451
+  },
+  {
+   "start": 25468928,
+   "lang": "en",
+   "bytes": 1631,
+   "nats": 1407.5292224884033,
+   "gpt2_tokens": 481
+  },
+  {
+   "start": 25513984,
+   "lang": "en",
+   "bytes": 1642,
+   "nats": 1137.8730421066284,
+   "gpt2_tokens": 334
+  },
+  {
+   "start": 25559040,
+   "lang": "en",
+   "bytes": 1438,
+   "nats": 1070.3288831710815,
+   "gpt2_tokens": 322
+  },
+  {
+   "start": 25604608,
+   "lang": "en",
+   "bytes": 1857,
+   "nats": 1644.1213035583496,
+   "gpt2_tokens": 428
+  },
+  {
+   "start": 25649664,
+   "lang": "en",
+   "bytes": 1696,
+   "nats": 1129.9396784305573,
+   "gpt2_tokens": 339
+  },
+  {
+   "start": 25694720,
+   "lang": "en",
+   "bytes": 1946,
+   "nats": 1708.229531288147,
+   "gpt2_tokens": 434
+  },
+  {
+   "start": 25739776,
+   "lang": "en",
+   "bytes": 1973,
+   "nats": 1482.8505744934082,
+   "gpt2_tokens": 392
+  },
+  {
+   "start": 25784832,
+   "lang": "en",
+   "bytes": 1893,
+   "nats": 1670.6955347061157,
+   "gpt2_tokens": 371
+  },
+  {
+   "start": 25830400,
+   "lang": "en",
+   "bytes": 1625,
+   "nats": 1482.08518576622,
+   "gpt2_tokens": 437
+  },
+  {
+   "start": 25875456,
+   "lang": "en",
+   "bytes": 1439,
+   "nats": 1078.637371301651,
+   "gpt2_tokens": 447
+  },
+  {
+   "start": 25920512,
+   "lang": "en",
+   "bytes": 1870,
+   "nats": 1590.3856163024902,
+   "gpt2_tokens": 422
+  },
+  {
+   "start": 25965568,
+   "lang": "en",
+   "bytes": 2063,
+   "nats": 1850.331913948059,
+   "gpt2_tokens": 438
+  },
+  {
+   "start": 26010624,
+   "lang": "en",
+   "bytes": 1036,
+   "nats": 1298.871663093567,
+   "gpt2_tokens": 381
+  },
+  {
+   "start": 26055680,
+   "lang": "en",
+   "bytes": 1222,
+   "nats": 1545.1780557632446,
+   "gpt2_tokens": 375
+  },
+  {
+   "start": 26101248,
+   "lang": "en",
+   "bytes": 1958,
+   "nats": 1720.580979347229,
+   "gpt2_tokens": 452
+  },
+  {
+   "start": 26146304,
+   "lang": "en",
+   "bytes": 1309,
+   "nats": 1282.8044271469116,
+   "gpt2_tokens": 420
+  },
+  {
+   "start": 26191360,
+   "lang": "en",
+   "bytes": 1860,
+   "nats": 1671.6141777038574,
+   "gpt2_tokens": 428
+  },
+  {
+   "start": 26236416,
+   "lang": "en",
+   "bytes": 1412,
+   "nats": 895.1886370182037,
+   "gpt2_tokens": 303
+  },
+  {
+   "start": 26281472,
+   "lang": "en",
+   "bytes": 1713,
+   "nats": 1656.3915467262268,
+   "gpt2_tokens": 405
+  },
+  {
+   "start": 26327040,
+   "lang": "en",
+   "bytes": 1486,
+   "nats": 1654.013320684433,
+   "gpt2_tokens": 489
+  },
+  {
+   "start": 26372096,
+   "lang": "en",
+   "bytes": 1758,
+   "nats": 1696.880283355713,
+   "gpt2_tokens": 394
+  },
+  {
+   "start": 26417152,
+   "lang": "en",
+   "bytes": 1812,
+   "nats": 1674.86354637146,
+   "gpt2_tokens": 437
+  },
+  {
+   "start": 26462208,
+   "lang": "en",
+   "bytes": 1600,
+   "nats": 1085.152367591858,
+   "gpt2_tokens": 316
+  },
+  {
+   "start": 26507264,
+   "lang": "en",
+   "bytes": 1516,
+   "nats": 1287.68918466568,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 26552832,
+   "lang": "en",
+   "bytes": 1498,
+   "nats": 1284.406828403473,
+   "gpt2_tokens": 449
+  },
+  {
+   "start": 26597888,
+   "lang": "en",
+   "bytes": 1320,
+   "nats": 1005.7732772827148,
+   "gpt2_tokens": 432
+  },
+  {
+   "start": 26642944,
+   "lang": "en",
+   "bytes": 1778,
+   "nats": 1464.6046357154846,
+   "gpt2_tokens": 421
+  },
+  {
+   "start": 26688000,
+   "lang": "en",
+   "bytes": 1864,
+   "nats": 1509.5955715179443,
+   "gpt2_tokens": 436
+  },
+  {
+   "start": 26733056,
+   "lang": "en",
+   "bytes": 1419,
+   "nats": 1081.1145951747894,
+   "gpt2_tokens": 333
+  },
+  {
+   "start": 26778624,
+   "lang": "en",
+   "bytes": 1965,
+   "nats": 1734.0646123886108,
+   "gpt2_tokens": 373
+  },
+  {
+   "start": 26823680,
+   "lang": "en",
+   "bytes": 1649,
+   "nats": 1465.9863739013672,
+   "gpt2_tokens": 432
+  },
+  {
+   "start": 26868736,
+   "lang": "en",
+   "bytes": 1296,
+   "nats": 1194.1628799438477,
+   "gpt2_tokens": 332
+  },
+  {
+   "start": 26913792,
+   "lang": "en",
+   "bytes": 1380,
+   "nats": 1530.4980630874634,
+   "gpt2_tokens": 374
+  },
+  {
+   "start": 26958848,
+   "lang": "en",
+   "bytes": 1335,
+   "nats": 1268.8546109199524,
+   "gpt2_tokens": 481
+  },
+  {
+   "start": 27004416,
+   "lang": "en",
+   "bytes": 1572,
+   "nats": 1314.359483718872,
+   "gpt2_tokens": 340
+  },
+  {
+   "start": 27049472,
+   "lang": "en",
+   "bytes": 1525,
+   "nats": 839.2639601230621,
+   "gpt2_tokens": 287
+  },
+  {
+   "start": 27094528,
+   "lang": "en",
+   "bytes": 1496,
+   "nats": 1016.115882396698,
+   "gpt2_tokens": 327
+  },
+  {
+   "start": 27139584,
+   "lang": "en",
+   "bytes": 1538,
+   "nats": 1213.2607383728027,
+   "gpt2_tokens": 326
+  },
+  {
+   "start": 27184640,
+   "lang": "en",
+   "bytes": 1490,
+   "nats": 1134.6417117118835,
+   "gpt2_tokens": 310
+  },
+  {
+   "start": 27230208,
+   "lang": "en",
+   "bytes": 1551,
+   "nats": 1266.477767944336,
+   "gpt2_tokens": 356
+  },
+  {
+   "start": 27275264,
+   "lang": "en",
+   "bytes": 1620,
+   "nats": 1196.0012426376343,
+   "gpt2_tokens": 356
+  },
+  {
+   "start": 27320320,
+   "lang": "en",
+   "bytes": 1557,
+   "nats": 1547.6939010620117,
+   "gpt2_tokens": 365
+  },
+  {
+   "start": 27365376,
+   "lang": "en",
+   "bytes": 1859,
+   "nats": 1517.0111417770386,
+   "gpt2_tokens": 374
+  },
+  {
+   "start": 27410432,
+   "lang": "en",
+   "bytes": 1954,
+   "nats": 1206.9584970474243,
+   "gpt2_tokens": 369
+  },
+  {
+   "start": 27456000,
+   "lang": "en",
+   "bytes": 1567,
+   "nats": 1580.286491394043,
+   "gpt2_tokens": 464
+  },
+  {
+   "start": 27501056,
+   "lang": "en",
+   "bytes": 1859,
+   "nats": 1453.2331252098083,
+   "gpt2_tokens": 417
+  },
+  {
+   "start": 27546112,
+   "lang": "en",
+   "bytes": 1657,
+   "nats": 1416.61039352417,
+   "gpt2_tokens": 436
+  },
+  {
+   "start": 27591168,
+   "lang": "en",
+   "bytes": 1612,
+   "nats": 1312.8908607959747,
+   "gpt2_tokens": 353
+  },
+  {
+   "start": 27636224,
+   "lang": "en",
+   "bytes": 1950,
+   "nats": 1681.9334335327148,
+   "gpt2_tokens": 414
+  },
+  {
+   "start": 27681792,
+   "lang": "en",
+   "bytes": 2024,
+   "nats": 1671.931589603424,
+   "gpt2_tokens": 401
+  },
+  {
+   "start": 27726848,
+   "lang": "en",
+   "bytes": 1567,
+   "nats": 1388.365390777588,
+   "gpt2_tokens": 459
+  },
+  {
+   "start": 27771904,
+   "lang": "en",
+   "bytes": 1779,
+   "nats": 1537.0354449748993,
+   "gpt2_tokens": 389
+  },
+  {
+   "start": 27816960,
+   "lang": "en",
+   "bytes": 1766,
+   "nats": 1514.173065662384,
+   "gpt2_tokens": 426
+  },
+  {
+   "start": 27862016,
+   "lang": "en",
+   "bytes": 1470,
+   "nats": 1212.2353248596191,
+   "gpt2_tokens": 328
+  },
+  {
+   "start": 27907584,
+   "lang": "en",
+   "bytes": 1836,
+   "nats": 1267.998390197754,
+   "gpt2_tokens": 360
+  },
+  {
+   "start": 27952640,
+   "lang": "en",
+   "bytes": 1877,
+   "nats": 1593.2197017669678,
+   "gpt2_tokens": 457
+  },
+  {
+   "start": 27997696,
+   "lang": "en",
+   "bytes": 1502,
+   "nats": 1178.2263374328613,
+   "gpt2_tokens": 422
+  },
+  {
+   "start": 28042752,
+   "lang": "en",
+   "bytes": 1859,
+   "nats": 1631.1524286270142,
+   "gpt2_tokens": 398
+  },
+  {
+   "start": 28087808,
+   "lang": "en",
+   "bytes": 1023,
+   "nats": 1128.5133361816406,
+   "gpt2_tokens": 384
+  },
+  {
+   "start": 28133376,
+   "lang": "en",
+   "bytes": 1659,
+   "nats": 1163.0046272277832,
+   "gpt2_tokens": 340
+  },
+  {
+   "start": 28178432,
+   "lang": "en",
+   "bytes": 1690,
+   "nats": 1317.764850616455,
+   "gpt2_tokens": 361
+  },
+  {
+   "start": 28223488,
+   "lang": "en",
+   "bytes": 1417,
+   "nats": 1113.6332137584686,
+   "gpt2_tokens": 323
+  },
+  {
+   "start": 28268544,
+   "lang": "en",
+   "bytes": 1666,
+   "nats": 1548.6478044986725,
+   "gpt2_tokens": 461
+  },
+  {
+   "start": 28313600,
+   "lang": "en",
+   "bytes": 1804,
+   "nats": 1541.1314344406128,
+   "gpt2_tokens": 404
+  },
+  {
+   "start": 28359168,
+   "lang": "en",
+   "bytes": 1504,
+   "nats": 1207.8340802192688,
+   "gpt2_tokens": 418
+  },
+  {
+   "start": 28404224,
+   "lang": "en",
+   "bytes": 1383,
+   "nats": 958.8791799545288,
+   "gpt2_tokens": 319
+  },
+  {
+   "start": 28449280,
+   "lang": "en",
+   "bytes": 1282,
+   "nats": 1230.8433837890625,
+   "gpt2_tokens": 432
+  },
+  {
+   "start": 28494336,
+   "lang": "en",
+   "bytes": 1504,
+   "nats": 1201.561871767044,
+   "gpt2_tokens": 329
+  },
+  {
+   "start": 28539392,
+   "lang": "en",
+   "bytes": 1232,
+   "nats": 1462.5760135650635,
+   "gpt2_tokens": 488
+  },
+  {
+   "start": 28584960,
+   "lang": "en",
+   "bytes": 1429,
+   "nats": 1027.3590202331543,
+   "gpt2_tokens": 328
+  },
+  {
+   "start": 28630016,
+   "lang": "ru",
+   "bytes": 2724,
+   "nats": 3511.637392759323,
+   "gpt2_tokens": 1599
+  },
+  {
+   "start": 28675072,
+   "lang": "ru",
+   "bytes": 2183,
+   "nats": 2743.683804988861,
+   "gpt2_tokens": 1251
+  },
+  {
+   "start": 28720128,
+   "lang": "ru",
+   "bytes": 2286,
+   "nats": 2685.0564296245575,
+   "gpt2_tokens": 1343
+  },
+  {
+   "start": 28765184,
+   "lang": "ru",
+   "bytes": 2607,
+   "nats": 3075.021719098091,
+   "gpt2_tokens": 1523
+  },
+  {
+   "start": 28810752,
+   "lang": "ru",
+   "bytes": 2473,
+   "nats": 2631.402367711067,
+   "gpt2_tokens": 1469
+  },
+  {
+   "start": 28855808,
+   "lang": "ru",
+   "bytes": 2648,
+   "nats": 3341.119773387909,
+   "gpt2_tokens": 1514
+  },
+  {
+   "start": 28900864,
+   "lang": "ru",
+   "bytes": 3108,
+   "nats": 3071.3906918764114,
+   "gpt2_tokens": 1812
+  },
+  {
+   "start": 28945920,
+   "lang": "ru",
+   "bytes": 2672,
+   "nats": 3410.889548063278,
+   "gpt2_tokens": 1551
+  },
+  {
+   "start": 28990976,
+   "lang": "ru",
+   "bytes": 2537,
+   "nats": 3274.042044401169,
+   "gpt2_tokens": 1415
+  },
+  {
+   "start": 29036544,
+   "lang": "ru",
+   "bytes": 2649,
+   "nats": 3071.5323326587677,
+   "gpt2_tokens": 1535
+  },
+  {
+   "start": 29081600,
+   "lang": "ru",
+   "bytes": 3244,
+   "nats": 3830.4572048187256,
+   "gpt2_tokens": 1889
+  },
+  {
+   "start": 29126656,
+   "lang": "ru",
+   "bytes": 2674,
+   "nats": 3354.6391911506653,
+   "gpt2_tokens": 1539
+  },
+  {
+   "start": 29171712,
+   "lang": "ru",
+   "bytes": 2526,
+   "nats": 3020.680470943451,
+   "gpt2_tokens": 1452
+  },
+  {
+   "start": 29216768,
+   "lang": "ru",
+   "bytes": 2698,
+   "nats": 3112.3475546836853,
+   "gpt2_tokens": 1593
+  },
+  {
+   "start": 29262336,
+   "lang": "ru",
+   "bytes": 2495,
+   "nats": 3020.4907150268555,
+   "gpt2_tokens": 1452
+  },
+  {
+   "start": 29307392,
+   "lang": "ru",
+   "bytes": 3755,
+   "nats": 3858.189603328705,
+   "gpt2_tokens": 2188
+  },
+  {
+   "start": 29352448,
+   "lang": "ru",
+   "bytes": 2617,
+   "nats": 3481.153033018112,
+   "gpt2_tokens": 1525
+  },
+  {
+   "start": 29397504,
+   "lang": "ru",
+   "bytes": 2625,
+   "nats": 3203.2615399360657,
+   "gpt2_tokens": 1578
+  },
+  {
+   "start": 29442560,
+   "lang": "ru",
+   "bytes": 3169,
+   "nats": 3527.8064888715744,
+   "gpt2_tokens": 1850
+  },
+  {
+   "start": 29488128,
+   "lang": "ru",
+   "bytes": 2495,
+   "nats": 3221.1302404403687,
+   "gpt2_tokens": 1437
+  },
+  {
+   "start": 29533184,
+   "lang": "ru",
+   "bytes": 3195,
+   "nats": 3625.9342987537384,
+   "gpt2_tokens": 1871
+  },
+  {
+   "start": 29578240,
+   "lang": "ru",
+   "bytes": 2736,
+   "nats": 3392.185379743576,
+   "gpt2_tokens": 1600
+  },
+  {
+   "start": 29623296,
+   "lang": "ru",
+   "bytes": 2096,
+   "nats": 2755.884713411331,
+   "gpt2_tokens": 1171
+  },
+  {
+   "start": 29668352,
+   "lang": "ru",
+   "bytes": 1610,
+   "nats": 2062.329877138138,
+   "gpt2_tokens": 889
+  },
+  {
+   "start": 29713920,
+   "lang": "ru",
+   "bytes": 2028,
+   "nats": 2548.7555165290833,
+   "gpt2_tokens": 1219
+  },
+  {
+   "start": 29758976,
+   "lang": "ru",
+   "bytes": 2150,
+   "nats": 2568.3851305246353,
+   "gpt2_tokens": 1241
+  },
+  {
+   "start": 29804032,
+   "lang": "ru",
+   "bytes": 2463,
+   "nats": 2245.236773252487,
+   "gpt2_tokens": 1406
+  },
+  {
+   "start": 29849088,
+   "lang": "ru",
+   "bytes": 2557,
+   "nats": 3032.403952598572,
+   "gpt2_tokens": 1525
+  },
+  {
+   "start": 29894144,
+   "lang": "ru",
+   "bytes": 2981,
+   "nats": 3616.8042964935303,
+   "gpt2_tokens": 1736
+  },
+  {
+   "start": 29939712,
+   "lang": "ru",
+   "bytes": 3055,
+   "nats": 3435.1177681684494,
+   "gpt2_tokens": 1780
+  },
+  {
+   "start": 29984768,
+   "lang": "ru",
+   "bytes": 1731,
+   "nats": 2474.8404932022095,
+   "gpt2_tokens": 985
+  },
+  {
+   "start": 30029824,
+   "lang": "ru",
+   "bytes": 2388,
+   "nats": 3308.3216004371643,
+   "gpt2_tokens": 1400
+  },
+  {
+   "start": 30074880,
+   "lang": "ru",
+   "bytes": 2943,
+   "nats": 3603.0559108257294,
+   "gpt2_tokens": 1677
+  },
+  {
+   "start": 30119936,
+   "lang": "ru",
+   "bytes": 1986,
+   "nats": 2252.9016802310944,
+   "gpt2_tokens": 1142
+  },
+  {
+   "start": 30165504,
+   "lang": "ru",
+   "bytes": 2875,
+   "nats": 3535.7300205230713,
+   "gpt2_tokens": 1674
+  },
+  {
+   "start": 30210560,
+   "lang": "ru",
+   "bytes": 2883,
+   "nats": 3623.4108653068542,
+   "gpt2_tokens": 1671
+  },
+  {
+   "start": 30255616,
+   "lang": "ru",
+   "bytes": 1838,
+   "nats": 2109.483475446701,
+   "gpt2_tokens": 1019
+  },
+  {
+   "start": 30300672,
+   "lang": "ru",
+   "bytes": 2887,
+   "nats": 3599.6624915599823,
+   "gpt2_tokens": 1683
+  },
+  {
+   "start": 30345728,
+   "lang": "ru",
+   "bytes": 2778,
+   "nats": 3430.0694618225098,
+   "gpt2_tokens": 1608
+  },
+  {
+   "start": 30391296,
+   "lang": "ru",
+   "bytes": 2866,
+   "nats": 3378.2844668626785,
+   "gpt2_tokens": 1666
+  },
+  {
+   "start": 30436352,
+   "lang": "ru",
+   "bytes": 2357,
+   "nats": 2980.1587913036346,
+   "gpt2_tokens": 1373
+  },
+  {
+   "start": 30481408,
+   "lang": "ru",
+   "bytes": 2778,
+   "nats": 3607.831650018692,
+   "gpt2_tokens": 1640
+  },
+  {
+   "start": 30526464,
+   "lang": "ru",
+   "bytes": 2776,
+   "nats": 3381.257984638214,
+   "gpt2_tokens": 1621
+  },
+  {
+   "start": 30571520,
+   "lang": "ru",
+   "bytes": 2485,
+   "nats": 3087.0045869350433,
+   "gpt2_tokens": 1446
+  },
+  {
+   "start": 30617088,
+   "lang": "ru",
+   "bytes": 1796,
+   "nats": 2852.1442301273346,
+   "gpt2_tokens": 1037
+  },
+  {
+   "start": 30662144,
+   "lang": "ru",
+   "bytes": 2685,
+   "nats": 3501.9647283554077,
+   "gpt2_tokens": 1601
+  },
+  {
+   "start": 30707200,
+   "lang": "ru",
+   "bytes": 2375,
+   "nats": 2881.000401377678,
+   "gpt2_tokens": 1434
+  },
+  {
+   "start": 30752256,
+   "lang": "ru",
+   "bytes": 2025,
+   "nats": 2476.8170578479767,
+   "gpt2_tokens": 1125
+  },
+  {
+   "start": 30797312,
+   "lang": "ru",
+   "bytes": 2711,
+   "nats": 3532.2510130405426,
+   "gpt2_tokens": 1596
+  },
+  {
+   "start": 30842880,
+   "lang": "ru",
+   "bytes": 2305,
+   "nats": 3146.7195739746094,
+   "gpt2_tokens": 1344
+  },
+  {
+   "start": 30887936,
+   "lang": "ru",
+   "bytes": 1815,
+   "nats": 2485.4785685539246,
+   "gpt2_tokens": 1007
+  },
+  {
+   "start": 30932992,
+   "lang": "ru",
+   "bytes": 3442,
+   "nats": 3709.7538092136383,
+   "gpt2_tokens": 2071
+  },
+  {
+   "start": 30978048,
+   "lang": "ru",
+   "bytes": 1891,
+   "nats": 2318.372843503952,
+   "gpt2_tokens": 1115
+  },
+  {
+   "start": 31023104,
+   "lang": "ru",
+   "bytes": 2995,
+   "nats": 3736.149163246155,
+   "gpt2_tokens": 1766
+  },
+  {
+   "start": 31068672,
+   "lang": "ru",
+   "bytes": 2527,
+   "nats": 3009.0361156463623,
+   "gpt2_tokens": 1528
+  },
+  {
+   "start": 31113728,
+   "lang": "ru",
+   "bytes": 2006,
+   "nats": 2460.192664861679,
+   "gpt2_tokens": 1183
+  },
+  {
+   "start": 31158784,
+   "lang": "ru",
+   "bytes": 2688,
+   "nats": 2947.437012076378,
+   "gpt2_tokens": 1551
+  },
+  {
+   "start": 31203840,
+   "lang": "ru",
+   "bytes": 2506,
+   "nats": 3090.7545766830444,
+   "gpt2_tokens": 1471
+  },
+  {
+   "start": 31248896,
+   "lang": "ru",
+   "bytes": 2686,
+   "nats": 3259.9720990657806,
+   "gpt2_tokens": 1597
+  },
+  {
+   "start": 31294464,
+   "lang": "ru",
+   "bytes": 2707,
+   "nats": 3364.4049859046936,
+   "gpt2_tokens": 1613
+  },
+  {
+   "start": 31339520,
+   "lang": "ru",
+   "bytes": 2543,
+   "nats": 3171.003273963928,
+   "gpt2_tokens": 1501
+  },
+  {
+   "start": 31384576,
+   "lang": "ru",
+   "bytes": 2539,
+   "nats": 2855.2912830114365,
+   "gpt2_tokens": 1441
+  },
+  {
+   "start": 31429632,
+   "lang": "ru",
+   "bytes": 2765,
+   "nats": 3551.423807621002,
+   "gpt2_tokens": 1622
+  },
+  {
+   "start": 31474688,
+   "lang": "ru",
+   "bytes": 2988,
+   "nats": 3506.6677854061127,
+   "gpt2_tokens": 1775
+  },
+  {
+   "start": 31520256,
+   "lang": "ru",
+   "bytes": 2772,
+   "nats": 3308.8315303325653,
+   "gpt2_tokens": 1612
+  },
+  {
+   "start": 31565312,
+   "lang": "ru",
+   "bytes": 2336,
+   "nats": 3242.150052547455,
+   "gpt2_tokens": 1375
+  },
+  {
+   "start": 31610368,
+   "lang": "ru",
+   "bytes": 1687,
+   "nats": 2157.8379094600677,
+   "gpt2_tokens": 985
+  },
+  {
+   "start": 31655424,
+   "lang": "ru",
+   "bytes": 2309,
+   "nats": 3050.093106031418,
+   "gpt2_tokens": 1352
+  },
+  {
+   "start": 31700480,
+   "lang": "ru",
+   "bytes": 2351,
+   "nats": 3067.604420900345,
+   "gpt2_tokens": 1367
+  },
+  {
+   "start": 31746048,
+   "lang": "ru",
+   "bytes": 2587,
+   "nats": 3233.789132833481,
+   "gpt2_tokens": 1534
+  },
+  {
+   "start": 31791104,
+   "lang": "ru",
+   "bytes": 2171,
+   "nats": 2889.9719862937927,
+   "gpt2_tokens": 1264
+  },
+  {
+   "start": 31836160,
+   "lang": "ru",
+   "bytes": 2406,
+   "nats": 2998.862298488617,
+   "gpt2_tokens": 1362
+  },
+  {
+   "start": 31881216,
+   "lang": "ru",
+   "bytes": 2792,
+   "nats": 3536.9881093502045,
+   "gpt2_tokens": 1634
+  },
+  {
+   "start": 31926272,
+   "lang": "ru",
+   "bytes": 2026,
+   "nats": 2591.6294717788696,
+   "gpt2_tokens": 1155
+  },
+  {
+   "start": 31971328,
+   "lang": "ru",
+   "bytes": 1402,
+   "nats": 1909.1109170913696,
+   "gpt2_tokens": 764
+  },
+  {
+   "start": 32016896,
+   "lang": "ru",
+   "bytes": 2760,
+   "nats": 3453.3421819210052,
+   "gpt2_tokens": 1629
+  },
+  {
+   "start": 32061952,
+   "lang": "ru",
+   "bytes": 2014,
+   "nats": 2703.934511423111,
+   "gpt2_tokens": 1057
+  },
+  {
+   "start": 32107008,
+   "lang": "ru",
+   "bytes": 2558,
+   "nats": 2954.495838403702,
+   "gpt2_tokens": 1490
+  },
+  {
+   "start": 32152064,
+   "lang": "ru",
+   "bytes": 1593,
+   "nats": 2479.5440912246704,
+   "gpt2_tokens": 900
+  },
+  {
+   "start": 32197120,
+   "lang": "ru",
+   "bytes": 2484,
+   "nats": 3011.777529478073,
+   "gpt2_tokens": 1459
+  },
+  {
+   "start": 32242688,
+   "lang": "ru",
+   "bytes": 2620,
+   "nats": 3308.683678150177,
+   "gpt2_tokens": 1546
+  },
+  {
+   "start": 32287744,
+   "lang": "ru",
+   "bytes": 2554,
+   "nats": 3365.48229432106,
+   "gpt2_tokens": 1527
+  },
+  {
+   "start": 32332800,
+   "lang": "ru",
+   "bytes": 2919,
+   "nats": 3627.648942232132,
+   "gpt2_tokens": 1722
+  },
+  {
+   "start": 32377856,
+   "lang": "ru",
+   "bytes": 2553,
+   "nats": 2936.4706540107727,
+   "gpt2_tokens": 1471
+  },
+  {
+   "start": 32422912,
+   "lang": "ru",
+   "bytes": 1645,
+   "nats": 2107.8447875976562,
+   "gpt2_tokens": 768
+  },
+  {
+   "start": 32468480,
+   "lang": "ru",
+   "bytes": 2345,
+   "nats": 2702.5476804971695,
+   "gpt2_tokens": 1371
+  },
+  {
+   "start": 32513536,
+   "lang": "ru",
+   "bytes": 2385,
+   "nats": 2981.761801958084,
+   "gpt2_tokens": 1371
+  },
+  {
+   "start": 32558592,
+   "lang": "ru",
+   "bytes": 2304,
+   "nats": 3143.308795452118,
+   "gpt2_tokens": 1352
+  },
+  {
+   "start": 32603648,
+   "lang": "ru",
+   "bytes": 2608,
+   "nats": 3351.805748462677,
+   "gpt2_tokens": 1545
+  },
+  {
+   "start": 32648704,
+   "lang": "ru",
+   "bytes": 2216,
+   "nats": 3054.1311008930206,
+   "gpt2_tokens": 1300
+  },
+  {
+   "start": 32694272,
+   "lang": "ru",
+   "bytes": 2764,
+   "nats": 3305.459853887558,
+   "gpt2_tokens": 1616
+  },
+  {
+   "start": 32739328,
+   "lang": "ru",
+   "bytes": 2310,
+   "nats": 2948.238856315613,
+   "gpt2_tokens": 1342
+  },
+  {
+   "start": 32784384,
+   "lang": "ru",
+   "bytes": 2995,
+   "nats": 3566.893585920334,
+   "gpt2_tokens": 1744
+  },
+  {
+   "start": 32829440,
+   "lang": "ru",
+   "bytes": 2571,
+   "nats": 3275.7672774791718,
+   "gpt2_tokens": 1492
+  },
+  {
+   "start": 32874496,
+   "lang": "ru",
+   "bytes": 2501,
+   "nats": 3252.638160467148,
+   "gpt2_tokens": 1491
+  },
+  {
+   "start": 32920064,
+   "lang": "ru",
+   "bytes": 2176,
+   "nats": 3124.0716717243195,
+   "gpt2_tokens": 1294
+  },
+  {
+   "start": 32965120,
+   "lang": "ru",
+   "bytes": 2279,
+   "nats": 2984.35098028183,
+   "gpt2_tokens": 1265
+  },
+  {
+   "start": 33010176,
+   "lang": "ru",
+   "bytes": 2413,
+   "nats": 2838.9454894065857,
+   "gpt2_tokens": 1422
+  },
+  {
+   "start": 33055232,
+   "lang": "ru",
+   "bytes": 2412,
+   "nats": 3393.966211795807,
+   "gpt2_tokens": 1404
+  },
+  {
+   "start": 33100288,
+   "lang": "ru",
+   "bytes": 1873,
+   "nats": 1514.4703469276428,
+   "gpt2_tokens": 1118
+  },
+  {
+   "start": 33145856,
+   "lang": "ru",
+   "bytes": 2895,
+   "nats": 3422.84896337986,
+   "gpt2_tokens": 1717
+  },
+  {
+   "start": 33190912,
+   "lang": "ru",
+   "bytes": 2473,
+   "nats": 3152.514169573784,
+   "gpt2_tokens": 1454
+  },
+  {
+   "start": 33235968,
+   "lang": "ru",
+   "bytes": 2318,
+   "nats": 3147.0467438697815,
+   "gpt2_tokens": 1348
+  },
+  {
+   "start": 33281024,
+   "lang": "ru",
+   "bytes": 3116,
+   "nats": 3532.371200323105,
+   "gpt2_tokens": 1875
+  },
+  {
+   "start": 33326080,
+   "lang": "ru",
+   "bytes": 2779,
+   "nats": 3355.4894955158234,
+   "gpt2_tokens": 1624
+  },
+  {
+   "start": 33371648,
+   "lang": "ru",
+   "bytes": 1922,
+   "nats": 2801.811281442642,
+   "gpt2_tokens": 1108
+  },
+  {
+   "start": 33416704,
+   "lang": "ru",
+   "bytes": 2387,
+   "nats": 2997.333894968033,
+   "gpt2_tokens": 1401
+  },
+  {
+   "start": 33461760,
+   "lang": "ru",
+   "bytes": 2751,
+   "nats": 3618.860464811325,
+   "gpt2_tokens": 1590
+  },
+  {
+   "start": 33506816,
+   "lang": "ru",
+   "bytes": 2435,
+   "nats": 3051.027904987335,
+   "gpt2_tokens": 1407
+  },
+  {
+   "start": 33551872,
+   "lang": "ru",
+   "bytes": 1435,
+   "nats": 1715.5457081794739,
+   "gpt2_tokens": 677
+  },
+  {
+   "start": 33597440,
+   "lang": "ru",
+   "bytes": 2805,
+   "nats": 3492.395450592041,
+   "gpt2_tokens": 1638
+  },
+  {
+   "start": 33642496,
+   "lang": "ru",
+   "bytes": 2422,
+   "nats": 3033.614313840866,
+   "gpt2_tokens": 1386
+  },
+  {
+   "start": 33687552,
+   "lang": "ru",
+   "bytes": 2738,
+   "nats": 3348.5545041561127,
+   "gpt2_tokens": 1607
+  },
+  {
+   "start": 33732608,
+   "lang": "ru",
+   "bytes": 1302,
+   "nats": 1534.0096588134766,
+   "gpt2_tokens": 608
+  },
+  {
+   "start": 33777664,
+   "lang": "ru",
+   "bytes": 2035,
+   "nats": 2515.1531224250793,
+   "gpt2_tokens": 1231
+  },
+  {
+   "start": 33823232,
+   "lang": "ru",
+   "bytes": 2408,
+   "nats": 3142.0064702033997,
+   "gpt2_tokens": 1370
+  },
+  {
+   "start": 33868288,
+   "lang": "ru",
+   "bytes": 3002,
+   "nats": 3557.11222243309,
+   "gpt2_tokens": 1731
+  },
+  {
+   "start": 33913344,
+   "lang": "ru",
+   "bytes": 1978,
+   "nats": 2794.816901445389,
+   "gpt2_tokens": 1118
+  },
+  {
+   "start": 33958400,
+   "lang": "ru",
+   "bytes": 2449,
+   "nats": 2795.960434317589,
+   "gpt2_tokens": 1460
+  },
+  {
+   "start": 34003456,
+   "lang": "ru",
+   "bytes": 1514,
+   "nats": 1710.3751068115234,
+   "gpt2_tokens": 866
+  },
+  {
+   "start": 34049024,
+   "lang": "ru",
+   "bytes": 2320,
+   "nats": 2729.8896646499634,
+   "gpt2_tokens": 1356
+  },
+  {
+   "start": 34094080,
+   "lang": "ru",
+   "bytes": 2676,
+   "nats": 3508.9066712856293,
+   "gpt2_tokens": 1532
+  },
+  {
+   "start": 34139136,
+   "lang": "ru",
+   "bytes": 2102,
+   "nats": 3030.901982307434,
+   "gpt2_tokens": 1133
+  },
+  {
+   "start": 34184192,
+   "lang": "ru",
+   "bytes": 3281,
+   "nats": 3651.1027748584747,
+   "gpt2_tokens": 1918
+  },
+  {
+   "start": 34229248,
+   "lang": "ru",
+   "bytes": 2501,
+   "nats": 3145.1875932216644,
+   "gpt2_tokens": 1469
+  },
+  {
+   "start": 34274816,
+   "lang": "ru",
+   "bytes": 3171,
+   "nats": 3648.0758442878723,
+   "gpt2_tokens": 1848
+  },
+  {
+   "start": 34319872,
+   "lang": "ru",
+   "bytes": 2792,
+   "nats": 3436.9825415611267,
+   "gpt2_tokens": 1635
+  },
+  {
+   "start": 34364928,
+   "lang": "ru",
+   "bytes": 1924,
+   "nats": 2404.9083778858185,
+   "gpt2_tokens": 1090
+  },
+  {
+   "start": 34409984,
+   "lang": "ru",
+   "bytes": 2433,
+   "nats": 3080.723797559738,
+   "gpt2_tokens": 1362
+  },
+  {
+   "start": 34455040,
+   "lang": "ru",
+   "bytes": 2849,
+   "nats": 3335.1138532161713,
+   "gpt2_tokens": 1661
+  },
+  {
+   "start": 34500608,
+   "lang": "ru",
+   "bytes": 2859,
+   "nats": 3651.6658129692078,
+   "gpt2_tokens": 1685
+  },
+  {
+   "start": 34545664,
+   "lang": "en",
+   "bytes": 514,
+   "nats": 736.6373505592346,
+   "gpt2_tokens": 447
+  },
+  {
+   "start": 34590720,
+   "lang": "ru",
+   "bytes": 2136,
+   "nats": 2627.414513349533,
+   "gpt2_tokens": 1237
+  },
+  {
+   "start": 34635776,
+   "lang": "ru",
+   "bytes": 3137,
+   "nats": 3604.5808901786804,
+   "gpt2_tokens": 1832
+  },
+  {
+   "start": 34680832,
+   "lang": "ru",
+   "bytes": 2595,
+   "nats": 3214.317616701126,
+   "gpt2_tokens": 1537
+  },
+  {
+   "start": 34726400,
+   "lang": "ru",
+   "bytes": 2781,
+   "nats": 3080.546447277069,
+   "gpt2_tokens": 1552
+  },
+  {
+   "start": 34771456,
+   "lang": "ru",
+   "bytes": 2503,
+   "nats": 3235.055412530899,
+   "gpt2_tokens": 1465
+  },
+  {
+   "start": 34816512,
+   "lang": "ru",
+   "bytes": 2343,
+   "nats": 3022.1020567417145,
+   "gpt2_tokens": 1401
+  },
+  {
+   "start": 34861568,
+   "lang": "ru",
+   "bytes": 2694,
+   "nats": 3336.686293363571,
+   "gpt2_tokens": 1573
+  },
+  {
+   "start": 34906624,
+   "lang": "ru",
+   "bytes": 2639,
+   "nats": 3476.1572177410126,
+   "gpt2_tokens": 1574
+  },
+  {
+   "start": 34952192,
+   "lang": "ru",
+   "bytes": 2524,
+   "nats": 3405.912973880768,
+   "gpt2_tokens": 1425
+  },
+  {
+   "start": 34997248,
+   "lang": "ru",
+   "bytes": 2424,
+   "nats": 3242.7269852161407,
+   "gpt2_tokens": 1456
+  },
+  {
+   "start": 35042304,
+   "lang": "ru",
+   "bytes": 2287,
+   "nats": 3007.689038515091,
+   "gpt2_tokens": 1350
+  },
+  {
+   "start": 35087360,
+   "lang": "ru",
+   "bytes": 2748,
+   "nats": 3250.8380320072174,
+   "gpt2_tokens": 1588
+  },
+  {
+   "start": 35132416,
+   "lang": "ru",
+   "bytes": 3062,
+   "nats": 3615.851007938385,
+   "gpt2_tokens": 1762
+  },
+  {
+   "start": 35177984,
+   "lang": "ru",
+   "bytes": 2740,
+   "nats": 3415.1579253673553,
+   "gpt2_tokens": 1607
+  },
+  {
+   "start": 35223040,
+   "lang": "ru",
+   "bytes": 2403,
+   "nats": 3262.106400489807,
+   "gpt2_tokens": 1414
+  },
+  {
+   "start": 35268096,
+   "lang": "ru",
+   "bytes": 2854,
+   "nats": 3603.2435913085938,
+   "gpt2_tokens": 1685
+  },
+  {
+   "start": 35313152,
+   "lang": "ru",
+   "bytes": 2246,
+   "nats": 3035.290437936783,
+   "gpt2_tokens": 1319
+  },
+  {
+   "start": 35358208,
+   "lang": "ru",
+   "bytes": 2106,
+   "nats": 3058.6254873275757,
+   "gpt2_tokens": 1233
+  },
+  {
+   "start": 35403776,
+   "lang": "ru",
+   "bytes": 2722,
+   "nats": 3440.8731257915497,
+   "gpt2_tokens": 1593
+  },
+  {
+   "start": 35448832,
+   "lang": "ru",
+   "bytes": 2869,
+   "nats": 3438.294439315796,
+   "gpt2_tokens": 1659
+  },
+  {
+   "start": 35493888,
+   "lang": "ru",
+   "bytes": 2525,
+   "nats": 3034.7539551258087,
+   "gpt2_tokens": 1491
+  },
+  {
+   "start": 35538944,
+   "lang": "ru",
+   "bytes": 2347,
+   "nats": 2911.735690355301,
+   "gpt2_tokens": 1371
+  },
+  {
+   "start": 35584000,
+   "lang": "ru",
+   "bytes": 2434,
+   "nats": 3078.817268371582,
+   "gpt2_tokens": 1397
+  },
+  {
+   "start": 35629568,
+   "lang": "ru",
+   "bytes": 2326,
+   "nats": 3104.925029039383,
+   "gpt2_tokens": 1383
+  },
+  {
+   "start": 35674624,
+   "lang": "ru",
+   "bytes": 2298,
+   "nats": 2897.1295795440674,
+   "gpt2_tokens": 1343
+  },
+  {
+   "start": 35719680,
+   "lang": "ru",
+   "bytes": 2729,
+   "nats": 3378.6188926696777,
+   "gpt2_tokens": 1597
+  },
+  {
+   "start": 35764736,
+   "lang": "ru",
+   "bytes": 2275,
+   "nats": 2653.438928961754,
+   "gpt2_tokens": 1342
+  },
+  {
+   "start": 35809792,
+   "lang": "ru",
+   "bytes": 2344,
+   "nats": 3049.845035791397,
+   "gpt2_tokens": 1385
+  },
+  {
+   "start": 35855360,
+   "lang": "ru",
+   "bytes": 2638,
+   "nats": 3284.4232048988342,
+   "gpt2_tokens": 1534
+  },
+  {
+   "start": 35900416,
+   "lang": "ru",
+   "bytes": 2614,
+   "nats": 3297.272629737854,
+   "gpt2_tokens": 1487
+  },
+  {
+   "start": 35945472,
+   "lang": "ru",
+   "bytes": 2496,
+   "nats": 3001.0284757614136,
+   "gpt2_tokens": 1501
+  },
+  {
+   "start": 35990528,
+   "lang": "ru",
+   "bytes": 2492,
+   "nats": 3349.4746165275574,
+   "gpt2_tokens": 1448
+  },
+  {
+   "start": 36035584,
+   "lang": "ru",
+   "bytes": 2801,
+   "nats": 3529.199110507965,
+   "gpt2_tokens": 1632
+  },
+  {
+   "start": 36081152,
+   "lang": "ru",
+   "bytes": 2214,
+   "nats": 2475.0273892879486,
+   "gpt2_tokens": 1293
+  },
+  {
+   "start": 36126208,
+   "lang": "ru",
+   "bytes": 2624,
+   "nats": 3400.371155023575,
+   "gpt2_tokens": 1564
+  },
+  {
+   "start": 36171264,
+   "lang": "ru",
+   "bytes": 2683,
+   "nats": 3358.2614545822144,
+   "gpt2_tokens": 1555
+  },
+  {
+   "start": 36216320,
+   "lang": "ru",
+   "bytes": 2219,
+   "nats": 2936.025152683258,
+   "gpt2_tokens": 1271
+  },
+  {
+   "start": 36261376,
+   "lang": "ru",
+   "bytes": 2370,
+   "nats": 3187.1319572925568,
+   "gpt2_tokens": 1377
+  },
+  {
+   "start": 36306944,
+   "lang": "ru",
+   "bytes": 2339,
+   "nats": 2983.000832080841,
+   "gpt2_tokens": 1349
+  },
+  {
+   "start": 36352000,
+   "lang": "ru",
+   "bytes": 2539,
+   "nats": 3271.229836463928,
+   "gpt2_tokens": 1494
+  },
+  {
+   "start": 36397056,
+   "lang": "ru",
+   "bytes": 2600,
+   "nats": 3467.781242132187,
+   "gpt2_tokens": 1511
+  },
+  {
+   "start": 36442112,
+   "lang": "ru",
+   "bytes": 2962,
+   "nats": 3698.9988408088684,
+   "gpt2_tokens": 1651
+  },
+  {
+   "start": 36487168,
+   "lang": "ru",
+   "bytes": 2087,
+   "nats": 2518.6429121494293,
+   "gpt2_tokens": 1171
+  },
+  {
+   "start": 36532736,
+   "lang": "ru",
+   "bytes": 2685,
+   "nats": 2881.515222787857,
+   "gpt2_tokens": 1566
+  },
+  {
+   "start": 36577792,
+   "lang": "ru",
+   "bytes": 2476,
+   "nats": 3173.300258874893,
+   "gpt2_tokens": 1449
+  },
+  {
+   "start": 36622848,
+   "lang": "ru",
+   "bytes": 2700,
+   "nats": 3435.9284913539886,
+   "gpt2_tokens": 1597
+  },
+  {
+   "start": 36667904,
+   "lang": "ru",
+   "bytes": 2062,
+   "nats": 2598.969792842865,
+   "gpt2_tokens": 1193
+  },
+  {
+   "start": 36712960,
+   "lang": "ru",
+   "bytes": 2950,
+   "nats": 3642.138043642044,
+   "gpt2_tokens": 1707
+  },
+  {
+   "start": 36758528,
+   "lang": "ru",
+   "bytes": 2784,
+   "nats": 3175.723148584366,
+   "gpt2_tokens": 1622
+  },
+  {
+   "start": 36803584,
+   "lang": "ru",
+   "bytes": 2146,
+   "nats": 2384.7845356464386,
+   "gpt2_tokens": 1262
+  },
+  {
+   "start": 36848640,
+   "lang": "ru",
+   "bytes": 2938,
+   "nats": 3522.2919042110443,
+   "gpt2_tokens": 1714
+  },
+  {
+   "start": 36893696,
+   "lang": "ru",
+   "bytes": 2431,
+   "nats": 3019.0301423072815,
+   "gpt2_tokens": 1409
+  },
+  {
+   "start": 36938752,
+   "lang": "ru",
+   "bytes": 2713,
+   "nats": 3055.978627204895,
+   "gpt2_tokens": 1586
+  },
+  {
+   "start": 36984320,
+   "lang": "ru",
+   "bytes": 2250,
+   "nats": 2958.7105338573456,
+   "gpt2_tokens": 1321
+  },
+  {
+   "start": 37029376,
+   "lang": "ru",
+   "bytes": 2633,
+   "nats": 3045.359186530113,
+   "gpt2_tokens": 1498
+  },
+  {
+   "start": 37074432,
+   "lang": "ru",
+   "bytes": 2005,
+   "nats": 2599.0715432167053,
+   "gpt2_tokens": 1145
+  },
+  {
+   "start": 37119488,
+   "lang": "ru",
+   "bytes": 2619,
+   "nats": 3145.1028413772583,
+   "gpt2_tokens": 1557
+  },
+  {
+   "start": 37164544,
+   "lang": "ru",
+   "bytes": 2741,
+   "nats": 3349.3688085079193,
+   "gpt2_tokens": 1575
+  },
+  {
+   "start": 37210112,
+   "lang": "ru",
+   "bytes": 2597,
+   "nats": 3263.3132355213165,
+   "gpt2_tokens": 1511
+  },
+  {
+   "start": 37255168,
+   "lang": "ru",
+   "bytes": 2730,
+   "nats": 3489.3827452659607,
+   "gpt2_tokens": 1583
+  },
+  {
+   "start": 37300224,
+   "lang": "ru",
+   "bytes": 1290,
+   "nats": 1745.1271405220032,
+   "gpt2_tokens": 629
+  },
+  {
+   "start": 37345280,
+   "lang": "ru",
+   "bytes": 1985,
+   "nats": 2895.815639734268,
+   "gpt2_tokens": 1145
+  },
+  {
+   "start": 37390336,
+   "lang": "ru",
+   "bytes": 2677,
+   "nats": 3399.0845897197723,
+   "gpt2_tokens": 1563
+  },
+  {
+   "start": 37435904,
+   "lang": "ru",
+   "bytes": 2066,
+   "nats": 2642.251010656357,
+   "gpt2_tokens": 1185
+  },
+  {
+   "start": 37480960,
+   "lang": "en",
+   "bytes": 1101,
+   "nats": 1235.5009565353394,
+   "gpt2_tokens": 338
+  },
+  {
+   "start": 37526016,
+   "lang": "ru",
+   "bytes": 2762,
+   "nats": 3206.045841693878,
+   "gpt2_tokens": 1626
+  },
+  {
+   "start": 37571072,
+   "lang": "ru",
+   "bytes": 3103,
+   "nats": 3689.385506749153,
+   "gpt2_tokens": 1810
+  },
+  {
+   "start": 37616128,
+   "lang": "ru",
+   "bytes": 2783,
+   "nats": 3362.6679339408875,
+   "gpt2_tokens": 1617
+  },
+  {
+   "start": 37661184,
+   "lang": "ru",
+   "bytes": 2398,
+   "nats": 2972.6615669727325,
+   "gpt2_tokens": 1297
+  },
+  {
+   "start": 37706752,
+   "lang": "ru",
+   "bytes": 3323,
+   "nats": 3651.558529615402,
+   "gpt2_tokens": 1957
+  },
+  {
+   "start": 37751808,
+   "lang": "ru",
+   "bytes": 1835,
+   "nats": 2643.0488319396973,
+   "gpt2_tokens": 1044
+  },
+  {
+   "start": 37796864,
+   "lang": "ru",
+   "bytes": 2434,
+   "nats": 3111.6670179367065,
+   "gpt2_tokens": 1421
+  },
+  {
+   "start": 37841920,
+   "lang": "ru",
+   "bytes": 2454,
+   "nats": 3051.180815219879,
+   "gpt2_tokens": 1395
+  },
+  {
+   "start": 37886976,
+   "lang": "ru",
+   "bytes": 2785,
+   "nats": 3312.749191045761,
+   "gpt2_tokens": 1643
+  },
+  {
+   "start": 37932544,
+   "lang": "ru",
+   "bytes": 2912,
+   "nats": 3610.233651161194,
+   "gpt2_tokens": 1682
+  },
+  {
+   "start": 37977600,
+   "lang": "ru",
+   "bytes": 2009,
+   "nats": 3023.884261608124,
+   "gpt2_tokens": 1248
+  },
+  {
+   "start": 38022656,
+   "lang": "ru",
+   "bytes": 3143,
+   "nats": 3840.582841157913,
+   "gpt2_tokens": 1836
+  },
+  {
+   "start": 38067712,
+   "lang": "ru",
+   "bytes": 2183,
+   "nats": 3058.9873764514923,
+   "gpt2_tokens": 1300
+  },
+  {
+   "start": 38112768,
+   "lang": "ru",
+   "bytes": 2496,
+   "nats": 3293.218008995056,
+   "gpt2_tokens": 1445
+  },
+  {
+   "start": 38158336,
+   "lang": "ru",
+   "bytes": 2390,
+   "nats": 3355.544125556946,
+   "gpt2_tokens": 1436
+  },
+  {
+   "start": 38203392,
+   "lang": "ru",
+   "bytes": 2949,
+   "nats": 3407.045836687088,
+   "gpt2_tokens": 1729
+  },
+  {
+   "start": 38248448,
+   "lang": "ru",
+   "bytes": 1809,
+   "nats": 2453.3237085342407,
+   "gpt2_tokens": 1104
+  },
+  {
+   "start": 38293504,
+   "lang": "ru",
+   "bytes": 2577,
+   "nats": 3180.211608171463,
+   "gpt2_tokens": 1537
+  },
+  {
+   "start": 38338560,
+   "lang": "ru",
+   "bytes": 2311,
+   "nats": 2835.590786933899,
+   "gpt2_tokens": 1345
+  },
+  {
+   "start": 38384128,
+   "lang": "ru",
+   "bytes": 1772,
+   "nats": 2454.7247886657715,
+   "gpt2_tokens": 1000
+  },
+  {
+   "start": 38429184,
+   "lang": "ru",
+   "bytes": 2520,
+   "nats": 3067.7387552261353,
+   "gpt2_tokens": 1451
+  },
+  {
+   "start": 38474240,
+   "lang": "ru",
+   "bytes": 2493,
+   "nats": 3355.786784887314,
+   "gpt2_tokens": 1478
+  },
+  {
+   "start": 38519296,
+   "lang": "ru",
+   "bytes": 1994,
+   "nats": 2961.1818058490753,
+   "gpt2_tokens": 1269
+  },
+  {
+   "start": 38564352,
+   "lang": "ru",
+   "bytes": 2510,
+   "nats": 3159.292500972748,
+   "gpt2_tokens": 1509
+  },
+  {
+   "start": 38609920,
+   "lang": "ru",
+   "bytes": 2344,
+   "nats": 3069.216382741928,
+   "gpt2_tokens": 1402
+  },
+  {
+   "start": 38654976,
+   "lang": "ru",
+   "bytes": 2072,
+   "nats": 2839.762993812561,
+   "gpt2_tokens": 1314
+  },
+  {
+   "start": 38700032,
+   "lang": "ru",
+   "bytes": 3131,
+   "nats": 3810.8102838993073,
+   "gpt2_tokens": 1855
+  },
+  {
+   "start": 38745088,
+   "lang": "ru",
+   "bytes": 2404,
+   "nats": 2963.2429891824722,
+   "gpt2_tokens": 1472
+  },
+  {
+   "start": 38790144,
+   "lang": "ru",
+   "bytes": 2385,
+   "nats": 2878.7642827033997,
+   "gpt2_tokens": 1446
+  },
+  {
+   "start": 38835712,
+   "lang": "ru",
+   "bytes": 2420,
+   "nats": 3097.506883621216,
+   "gpt2_tokens": 1434
+  },
+  {
+   "start": 38880768,
+   "lang": "ru",
+   "bytes": 3745,
+   "nats": 3897.834761738777,
+   "gpt2_tokens": 2180
+  },
+  {
+   "start": 38925824,
+   "lang": "ru",
+   "bytes": 2706,
+   "nats": 3465.5457911491394,
+   "gpt2_tokens": 1597
+  },
+  {
+   "start": 38970880,
+   "lang": "ru",
+   "bytes": 2407,
+   "nats": 3020.9045634269714,
+   "gpt2_tokens": 1404
+  },
+  {
+   "start": 39015936,
+   "lang": "ru",
+   "bytes": 2556,
+   "nats": 3350.4183275699615,
+   "gpt2_tokens": 1515
+  },
+  {
+   "start": 39061504,
+   "lang": "ru",
+   "bytes": 2249,
+   "nats": 3161.523368358612,
+   "gpt2_tokens": 1397
+  },
+  {
+   "start": 39106560,
+   "lang": "ru",
+   "bytes": 2497,
+   "nats": 3403.22718501091,
+   "gpt2_tokens": 1490
+  },
+  {
+   "start": 39151616,
+   "lang": "ru",
+   "bytes": 2465,
+   "nats": 3525.3803486824036,
+   "gpt2_tokens": 1489
+  },
+  {
+   "start": 39196672,
+   "lang": "ru",
+   "bytes": 2250,
+   "nats": 3247.613682746887,
+   "gpt2_tokens": 1351
+  },
+  {
+   "start": 39241728,
+   "lang": "ru",
+   "bytes": 2856,
+   "nats": 3289.1408561468124,
+   "gpt2_tokens": 1667
+  },
+  {
+   "start": 39287296,
+   "lang": "ru",
+   "bytes": 2269,
+   "nats": 3119.3027155399323,
+   "gpt2_tokens": 1322
+  },
+  {
+   "start": 39332352,
+   "lang": "ru",
+   "bytes": 2461,
+   "nats": 3226.0789802074432,
+   "gpt2_tokens": 1451
+  },
+  {
+   "start": 39377408,
+   "lang": "ru",
+   "bytes": 2622,
+   "nats": 3267.3549020290375,
+   "gpt2_tokens": 1557
+  },
+  {
+   "start": 39422464,
+   "lang": "ru",
+   "bytes": 2834,
+   "nats": 3304.609313249588,
+   "gpt2_tokens": 1663
+  },
+  {
+   "start": 39467520,
+   "lang": "ru",
+   "bytes": 2153,
+   "nats": 3034.768182992935,
+   "gpt2_tokens": 1314
+  },
+  {
+   "start": 39513088,
+   "lang": "ru",
+   "bytes": 2529,
+   "nats": 2961.1234209537506,
+   "gpt2_tokens": 1450
+  },
+  {
+   "start": 39558144,
+   "lang": "ru",
+   "bytes": 2908,
+   "nats": 3413.451051235199,
+   "gpt2_tokens": 1686
+  },
+  {
+   "start": 39603200,
+   "lang": "ru",
+   "bytes": 2873,
+   "nats": 3399.1559658050537,
+   "gpt2_tokens": 1693
+  },
+  {
+   "start": 39648256,
+   "lang": "ru",
+   "bytes": 2263,
+   "nats": 3034.1748485565186,
+   "gpt2_tokens": 1351
+  },
+  {
+   "start": 39693312,
+   "lang": "ru",
+   "bytes": 1914,
+   "nats": 2779.7828919887543,
+   "gpt2_tokens": 1183
+  },
+  {
+   "start": 39738880,
+   "lang": "ru",
+   "bytes": 2278,
+   "nats": 3046.9689242839813,
+   "gpt2_tokens": 1345
+  },
+  {
+   "start": 39783936,
+   "lang": "ru",
+   "bytes": 3133,
+   "nats": 3796.5717697143555,
+   "gpt2_tokens": 1823
+  },
+  {
+   "start": 39828992,
+   "lang": "ru",
+   "bytes": 2683,
+   "nats": 3486.8743150234222,
+   "gpt2_tokens": 1591
+  },
+  {
+   "start": 39874048,
+   "lang": "ru",
+   "bytes": 2626,
+   "nats": 2961.300230741501,
+   "gpt2_tokens": 1542
+  },
+  {
+   "start": 39919104,
+   "lang": "ru",
+   "bytes": 2915,
+   "nats": 3163.95381295681,
+   "gpt2_tokens": 1709
+  },
+  {
+   "start": 39964672,
+   "lang": "ru",
+   "bytes": 2247,
+   "nats": 2955.096442461014,
+   "gpt2_tokens": 1358
+  },
+  {
+   "start": 40009728,
+   "lang": "ru",
+   "bytes": 3102,
+   "nats": 3645.3463609218597,
+   "gpt2_tokens": 1829
+  },
+  {
+   "start": 40054784,
+   "lang": "ru",
+   "bytes": 2675,
+   "nats": 3267.7151308059692,
+   "gpt2_tokens": 1552
+  },
+  {
+   "start": 40099840,
+   "lang": "ru",
+   "bytes": 2912,
+   "nats": 3463.079028367996,
+   "gpt2_tokens": 1713
+  },
+  {
+   "start": 40144896,
+   "lang": "ru",
+   "bytes": 2611,
+   "nats": 3360.801662683487,
+   "gpt2_tokens": 1520
+  },
+  {
+   "start": 40190464,
+   "lang": "ru",
+   "bytes": 2102,
+   "nats": 3074.788288831711,
+   "gpt2_tokens": 1316
+  },
+  {
+   "start": 40235520,
+   "lang": "ru",
+   "bytes": 2436,
+   "nats": 3212.8088839054108,
+   "gpt2_tokens": 1424
+  },
+  {
+   "start": 40280576,
+   "lang": "ru",
+   "bytes": 2632,
+   "nats": 3056.458627820015,
+   "gpt2_tokens": 1570
+  },
+  {
+   "start": 40325632,
+   "lang": "ru",
+   "bytes": 2587,
+   "nats": 3365.746201992035,
+   "gpt2_tokens": 1537
+  },
+  {
+   "start": 40370688,
+   "lang": "ru",
+   "bytes": 2751,
+   "nats": 3211.87669301033,
+   "gpt2_tokens": 1622
+  },
+  {
+   "start": 40416256,
+   "lang": "ru",
+   "bytes": 2049,
+   "nats": 2855.2537961006165,
+   "gpt2_tokens": 1264
+  },
+  {
+   "start": 40461312,
+   "lang": "ru",
+   "bytes": 2557,
+   "nats": 3210.7038617134094,
+   "gpt2_tokens": 1518
+  },
+  {
+   "start": 40506368,
+   "lang": "ru",
+   "bytes": 2788,
+   "nats": 3612.9153485298157,
+   "gpt2_tokens": 1615
+  },
+  {
+   "start": 40551424,
+   "lang": "ru",
+   "bytes": 2559,
+   "nats": 3292.770021915436,
+   "gpt2_tokens": 1447
+  },
+  {
+   "start": 40596480,
+   "lang": "ru",
+   "bytes": 2104,
+   "nats": 2666.988090991974,
+   "gpt2_tokens": 1228
+  },
+  {
+   "start": 40642048,
+   "lang": "ru",
+   "bytes": 2458,
+   "nats": 3218.6976647377014,
+   "gpt2_tokens": 1466
+  },
+  {
+   "start": 40687104,
+   "lang": "ru",
+   "bytes": 2889,
+   "nats": 3499.4377841949463,
+   "gpt2_tokens": 1710
+  },
+  {
+   "start": 40732160,
+   "lang": "ru",
+   "bytes": 2532,
+   "nats": 3316.70401763916,
+   "gpt2_tokens": 1502
+  },
+  {
+   "start": 40777216,
+   "lang": "ru",
+   "bytes": 2771,
+   "nats": 3536.743595123291,
+   "gpt2_tokens": 1642
+  },
+  {
+   "start": 40822272,
+   "lang": "ru",
+   "bytes": 2084,
+   "nats": 2637.9645272493362,
+   "gpt2_tokens": 1232
+  },
+  {
+   "start": 40867840,
+   "lang": "ru",
+   "bytes": 2441,
+   "nats": 3082.307193517685,
+   "gpt2_tokens": 1488
+  },
+  {
+   "start": 40912896,
+   "lang": "ru",
+   "bytes": 1671,
+   "nats": 2437.698652982712,
+   "gpt2_tokens": 951
+  },
+  {
+   "start": 40957952,
+   "lang": "ru",
+   "bytes": 2575,
+   "nats": 3314.0089795589447,
+   "gpt2_tokens": 1500
+  },
+  {
+   "start": 41003008,
+   "lang": "ru",
+   "bytes": 2662,
+   "nats": 3266.4696860313416,
+   "gpt2_tokens": 1612
+  },
+  {
+   "start": 41048064,
+   "lang": "ru",
+   "bytes": 2787,
+   "nats": 3512.688780069351,
+   "gpt2_tokens": 1656
+  },
+  {
+   "start": 41093632,
+   "lang": "ru",
+   "bytes": 2674,
+   "nats": 3322.980632543564,
+   "gpt2_tokens": 1598
+  },
+  {
+   "start": 41138688,
+   "lang": "ru",
+   "bytes": 2607,
+   "nats": 3182.8698370456696,
+   "gpt2_tokens": 1554
+  },
+  {
+   "start": 41183744,
+   "lang": "ru",
+   "bytes": 2526,
+   "nats": 3338.835668563843,
+   "gpt2_tokens": 1479
+  },
+  {
+   "start": 41228800,
+   "lang": "ru",
+   "bytes": 3108,
+   "nats": 3113.0363359451294,
+   "gpt2_tokens": 1801
+  },
+  {
+   "start": 41273856,
+   "lang": "ru",
+   "bytes": 1985,
+   "nats": 2985.9196434020996,
+   "gpt2_tokens": 1198
+  },
+  {
+   "start": 41319424,
+   "lang": "ru",
+   "bytes": 2517,
+   "nats": 3121.115652322769,
+   "gpt2_tokens": 1497
+  },
+  {
+   "start": 41364480,
+   "lang": "ru",
+   "bytes": 2591,
+   "nats": 3317.4901492595673,
+   "gpt2_tokens": 1567
+  },
+  {
+   "start": 41409536,
+   "lang": "ru",
+   "bytes": 2420,
+   "nats": 2914.121882200241,
+   "gpt2_tokens": 1346
+  },
+  {
+   "start": 41454592,
+   "lang": "ru",
+   "bytes": 2527,
+   "nats": 3354.3585448265076,
+   "gpt2_tokens": 1500
+  },
+  {
+   "start": 41499648,
+   "lang": "ru",
+   "bytes": 2321,
+   "nats": 3227.6560735702515,
+   "gpt2_tokens": 1344
+  },
+  {
+   "start": 41545216,
+   "lang": "ru",
+   "bytes": 2125,
+   "nats": 2990.658308982849,
+   "gpt2_tokens": 1324
+  },
+  {
+   "start": 41590272,
+   "lang": "ru",
+   "bytes": 2275,
+   "nats": 3019.6345195770264,
+   "gpt2_tokens": 1326
+  },
+  {
+   "start": 41635328,
+   "lang": "ru",
+   "bytes": 2621,
+   "nats": 3501.8540647029877,
+   "gpt2_tokens": 1569
+  },
+  {
+   "start": 41680384,
+   "lang": "ru",
+   "bytes": 2715,
+   "nats": 3492.792296886444,
+   "gpt2_tokens": 1598
+  },
+  {
+   "start": 41725440,
+   "lang": "ru",
+   "bytes": 2738,
+   "nats": 3383.7898378372192,
+   "gpt2_tokens": 1602
+  },
+  {
+   "start": 41771008,
+   "lang": "ru",
+   "bytes": 2164,
+   "nats": 2883.976303577423,
+   "gpt2_tokens": 1271
+  },
+  {
+   "start": 41816064,
+   "lang": "ru",
+   "bytes": 2408,
+   "nats": 3230.5213844776154,
+   "gpt2_tokens": 1398
+  },
+  {
+   "start": 41861120,
+   "lang": "ru",
+   "bytes": 2653,
+   "nats": 3541.3196721076965,
+   "gpt2_tokens": 1559
+  },
+  {
+   "start": 41906176,
+   "lang": "ru",
+   "bytes": 2363,
+   "nats": 3103.6191744804382,
+   "gpt2_tokens": 1407
+  },
+  {
+   "start": 41951232,
+   "lang": "ru",
+   "bytes": 2772,
+   "nats": 3511.883870601654,
+   "gpt2_tokens": 1629
+  },
+  {
+   "start": 41996800,
+   "lang": "ru",
+   "bytes": 2235,
+   "nats": 2933.0753729343414,
+   "gpt2_tokens": 1274
+  },
+  {
+   "start": 42041856,
+   "lang": "ru",
+   "bytes": 2163,
+   "nats": 3089.977339744568,
+   "gpt2_tokens": 1268
+  },
+  {
+   "start": 42086912,
+   "lang": "ru",
+   "bytes": 2387,
+   "nats": 3166.8840980529785,
+   "gpt2_tokens": 1422
+  },
+  {
+   "start": 42131968,
+   "lang": "ru",
+   "bytes": 2495,
+   "nats": 3076.9621827602386,
+   "gpt2_tokens": 1480
+  },
+  {
+   "start": 42177024,
+   "lang": "ru",
+   "bytes": 2113,
+   "nats": 3086.8638854026794,
+   "gpt2_tokens": 1302
+  },
+  {
+   "start": 42222592,
+   "lang": "ru",
+   "bytes": 3101,
+   "nats": 3318.031646490097,
+   "gpt2_tokens": 1824
+  },
+  {
+   "start": 42267648,
+   "lang": "ru",
+   "bytes": 1966,
+   "nats": 2837.288590192795,
+   "gpt2_tokens": 1173
+  },
+  {
+   "start": 42312704,
+   "lang": "ru",
+   "bytes": 2876,
+   "nats": 3478.5549582242966,
+   "gpt2_tokens": 1699
+  },
+  {
+   "start": 42357760,
+   "lang": "ru",
+   "bytes": 2120,
+   "nats": 2743.583390235901,
+   "gpt2_tokens": 1308
+  },
+  {
+   "start": 42402816,
+   "lang": "ru",
+   "bytes": 2311,
+   "nats": 3102.0268228054047,
+   "gpt2_tokens": 1380
+  },
+  {
+   "start": 42448384,
+   "lang": "ru",
+   "bytes": 2149,
+   "nats": 3016.4198427200317,
+   "gpt2_tokens": 1323
+  },
+  {
+   "start": 42493440,
+   "lang": "ru",
+   "bytes": 2014,
+   "nats": 3349.549221754074,
+   "gpt2_tokens": 1227
+  },
+  {
+   "start": 42538496,
+   "lang": "ru",
+   "bytes": 2653,
+   "nats": 3429.6212928295135,
+   "gpt2_tokens": 1574
+  },
+  {
+   "start": 42583552,
+   "lang": "ru",
+   "bytes": 2010,
+   "nats": 2880.4650433063507,
+   "gpt2_tokens": 1204
+  },
+  {
+   "start": 42628608,
+   "lang": "ru",
+   "bytes": 2524,
+   "nats": 3072.4690302610397,
+   "gpt2_tokens": 1520
+  },
+  {
+   "start": 42674176,
+   "lang": "ru",
+   "bytes": 2132,
+   "nats": 2949.6979155540466,
+   "gpt2_tokens": 1306
+  },
+  {
+   "start": 42719232,
+   "lang": "ru",
+   "bytes": 2767,
+   "nats": 3300.620128393173,
+   "gpt2_tokens": 1609
+  },
+  {
+   "start": 42764288,
+   "lang": "ru",
+   "bytes": 2558,
+   "nats": 3363.4885988235474,
+   "gpt2_tokens": 1495
+  },
+  {
+   "start": 42809344,
+   "lang": "ru",
+   "bytes": 2427,
+   "nats": 2899.9778056144714,
+   "gpt2_tokens": 1399
+  },
+  {
+   "start": 42854400,
+   "lang": "ru",
+   "bytes": 2184,
+   "nats": 3020.1427330970764,
+   "gpt2_tokens": 1329
+  },
+  {
+   "start": 42899968,
+   "lang": "ru",
+   "bytes": 3150,
+   "nats": 3451.9724662303925,
+   "gpt2_tokens": 1840
+  },
+  {
+   "start": 42945024,
+   "lang": "ru",
+   "bytes": 3347,
+   "nats": 3597.2132836580276,
+   "gpt2_tokens": 1940
+  },
+  {
+   "start": 42990080,
+   "lang": "ru",
+   "bytes": 2711,
+   "nats": 3397.523995399475,
+   "gpt2_tokens": 1569
+  },
+  {
+   "start": 43035136,
+   "lang": "ru",
+   "bytes": 3244,
+   "nats": 3540.994086265564,
+   "gpt2_tokens": 1901
+  },
+  {
+   "start": 43080192,
+   "lang": "ru",
+   "bytes": 3235,
+   "nats": 3818.013135075569,
+   "gpt2_tokens": 1879
+  },
+  {
+   "start": 43125760,
+   "lang": "ru",
+   "bytes": 3416,
+   "nats": 3665.3365156650543,
+   "gpt2_tokens": 1981
+  },
+  {
+   "start": 43170816,
+   "lang": "ru",
+   "bytes": 2839,
+   "nats": 3484.6045622825623,
+   "gpt2_tokens": 1649
+  },
+  {
+   "start": 43215872,
+   "lang": "ru",
+   "bytes": 2949,
+   "nats": 3671.281170129776,
+   "gpt2_tokens": 1731
+  },
+  {
+   "start": 43260928,
+   "lang": "ru",
+   "bytes": 2782,
+   "nats": 3166.1369841098785,
+   "gpt2_tokens": 1662
+  },
+  {
+   "start": 43305984,
+   "lang": "ru",
+   "bytes": 3013,
+   "nats": 3441.410035610199,
+   "gpt2_tokens": 1771
+  },
+  {
+   "start": 43351040,
+   "lang": "ru",
+   "bytes": 2601,
+   "nats": 3187.3553342819214,
+   "gpt2_tokens": 1519
+  },
+  {
+   "start": 43396608,
+   "lang": "ru",
+   "bytes": 2641,
+   "nats": 3354.3246443271637,
+   "gpt2_tokens": 1552
+  },
+  {
+   "start": 43441664,
+   "lang": "ru",
+   "bytes": 2327,
+   "nats": 3087.551308631897,
+   "gpt2_tokens": 1376
+  },
+  {
+   "start": 43486720,
+   "lang": "ru",
+   "bytes": 2995,
+   "nats": 3622.3509571552277,
+   "gpt2_tokens": 1746
+  },
+  {
+   "start": 43531776,
+   "lang": "ru",
+   "bytes": 2767,
+   "nats": 3519.0561451911926,
+   "gpt2_tokens": 1631
+  },
+  {
+   "start": 43576832,
+   "lang": "ru",
+   "bytes": 2455,
+   "nats": 2679.8010293245316,
+   "gpt2_tokens": 1421
+  },
+  {
+   "start": 43622400,
+   "lang": "ru",
+   "bytes": 3027,
+   "nats": 3514.8452585935593,
+   "gpt2_tokens": 1777
+  },
+  {
+   "start": 43667456,
+   "lang": "ru",
+   "bytes": 2631,
+   "nats": 3110.91215968132,
+   "gpt2_tokens": 1513
+  },
+  {
+   "start": 43712512,
+   "lang": "ru",
+   "bytes": 2999,
+   "nats": 3527.4843175411224,
+   "gpt2_tokens": 1738
+  },
+  {
+   "start": 43757568,
+   "lang": "ru",
+   "bytes": 3457,
+   "nats": 3852.933800339699,
+   "gpt2_tokens": 2049
+  },
+  {
+   "start": 43802624,
+   "lang": "ru",
+   "bytes": 3308,
+   "nats": 3847.9051773548126,
+   "gpt2_tokens": 1922
+  },
+  {
+   "start": 43848192,
+   "lang": "ru",
+   "bytes": 1114,
+   "nats": 1184.3732724189758,
+   "gpt2_tokens": 703
+  },
+  {
+   "start": 43893248,
+   "lang": "ru",
+   "bytes": 2140,
+   "nats": 2613.7562091350555,
+   "gpt2_tokens": 1176
+  },
+  {
+   "start": 43938304,
+   "lang": "ru",
+   "bytes": 2607,
+   "nats": 3286.713721036911,
+   "gpt2_tokens": 1540
+  },
+  {
+   "start": 43983360,
+   "lang": "ru",
+   "bytes": 2524,
+   "nats": 3172.5805428028107,
+   "gpt2_tokens": 1470
+  },
+  {
+   "start": 44028416,
+   "lang": "ru",
+   "bytes": 2795,
+   "nats": 3178.0014066696167,
+   "gpt2_tokens": 1628
+  },
+  {
+   "start": 44073984,
+   "lang": "ru",
+   "bytes": 3120,
+   "nats": 3709.597681760788,
+   "gpt2_tokens": 1815
+  },
+  {
+   "start": 44119040,
+   "lang": "ru",
+   "bytes": 2838,
+   "nats": 3588.3118364810944,
+   "gpt2_tokens": 1625
+  },
+  {
+   "start": 44164096,
+   "lang": "ru",
+   "bytes": 1668,
+   "nats": 1928.419333934784,
+   "gpt2_tokens": 943
+  },
+  {
+   "start": 44209152,
+   "lang": "ru",
+   "bytes": 3099,
+   "nats": 3633.0280841588974,
+   "gpt2_tokens": 1806
+  },
+  {
+   "start": 44254208,
+   "lang": "ru",
+   "bytes": 2681,
+   "nats": 3325.0531389713287,
+   "gpt2_tokens": 1584
+  },
+  {
+   "start": 44299776,
+   "lang": "ru",
+   "bytes": 2906,
+   "nats": 3554.177253007889,
+   "gpt2_tokens": 1730
+  },
+  {
+   "start": 44344832,
+   "lang": "ru",
+   "bytes": 2660,
+   "nats": 3263.43599486351,
+   "gpt2_tokens": 1556
+  },
+  {
+   "start": 44389888,
+   "lang": "ru",
+   "bytes": 3211,
+   "nats": 3644.086421728134,
+   "gpt2_tokens": 1878
+  },
+  {
+   "start": 44434944,
+   "lang": "ru",
+   "bytes": 2748,
+   "nats": 3355.9410831928253,
+   "gpt2_tokens": 1637
+  },
+  {
+   "start": 44480000,
+   "lang": "ru",
+   "bytes": 2432,
+   "nats": 3037.905311346054,
+   "gpt2_tokens": 1402
+  },
+  {
+   "start": 44525568,
+   "lang": "ru",
+   "bytes": 3095,
+   "nats": 3577.730003476143,
+   "gpt2_tokens": 1811
+  },
+  {
+   "start": 44570624,
+   "lang": "ru",
+   "bytes": 2891,
+   "nats": 3587.37109708786,
+   "gpt2_tokens": 1698
+  },
+  {
+   "start": 44615680,
+   "lang": "ru",
+   "bytes": 2936,
+   "nats": 3622.7419736385345,
+   "gpt2_tokens": 1724
+  },
+  {
+   "start": 44660736,
+   "lang": "ru",
+   "bytes": 3154,
+   "nats": 3738.6383385658264,
+   "gpt2_tokens": 1845
+  },
+  {
+   "start": 44705792,
+   "lang": "ru",
+   "bytes": 2524,
+   "nats": 3040.102439880371,
+   "gpt2_tokens": 1451
+  },
+  {
+   "start": 44751360,
+   "lang": "ru",
+   "bytes": 2094,
+   "nats": 2608.6303465366364,
+   "gpt2_tokens": 1202
+  },
+  {
+   "start": 44796416,
+   "lang": "ru",
+   "bytes": 2649,
+   "nats": 3403.025442838669,
+   "gpt2_tokens": 1548
+  },
+  {
+   "start": 44841472,
+   "lang": "ru",
+   "bytes": 2793,
+   "nats": 3267.9244772195816,
+   "gpt2_tokens": 1630
+  },
+  {
+   "start": 44886528,
+   "lang": "ru",
+   "bytes": 2989,
+   "nats": 3265.3196128606796,
+   "gpt2_tokens": 1762
+  },
+  {
+   "start": 44931584,
+   "lang": "ru",
+   "bytes": 2268,
+   "nats": 3173.009383201599,
+   "gpt2_tokens": 1378
+  },
+  {
+   "start": 44977152,
+   "lang": "ru",
+   "bytes": 3074,
+   "nats": 3234.980879545212,
+   "gpt2_tokens": 1803
+  },
+  {
+   "start": 45022208,
+   "lang": "ru",
+   "bytes": 2725,
+   "nats": 3499.8565299510956,
+   "gpt2_tokens": 1593
+  },
+  {
+   "start": 45067264,
+   "lang": "ru",
+   "bytes": 3023,
+   "nats": 3514.746259689331,
+   "gpt2_tokens": 1773
+  },
+  {
+   "start": 45112320,
+   "lang": "ru",
+   "bytes": 2649,
+   "nats": 3167.5152772665024,
+   "gpt2_tokens": 1647
+  },
+  {
+   "start": 45157376,
+   "lang": "ru",
+   "bytes": 1440,
+   "nats": 2037.5987124443054,
+   "gpt2_tokens": 922
+  },
+  {
+   "start": 45202944,
+   "lang": "ru",
+   "bytes": 3120,
+   "nats": 3752.9089930057526,
+   "gpt2_tokens": 1839
+  },
+  {
+   "start": 45248000,
+   "lang": "ru",
+   "bytes": 2768,
+   "nats": 2688.245777606964,
+   "gpt2_tokens": 1587
+  },
+  {
+   "start": 45293056,
+   "lang": "ru",
+   "bytes": 3033,
+   "nats": 3539.2423783540726,
+   "gpt2_tokens": 1790
+  },
+  {
+   "start": 45338112,
+   "lang": "ru",
+   "bytes": 1965,
+   "nats": 2693.2477700710297,
+   "gpt2_tokens": 1150
+  },
+  {
+   "start": 45383168,
+   "lang": "ru",
+   "bytes": 2320,
+   "nats": 2872.8765897750854,
+   "gpt2_tokens": 1339
+  },
+  {
+   "start": 45428736,
+   "lang": "ru",
+   "bytes": 2587,
+   "nats": 3400.7764439582825,
+   "gpt2_tokens": 1493
+  },
+  {
+   "start": 45473792,
+   "lang": "ru",
+   "bytes": 2802,
+   "nats": 3508.147165775299,
+   "gpt2_tokens": 1651
+  },
+  {
+   "start": 45518848,
+   "lang": "ru",
+   "bytes": 2376,
+   "nats": 3099.988745689392,
+   "gpt2_tokens": 1423
+  },
+  {
+   "start": 45563904,
+   "lang": "ru",
+   "bytes": 2721,
+   "nats": 3382.1606352329254,
+   "gpt2_tokens": 1565
+  },
+  {
+   "start": 45608960,
+   "lang": "ru",
+   "bytes": 3425,
+   "nats": 3806.876039505005,
+   "gpt2_tokens": 2009
+  },
+  {
+   "start": 45654528,
+   "lang": "ru",
+   "bytes": 3461,
+   "nats": 3879.795305490494,
+   "gpt2_tokens": 2027
+  },
+  {
+   "start": 45699584,
+   "lang": "ru",
+   "bytes": 2314,
+   "nats": 2825.055825948715,
+   "gpt2_tokens": 1311
+  },
+  {
+   "start": 45744640,
+   "lang": "ru",
+   "bytes": 1907,
+   "nats": 2382.108522415161,
+   "gpt2_tokens": 1108
+  },
+  {
+   "start": 45789696,
+   "lang": "ru",
+   "bytes": 2693,
+   "nats": 3401.0275225639343,
+   "gpt2_tokens": 1554
+  },
+  {
+   "start": 45834752,
+   "lang": "ru",
+   "bytes": 2842,
+   "nats": 3520.2109076976776,
+   "gpt2_tokens": 1679
+  },
+  {
+   "start": 45880320,
+   "lang": "ru",
+   "bytes": 2343,
+   "nats": 2764.65619969368,
+   "gpt2_tokens": 1379
+  },
+  {
+   "start": 45925376,
+   "lang": "ru",
+   "bytes": 2706,
+   "nats": 3396.632515668869,
+   "gpt2_tokens": 1587
+  },
+  {
+   "start": 45970432,
+   "lang": "ru",
+   "bytes": 2590,
+   "nats": 3326.3153204917908,
+   "gpt2_tokens": 1531
+  },
+  {
+   "start": 46015488,
+   "lang": "ru",
+   "bytes": 3070,
+   "nats": 3455.3913309574127,
+   "gpt2_tokens": 1782
+  },
+  {
+   "start": 46060544,
+   "lang": "ru",
+   "bytes": 2823,
+   "nats": 2715.951133608818,
+   "gpt2_tokens": 1631
+  },
+  {
+   "start": 46106112,
+   "lang": "ru",
+   "bytes": 2917,
+   "nats": 3545.400399684906,
+   "gpt2_tokens": 1708
+  },
+  {
+   "start": 46151168,
+   "lang": "ru",
+   "bytes": 3506,
+   "nats": 3951.82577586174,
+   "gpt2_tokens": 2023
+  },
+  {
+   "start": 46196224,
+   "lang": "ru",
+   "bytes": 2814,
+   "nats": 3536.8954055309296,
+   "gpt2_tokens": 1702
+  }
+ ]
+}

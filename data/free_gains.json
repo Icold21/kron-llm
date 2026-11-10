@@ -1,0 +1,910 @@
+{
+ "ckpt": "data/kaggle_out/q10/last.pt",
+ "step": 35115,
+ "max_new_tokens": 56,
+ "seeds": 3,
+ "samplers": [
+  {
+   "sampler": "greedy",
+   "temperature": 0.0,
+   "top_k": 0,
+   "judge_en": 0.4616248357119271,
+   "judge_ru": 0.4924427631779653,
+   "self_bpb": 0.6349841168750519,
+   "loops": 1.0,
+   "distinct3": 0.2411329405895533,
+   "code_ok": 1.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 42.5,
+   "samples": {
+    "en_prose": [
+     " opened the door.\n\nThey were now in the morning, and the door was opened.\n\nThey were now in the morning, and the door was opened.\n\nThey were now in the morning, and the door was opened.",
+     " opened the door.\n\nThey were now in the morning, and the door was opened.\n\nThey were now in the morning, and the door was opened.\n\nThey were now in the morning, and the door was opened.",
+     " opened the door.\n\nThey were now in the morning, and the door was opened.\n\nThey were now in the morning, and the door was opened.\n\nThey were now in the morning, and the door was opened."
+    ],
+    "en_science": [
+     " 1000000000000000000000000000000000000000000000000000000",
+     " 1000000000000000000000000000000000000000000000000000000",
+     " 1000000000000000000000000000000000000000000000000000000"
+    ],
+    "ru_prose": [
+     " стал его друзьем.\n\nВ 1990 году, когда он был назначен на должность, он был назначен на должность. В 1991 году он был назначен на должность, а в 1992",
+     " стал его друзьем.\n\nВ 1990 году, когда он был назначен на должность, он был назначен на должность. В 1991 году он был назначен на должность, а в 1992",
+     " стал его друзьем.\n\nВ 1990 году, когда он был назначен на должность, он был назначен на должность. В 1991 году он был назначен на должность, а в 1992"
+    ],
+    "ru_history": [
+     " в Москве была образована 15-я гвардейская дивизия, 15-я гвардейская дивизия, 15-я гвардейская дивизия, 15-я г",
+     " в Москве была образована 15-я гвардейская дивизия, 15-я гвардейская дивизия, 15-я гвардейская дивизия, 15-я г",
+     " в Москве была образована 15-я гвардейская дивизия, 15-я гвардейская дивизия, 15-я гвардейская дивизия, 15-я г"
+    ],
+    "code": [
+     " a.__class__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name",
+     " a.__class__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name",
+     " a.__class__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name__.__name"
+    ],
+    "arith": [
+     " 1000000000000000000000000000000000000000000000000000000",
+     " 1000000000000000000000000000000000000000000000000000000",
+     " 1000000000000000000000000000000000000000000000000000000"
+    ],
+    "identity": [
+     " not a very small language, and it is not a very small language that is not a very small language that is not a very small language that is not a very small language that is not a very small language that is not a very small language that is not a very small language",
+     " not a very small language, and it is not a very small language that is not a very small language that is not a very small language that is not a very small language that is not a very small language that is not a very small language that is not a very small language",
+     " not a very small language, and it is not a very small language that is not a very small language that is not a very small language that is not a very small language that is not a very small language that is not a very small language that is not a very small language"
+    ]
+   }
+  },
+  {
+   "sampler": "greedy+norep3",
+   "temperature": 0.0,
+   "top_k": 0,
+   "no_repeat_ngram_size": 3,
+   "judge_en": 1.7278073365819324,
+   "judge_ru": 0.9256236983212466,
+   "self_bpb": 1.1099103478763206,
+   "loops": 0.8571428571428571,
+   "distinct3": 0.7413805069342754,
+   "code_ok": 0.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 51.8,
+   "samples": {
+    "en_prose": [
+     " opened it.\n\nThey were now in the morning, and the next day, and then the\n\nlittle-little, and they were now, and there was no time to be seen.\nThen the next morning, the next night, the",
+     " opened it.\n\nThey were now in the morning, and the next day, and then the\n\nlittle-little, and they were now, and there was no time to be seen.\nThen the next morning, the next night, the",
+     " opened it.\n\nThey were now in the morning, and the next day, and then the\n\nlittle-little, and they were now, and there was no time to be seen.\nThen the next morning, the next night, the"
+    ],
+    "en_science": [
+     " 1000 km/s.\n\nThe Schwartz and Schwebhartz (1999) is a fairly popularly-faced fair-filled-footing, and is a",
+     " 1000 km/s.\n\nThe Schwartz and Schwebhartz (1999) is a fairly popularly-faced fair-filled-footing, and is a",
+     " 1000 km/s.\n\nThe Schwartz and Schwebhartz (1999) is a fairly popularly-faced fair-filled-footing, and is a"
+    ],
+    "ru_prose": [
+     " стал его друзьем.\n\nВ 1990 году, когда он был назначен на должность, он был приглашён к власти. В 1891 году он был избран в должность.\nВ июне 1",
+     " стал его друзьем.\n\nВ 1990 году, когда он был назначен на должность, он был приглашён к власти. В 1891 году он был избран в должность.\nВ июне 1",
+     " стал его друзьем.\n\nВ 1990 году, когда он был назначен на должность, он был приглашён к власти. В 1891 году он был избран в должность.\nВ июне 1"
+    ],
+    "ru_history": [
+     " в Москве была образована 15-я гвардейская дивизия, 16-я бригады, 2-я дивизм, 3-я пехотная дивия, а 1-я арти",
+     " в Москве была образована 15-я гвардейская дивизия, 16-я бригады, 2-я дивизм, 3-я пехотная дивия, а 1-я арти",
+     " в Москве была образована 15-я гвардейская дивизия, 16-я бригады, 2-я дивизм, 3-я пехотная дивия, а 1-я арти"
+    ],
+    "code": [
+     " a.__class__.__name__.items()\n\n\ndef get_build_filter(a):\n    \"\"\"\n    Getter a bug for a binary bug.\n    \"\"\"\n\n    if b.__in__.is_b",
+     " a.__class__.__name__.items()\n\n\ndef get_build_filter(a):\n    \"\"\"\n    Getter a bug for a binary bug.\n    \"\"\"\n\n    if b.__in__.is_b",
+     " a.__class__.__name__.items()\n\n\ndef get_build_filter(a):\n    \"\"\"\n    Getter a bug for a binary bug.\n    \"\"\"\n\n    if b.__in__.is_b"
+    ],
+    "arith": [
+     " 1000 + 110 = 0.0010 + ( 1.0 + -1.1 ) + 0 = -10.101 + 30 = ( 0 + + 4 ) + (",
+     " 1000 + 110 = 0.0010 + ( 1.0 + -1.1 ) + 0 = -10.101 + 30 = ( 0 + + 4 ) + (",
+     " 1000 + 110 = 0.0010 + ( 1.0 + -1.1 ) + 0 = -10.101 + 30 = ( 0 + + 4 ) + ("
+    ],
+    "identity": [
+     " not a very small language, and it is not worth a few years to be a very large language.\n\nThe first part of the book is the first part in the book, and the second part in a book is a very high degree, and its first part is",
+     " not a very small language, and it is not worth a few years to be a very large language.\n\nThe first part of the book is the first part in the book, and the second part in a book is a very high degree, and its first part is",
+     " not a very small language, and it is not worth a few years to be a very large language.\n\nThe first part of the book is the first part in the book, and the second part in a book is a very high degree, and its first part is"
+    ]
+   }
+  },
+  {
+   "sampler": "recipe k8 rp1.1",
+   "temperature": 1.0,
+   "top_k": 8,
+   "repetition_penalty": 1.1,
+   "judge_en": 1.5930216447605685,
+   "judge_ru": 0.8940214054405574,
+   "self_bpb": 1.094004041162119,
+   "loops": 0.8571428571428571,
+   "distinct3": 0.81055395512371,
+   "code_ok": 0.3333333333333333,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 117.4,
+   "samples": {
+    "en_prose": [
+     " went to the stairs.\n\nOn the same time he was now a few years later, and he said.\n\n“I’ll come back with me. I’ll have a little time. I’ll do so,” he added, “and\n",
+     " was opened, the next morning.\n\nThe next day, after the night, when she had been opened to the door, he\n\nwas closed, and went away from the background of the street and a few minutes,\n\nand then came",
+     " started a few months, and went on to the door,\n\nshe turned to his house. He was a loud stone, and went back to the room\n\nof the street, the window. The boy of the fire had no"
+    ],
+    "en_science": [
+     " 120 kg.\n\nReferences\n\nGeographical in the United States\nGeography of the South Mountain",
+     " 72,640. According to the Salamann-Wangsch theorem and the Dirac-Elliße-Schödinger theorem, the Richardson theorem and the Sunworth-",
+     " 70° from the middle to the east in a wide range of food. Instruction of the military, the Belgian and Austrian Research Institute of Technology of Susseason ("
+    ],
+    "ru_prose": [
+     " был уволён, но уже в 1940 году был атакован и уволён.\n\nПосле смерти Джона Майяра, который, по словам майяра, принимал участие в следующие роста:\n",
+     " в том числе, что, как и в конце концов, он начал «вотмировать» в свою «собственную и сдержанную работу.\nИсточник:\n\nМне кажется, что, когда я пошел",
+     " стал бывать невесту. В 1840 году Скопиум-Венгрии был назначен в Бразилию в чине Скопиума, где он был назначен на должности, но был переведён в"
+    ],
+    "ru_history": [
+     " была образована Майкл Гаррисон на североамериканском форуме.\n\nНа 2022 год в городе было создано несколько тысяч человек, среди которых Кит-Джорджа, а в 19",
+     " в Северной Германии было создано 137389 человек (в 1963 г. 5039 человек), однако в 1964 году в Париже 1964 г. была организована",
+     " на В. Доме был создан Спектаксберг, но затем он не стал членом Государственной комиссии по созданию в Бельгии. Спектаксберг стал одним из главных редакторов этого проекта — в"
+    ],
+    "code": [
+     " a.group(b)\n\n# Take a subgroup of a group, but this is a group that contains a group of groups. The group of members can also be used for the groups.\n    def setUp(self, group):\n       ",
+     " a.get(b, c)\n    for i, y in range(5):\n        print(b'{0\\n{1}*{1}& 1\\n\\n{\\n}|+b'\\n{0\\n{3",
+     " 0\n\n# This can happen to make sure that there is no such that it's only a little way\n# because the otherwise, but not just one of the two. If you want to see this, then it's not so much\n # but it"
+    ],
+    "arith": [
+     " 11000 # 91110\n# # 53140 - 602022211138\n\n# Someone is right, so you can't get an answer, but the answer",
+     " 620 + 620 .\nwe show a large scale factor @xmath77 in @xcite that the first order fermi matrix is @xmath78 and it is not easier to solve for a given system and @xmath79 .\n",
+     " 0.15 + 34 = .4090 * 89 = (1.7 ) , (1.2)2 = 30 = 0.06 + 14 = .5283 * 60"
+    ],
+    "identity": [
+     " a small family of such that its own, so that they are more than one family, but that is why we are not to say, but that the most important thing has come in.\n\nWe have to say, the first term is the only way, but that the",
+     " highly efficient and efficient. For example: Accelerated Syntax: The Difficulty and the Discussion of Differential Equations: Coalysted Depends.\nEfficient Disc",
+     " a very useful tool for me and I am using it.\n\nThen the first term is a very simple example of the function.\n\nThis means that the function is not an arbitrary function, but the function cannot be written.\nSometimes, the functions are"
+    ]
+   }
+  },
+  {
+   "sampler": "recipe+top_p0.9",
+   "temperature": 1.0,
+   "top_k": 8,
+   "top_p": 0.9,
+   "repetition_penalty": 1.1,
+   "judge_en": 1.5382840920663055,
+   "judge_ru": 0.9320486435201221,
+   "self_bpb": 1.033111756757061,
+   "loops": 0.8095238095238095,
+   "distinct3": 0.7736150011557025,
+   "code_ok": 0.3333333333333333,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 98.1,
+   "samples": {
+    "en_prose": [
+     " went to the stairs.\n\nOn the same time he was now a few years later, and he was not to be a faster\n\nand a gaze. In his first place he was in the middle, but he had been in the\n",
+     " was opened, the next morning.\n\nThe next day, after the night, when she had been opened to the door, he\n\nwas closed, and went away from the background of the street and a few minutes,\n\nand then came",
+     " the other was the last time in the next time.\n\n“Then you have to do, sir?” he replied.\n\n“And I don’t know how you should do, sir. Have you been a good dear?”\n\n“"
+    ],
+    "en_science": [
+     " 120 kg.\n\nReferences\n\nGeographical in the United States\nGeography of the South Mountain",
+     " 72,640. According to the Salamann-Wangsch theorem and the Dirac-Elliotti equation of the Hamiltonian (1098) and the Hamiltonian (1070).\n",
+     " 70° from the middle to the east of a wide range of food. Instead, there is no need to be seen on the sandwich of the earth.\n\nAfter the earth was reaching a"
+    ],
+    "ru_prose": [
+     " был уволен, но уже в 1940 году был выставлен на Востоке.\n\nПосле 2021 года вновь получил своё название, а также в составе Добровольческой Государственной Депар",
+     " в том числе, что, как и в конце концов, он начал «вотмировать» в свою «собственную и сдержанную работу.\nВ течение первых 1680 года на 2000 году он переме",
+     " стал бывать невесту. В 1840 году Скопиум-Венгрии был назначен в Бразилию в чине Скопиума, где он был назначен на должности, но был переведён в"
+    ],
+    "ru_history": [
+     " была образована Майкл Гаррисон, затем основана в 1957 году в Виленском институте математики (в том числе в Вилимской школе, а также в Ленинградском университете).\n\nВ 1",
+     " в Северной Германии было создано 137389 человек (в 1963 г. 5039 человек), но не было 1248 человек. Вскоре после смерти 1964 года 3",
+     " на В. Доме был создан Спектаксберг, а также Спектаков. В настоящее время в Бразилии входит Гонконг — Спектаков.\n\nСоздание и развитие Спектакси"
+    ],
+    "code": [
+     " a.group(b)\n\n# Take a subgroup of a group, but this is a group that contains a group of groups. The group of groups in the group is\n    # the groups in which it is the group of groups.\n ",
+     " a.get(b, c)\n    if b:\n        a = b.get(a)\n    assert a[0] + b[1]\n    assert a[1] + b[2]\n\n    def test_package_failure_s",
+     " 0\n\n# This can happen to work.\n# The next is that it's only a little way to do it.\n#\ndef add(a, b):\n    print \"\\d\"\n    if a < b:\n        print \"\\s*"
+    ],
+    "arith": [
+     " 11000 # 41000\n# # 43100 - 4020 = 21010 # 68100\n# # 63000 + 190",
+     " 620 + 620 .\nwe show that for the @xmath40-bound and for the 25-bits , we show the two different types of @xmath38-bit pairs in fig .\n[ fig : b",
+     " 0.15 + 32 = 40.000 + 60.9 + 200.212 + 30 = 0.02 + 10.5 + 10.0 + "
+    ],
+    "identity": [
+     " a small family of such that its own, or, if it's not.\n\nThis is a simple example of the following:\n\n• If we don't know what the product is, you have to say, the product of the product and the product of the products",
+     " highly efficient and efficient.\nThe STRP is designed to operate a large system of STRPs. This is only a few years of development in the US and the STRP is designed to operate a large system of STR",
+     " a very useful tool for me.\nI've read the picture, but that's just what I wanted to do.\n\nI am going to think about it as an example of a very simple picture. The idea is to say, but this is"
+    ]
+   }
+  },
+  {
+   "sampler": "min_p0.02",
+   "temperature": 1.0,
+   "top_k": 0,
+   "min_p": 0.02,
+   "judge_en": 1.9574032614400798,
+   "judge_ru": 1.0035677408714847,
+   "self_bpb": 1.1832280129585706,
+   "loops": 0.8571428571428571,
+   "distinct3": 0.7859139637879332,
+   "code_ok": 0.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 64.9,
+   "samples": {
+    "en_prose": [
+     " went to the stout and sat out of the mud.\n\nWithout the hotel warning he saw the guise of the Barza, and the\n\nbest; the dry-has open the beggars, the three",
+     " finished a lecture in the African. She was now a sparse mother with her own Dandcarr; she was a collegiate.\n\nDandcarr was a torn of the son of the",
+     " started a few months for the season, but it was impossible for the\n\nnight. Instructions began to save the following day, and had gone with\n\ncorner sleep on the board of the festivities"
+    ],
+    "en_science": [
+     " 110 degrees and the splits was still set between 0 and 100 degrees at a distance of 199. The World of Mary, IK, was resolved by the Masters of Impernation,",
+     " 72,610. According to the Saltirouus 72,176,523 (situr niche) was the South South of 182 and 184.\n",
+     " 70 seconds for the AC to make sure, that is very close, because that is now.\n\n• Deal if a Fanjak is beaten. If you were all from this, there would be no nice faith or"
+    ],
+    "ru_prose": [
+     " перевернул в летре: «С нами во дворе во дворцовой части ночь к тому, что разбился».\n\nВ 1856 году майор Топман вновь заговорил, когда Доб",
+     " в том числе, что горький Декабрь, но тот раз уже долго сплетен в ночь. Однако, не видно было, однако, ни одной из несчастных правил этого «пропавшего». Впрочем, этот г",
+     " попросили взойти за куски, устало, смотреть на неё глаза. И остановились. Мне было тяжело; они-то убеждали, что никаких людей остаться. Но они, действительно, переехали в"
+    ],
+    "ru_history": [
+     " переименован в ГДР. К концу 1961 года была заложена только 32 992 м2. После этого, после кражтовых турбонов в 1961 году, когда группа получила",
+     " в ходе протоиерейской деятельности был перенесён в состав Волгоградского полка и несколько его работ. С 1976 года работал в Молгоградской области. 10 сентября 1976 года нач",
+     " на её пресечение было перенослено «Русская православная церковь». Роман окажется в пятиэмифах и замене зданий Священной церкви.\n\nЦерковь, направляя его на поддерж"
+    ],
+    "code": [
+     " a.id\n  def __init__(self, a, b):\n    return a.id\n  __main__ = _\n    ___unit__ = ___unit__\n\n  def __init__(self, b, b):\n    return a.id\n  __",
+     " issubclass(a, b.TRANTABLE)\n\n\ndef handle_thread(a, b, b):\n    \"\"\"Checks if it was working and is added to the next term\n    string (to be removable)",
+     " 0\n\ndef test2diag_sum(a, b):\n    return 0\n\ndef test2diag_sum(a, b):\n    assert a == b\n\ndef test2diag_sum(a, b):"
+    ],
+    "arith": [
+     " 11000 # 21000\n1015 = 10000 # 29900\n1015 = 10000 # 33\n1015 = 1",
+     " 7 - 8 . in fig . [ fig : fig : ] , we consider a 20d gate , 2d _ [ fig : fig : 1 ] , the a_2c_t a_2c_0 - 13",
+     " 0.15 + 1.5 .\n, (1) is a multi-problem identifying a module of the Hermits in the Hermitian manifold.\n\nAuthors: Call Hamiltonian\n\n"
+    ],
+    "identity": [
+     " a tensor product of such tensor elements: it has a tensor product of matrices such that the tensor product of matrices is zero. I guess you didn't understand it more. It wasn't pretty much like this, but I have to be able to produce a",
+     " highly efficient and its own being in that place. However, even though all these properties affects the understanding of these concepts.\n\nIf they have differential equations, their properties are more important, but only holds a simple example of which of the internal relations are",
+     " continuous.\n\nIndicence, every curve of its unique nanotubes is unique. Instructively, the cooling of nanotubes can be extended to other connections, including some of the nanotubes."
+    ]
+   }
+  },
+  {
+   "sampler": "min_p0.05",
+   "temperature": 1.0,
+   "top_k": 0,
+   "min_p": 0.05,
+   "judge_en": 1.955970426882755,
+   "judge_ru": 1.0458151433454603,
+   "self_bpb": 1.060747504496201,
+   "loops": 0.8095238095238095,
+   "distinct3": 0.7538888275107316,
+   "code_ok": 0.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 113.9,
+   "samples": {
+    "en_prose": [
+     " went to the stairs.\n\nOn the same time the door went out the hotel and saw that the ship were\n\nthen the king. The saddle was the dark-stairs of the glowing, and the\n",
+     " finished a lecture in the fresh.\n\nMaybe that did not give no goodness and that the man who had come from the\n\ncorning stairs and the man who had done a mud and mump.\n\n",
+     " started a few months from the middle to the end,\n\nshe passed the door.\n\nAnd when the older brother saw a nutrition and a second of the\n\nyoung fair.\n\n“I’ll take"
+    ],
+    "en_science": [
+     " 1100 and the snowbottom was given up to 5000000.\n\nPotential\n\nThere are more than two snowbottoms in the Single Plants and the North Sea,",
+     " 72,610. According to the Saltirouus 72,176,203 (saltirouus 205) was a great ingredient and merger.\n\n",
+     " 70 seconds for the Australian period, which is very rapidly unusual. Instruction of the Hilbert Hydrophonic as award of the Lyhen-American Palacegnese Cult"
+    ],
+    "ru_prose": [
+     " перевернул в лихоенное место. К концу 1945 года он уехал к Лихоенное после 1946 года.\n\nКарьера\nУчился в 1946 году, когда стал уч",
+     " в том числе, что горький человек был схвачен, он видел его только на поле и горячен, и какую сторону не подошла на себя к ней. Когда он увидел, что это, кроме того, г",
+     " попросили взойти за куски, улыбаясь. Но он не понял о том, что все-таки придут для него, но для этого были пригнуты к себе, как это и стало, потому что они должны были у"
+    ],
+    "ru_history": [
+     " переименован в ГДР.\nВ 1961 году по очереди 49-го Харькова (211-го — 6 марта 1963, в 1964 году — 6 октября",
+     " в ходе экспонирования группу Мексиканского сельсовета НКВД СССР по делам герб.\n\nВ 1961—1964 годах в Чёрном крае Мексиканского сельсовета было",
+     " на основании Дома мультипликационного соляра Харькова-Юрка был разработан печатный курс в тюрьмной книге «Особенник».\nВ 1979 году на основ"
+    ],
+    "code": [
+     " a.id\n  def __init__(self, a, b):\n    return a.id\n  __main__ = _\n    ___unit__ = ___unit__\n\n  def __init__(self, b, b):\n    return a.id\n  __",
+     " a.get(a, b)\n    for b, y, in b:\n    print a.get(a, b)\n    return b\n\n\ndef main_links_buffer_filter(a):\n    \"\"\"Complement the `{}",
+     " 0\n\ndef test_items(a, b):\n    for a, b in c.items():\n        for a, b in a, b in b:\n        assert a, b == a\n\n    assert a < b, c == a < 0"
+    ],
+    "arith": [
+     " 1100000000000000000000000000000000000000000000000000000",
+     " 7 - 8 . in fig . [ fig : fig : ] , we have found a flavor - controlled cavity ( with respect to the full mixed stage , the size of the ionization ) and the cavity . the",
+     " 0.15 + 1.5 .\n\n@article\n\nThe census is a second of the census of 600 microstructures (also called the lens, namely the ic"
+    ],
+    "identity": [
+     " a tensor product of such tensor product as input product, i.e. can be used to solve the input product.\n\nIn other words, we will start with this,\n\n\\begin{align} \\text{}\n\\text{ } \\text{",
+     " highly efficient and efficient. For example, if the upper bound of $i$ is not open to $i$, then any open space of $i$, and hence a contradiction of $\\mathcal{I}$.\n\nThe above solution is equival",
+     " continuous.\n\nIndicence, every curve of a curve is a polynomial function that satisfies the polynomial function. The coefficients of polynomial functions and their converse are given by the number of points of a curve of a polynomial function."
+    ]
+   }
+  },
+  {
+   "sampler": "min_p0.10",
+   "temperature": 1.0,
+   "top_k": 0,
+   "min_p": 0.1,
+   "judge_en": 1.6907190116564712,
+   "judge_ru": 0.9695460557344432,
+   "self_bpb": 0.8603241500036322,
+   "loops": 0.9523809523809523,
+   "distinct3": 0.639685545392921,
+   "code_ok": 0.3333333333333333,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 113.2,
+   "samples": {
+    "en_prose": [
+     " went to the stairs.\n\nOn the same time the door went to the stairs.\n\n\"They were punctually on the stairs. In the first place the door came to the stairs.\n\nThey came",
+     " finished a time.\n\nIn a half-hour, a half-hour opened a day and was turned off to a ball with a\n\nlittle stairs and the other stairs. The door was so crawly",
+     " started a few months, and went on to break the\n\ngood-yard of the country.\n\n\"The next day I saw a nutrition of the Parsons, the Jewish fair. I got a\n\nsqu"
+    ],
+    "en_science": [
+     " 11000.\n\nReferences\n\nGeographical Survey of the West Congress\n\nExternal links\n\nOfficial site\nOfficial site\nScale Site\nScale s",
+     " 72,000.\n\nReferences\n\nExternal links\n\nBarry S. Barry D. Barry (1961)\nBarry S. Barry D. Barry (1961)",
+     " 7000 km in the loudly arms of the Kennethus. The Earth was then traveled with the Hydrophonic Wing of the Kennethus, where the Kennethus was driving"
+    ],
+    "ru_prose": [
+     " переподнял ее, —\n\nОн отвел отврат на него и улыбнулся.\n\nКто-то придумал, что он, конечно, не сомнется, а только не попал, но,",
+     " в 2001 году был приглашён.\n\nВ 1907 году Шотланди получил должность командира дверь 110000 человек (до 100000 человек).\n\n",
+     " попал в нее, чтобы заступить ему.\n\nИ вот он не знал.\n\n— Тогда он не знал, а заступил.\n\n— Что же ты, если ты не знал, что ты не"
+    ],
+    "ru_history": [
+     " переименован в ГДР.\nВ 1961 году, когда была выпущена в 1962 году, был выпущен на 50-летний срок. В 1964 году, когда он работал в США",
+     " в ходе переименования «Комнатия» в состав «Комнатия» внесла его в свой первый «Комнатия» в 1962 году, за 100000 долларов.\n\n",
+     " на основании Дома Гага, «Русская православная церковь» (1897), была опубликована в 1906 году в Мемуаре, где было выпущено 151 139 экземп"
+    ],
+    "code": [
+     " a.group(b, b)\n\n\ndef add_subgroup(a, b):\n    return b.group(b, b)\n\n\ndef add_subgroup(a, b):\n    return b.group(b, b)\n\n\ndef add",
+     " a.get(a, b)\n    for b, c, in b:\n        a = a.get(a, b)\n        a = a.get(a, c)\n    assert a == a.get(a, c)\n    assert a == b",
+     " 0\n\ndef test_invalid(a, b):\n    return 0\n\n# tests for a list of tests.\n\n# Tests for the tests for each tests.\n# tests for each tests.\n\nif"
+    ],
+    "arith": [
+     " 1100000000000000000000000000000000000000000000000000000",
+     " 7 .\nwe use the fourier transform as a fourier transforming the fourier transform .\nthe fourier transform is taken from the fourier transforms , and the fourier transforms are applied to the fourier transforms",
+     " 0.15 + 1.5 .\n\n##### Share on other sites\n\nMultiplicative numbers of the number of edges in the graph.\n\n##### Share on other sites\n\nDomain number of"
+    ],
+    "identity": [
+     " a tensor product of sets and elements of an object, and is a tensor product of sets, that is called an expression.\n\nIn other words, we will write the term in the first letter as the \"object\" which has been used in the form of the term",
+     " highly efficient and efficient.\n\nIn many other words, such a large language can be written to a list of strings. This is only a few of which, in many words, is more important, and not only a small language.\n\nThe textbook is",
+     " continuous.\n\nIn the following example, this means that, in a continuous case, there exists a neighborhood such that there exists a neighborhood such that there exists a neighborhood such that there exists a neighborhood such that there exists a neighborhood"
+    ]
+   }
+  },
+  {
+   "sampler": "typical0.5",
+   "temperature": 1.0,
+   "top_k": 0,
+   "typical_p": 0.5,
+   "judge_en": 2.239796001771421,
+   "judge_ru": 1.1465905484550736,
+   "self_bpb": 1.4089520780426976,
+   "loops": 0.7142857142857143,
+   "distinct3": 0.8577381296943297,
+   "code_ok": 0.3333333333333333,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 113.8,
+   "samples": {
+    "en_prose": [
+     " run up his way back and sat down, so was still still trying to run the hook for a month.\n\nPotton Bolz-Amerito: Sony Boujzad was setting the beginning, after three",
+     " finished a lecture in that sports as she stood, that did not need to hold upon her faire, novel; she won't tell you the unbound and is likely to go a mud and let them remove me the",
+     " tucked up on the wall in the schoolplace. Walter started his\n\nniece of a breaking travel from the Fanwhins in the province.\n\n“What can he happen, Palace?” he drove"
+    ],
+    "en_science": [
+     " 716 in America, so that Birn’s family the hawkes at 702 were made (the mining-legged. In Sony’s career, 704 had no, only wet",
+     " 72,616 freens up by the electric racks that occurring to 7137,7523 km from the color until it is more and is more stretching than the tast of the landlakes",
+     " 7, which are forbidden to Lu, Valley or the Devil, California. It is commonplace to a high-rise contraction.\n\nObservatory development\n\nCalifornia drops"
+    ],
+    "ru_prose": [
+     " намеревается листовать гнётов на концерты и во всех делах получает ночь только случайное освобождение фрай-А. При очищении колонии этот владения заговорил, когда государственный",
+     " ресторан для молодых густомек. На Клеопатах нет того, что не бывалось. Человек видел наружный волк, как мамышка заговорила: \"Не скажите за руку г",
+     " попросили взойти за кулады, которую убыло до ухода, если вкус покажет все пешем, то они-то для себя говорили себе, что говорили что-то».\n\nМедведь вош"
+    ],
+    "ru_history": [
+     " переименован в группу в Нордендию. В 1973 году начал секретно два года (или после приобретения — альтернативного сотрудника снабжён за мать и что когда Доб",
+     " Гонселун начал «вертой запрет на ночь на белом солдатском колдунке. Его имел право было восстановить волнения клони и собравшееся за правом собственным (холодной 3",
+     " президент исполкома Генерального штаба (штат «Новой Оси») возглавлял строительство металлического завода в результате блокировки зданий на Алаши.\n\nС 1963 года его строительство"
+    ],
+    "code": [
+     " (a, b)",
+     " issubclass(a, b)\n    for i, y in all(b):\n        print(\"Token=a*c*3*c*3*y*c*0)\n    return assert issubclass(a, b)\n\n\ndef test",
+     " 0\n\ndef test_items(a, b):\n    for a, b in css:\n        # Defaulting up a new-rule: display a storage string to allow one of them,\n    # false in a"
+    ],
+    "arith": [
+     " 01e + 05 = 04001.15\nPlease add an article based on a post. The part of your proposal is available for students see by Summerterto Sanskriten.\n",
+     " 4 . 61 + 7 . 370 , 515 + 8 . 7.12 & 9.46 = 4750 and 9850 + 117 + 8 and ",
+     " 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0"
+    ],
+    "identity": [
+     " naturally mathematical, its longer never disrupt your operations of poxing, that he isn't fading between gem (difficulty or proveor) to happy carefully, so you've hung through my fears like that",
+     " is highly effective, it's in that Accelerated School's law that uses every kind of list of climbards to operate; this can't be at all unbound and is entirely short of as a simple; and, while removing,",
+     " continuous.\n\nLet IX be an analytic field space of complex polynomials that satisfies EMT. It is surjective\n\nWe introduce a contraction of $n$ discrete elements, one of which, of course, implies that"
+    ]
+   }
+  },
+  {
+   "sampler": "typical0.9",
+   "temperature": 1.0,
+   "top_k": 0,
+   "typical_p": 0.9,
+   "judge_en": 2.2306332200394468,
+   "judge_ru": 1.284894174947049,
+   "self_bpb": 1.4049866054915894,
+   "loops": 0.6666666666666666,
+   "distinct3": 0.8374628378154938,
+   "code_ok": 0.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 118.2,
+   "samples": {
+    "en_prose": [
+     " later went from the door and sat out forced through Birming’s family the hotel warning.\n\nSeasons (2011)\n\nOther Sony’s career, published in 1995, has never",
+     " finished a lecture in that place. The second is a large duke of all the captive cards.\n\nRather with that, collins don't measuring Servetti Cyprus cables.\n\n",
+     " started a gravitic motion in the school Luis Vensele, where his crops were over. Her voice dismissed, in galloping movement were dismissed on March 28, 200"
+    ],
+    "en_science": [
+     " 110 degrees and the side of the Birth of Achilawa for Westminster III as a new Baron of Car. The skeleton resides as an Summerter, the beggars of the L",
+     " is 2,610 freens. An opposite of the naval resides in Boggle will have no metallicance, collins, but more and more Servettians.\n\nThe blue bal",
+     " 70 seconds for rainburghers. Was a minute that had been introduced. Instruction of the coiler of 60 gallonian countries were displayed from the lust, ngn dry sk"
+    ],
+    "ru_prose": [
+     " перевернул в летре: «С нами во дворе во Верехоле ночь к которым я должен быть после погребения». Позже, о культе мне попустил обратьев, не попал ни одного,",
+     " в щупь. Только как Декабрь Кератиси уже опять послал войска на горисполке и предал силам Степута Горницая. Когда Феодора сделали, он завел нач",
+     " попросили волонтить куски, устало работать с торчатыми методами. Когда он покажет все пешем, посмотрел за оружием своего Сучака о том, что именно опустошил службу его для поддерж"
+    ],
+    "ru_history": [
+     " переименован в ГДР. К концу 1961 года разработал для переименования ХУХ (или многие центральные. Во время калифорнийской астрофизики за годы до 1964",
+     " в соборе, среди гимнов Декларары, Франция уже была представлена на полном герцоге Константин Александра I, названная самым большим и глубоким почварем 1000 тысяч тонн.\n\n",
+     " попал в волонтё «Сулорянш» с торговой маркой РИАР ВОВО «Сулорянш» («Ростов Сучю»), в том числе: . Свои Беларусь ("
+    ],
+    "code": [
+     " a.id\n  def __init__(self, a, b):\n    return a.__init__(a)",
+     " issubclass(a, base_id)\n\n\ndef divisory_uint_query_three(a):\n    return b[a, b]\n\n\ndef divisory_is_qubit_suby (f : a) :\n   ",
+     " 0\n\ndef test3_theorem(a, b):\n    return 0\n\n__all__ = [\"Setup if diserse, not in xs]\n    __corotal__ = [\"Corotal false\"]"
+    ],
+    "arith": [
+     " 110 where 16 = 140\n10 = 2140497 + 199 = 110.56835 + 30 = 3.4999 + 4",
+     " 1 - 21 + 20 + 20 + 21 + 20 + 20 + 21 + 21 + 21 + 20 + 20 + 21 + 20 + ",
+     " 0.15 + 1.5 .\n, (1)2 = 0.15 + 2.5 .\n, (2)2 = 0.006 + 1.5 * 25 = 0.0"
+    ],
+    "identity": [
+     " a tensor product of such tensor elements: it translates the common matrices into a tensor product of a tensor product.\n\n\\left\\{\\begin{eqmatrix}[0<\\lambda] &= \\left\\{\\begin{eqmatrix}\\lambda &",
+     " big. Therefore it is perfect that A he uses as opposed as an integer called a\\bigtangle N. And that cannot be general with respect to how this can be written.\n\nOur creative term is a (fixed) (\n\\",
+     " continuous.\n\nIndicence, to maintain the desk of minority, requires what is called aetric noise or if a variable of 6 is then fraction. To refer to the unbounded lift, namely drying"
+    ]
+   }
+  },
+  {
+   "sampler": "k8+norep3",
+   "temperature": 1.0,
+   "top_k": 8,
+   "repetition_penalty": 1.1,
+   "no_repeat_ngram_size": 3,
+   "judge_en": 1.7150608540668892,
+   "judge_ru": 1.0265743398311236,
+   "self_bpb": 1.2014690594621238,
+   "loops": 0.8095238095238095,
+   "distinct3": 0.8337131155476003,
+   "code_ok": 0.3333333333333333,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 119.0,
+   "samples": {
+    "en_prose": [
+     " went to the stairs.\n\nOn the same time he was now a few years later, and he said.\nTurns on the south of the store. In his first place the wind was now.\nSome of them had been the s",
+     " was opened, the next morning.\n\nThe next day, after the night, when she had been opened to the door, he\n\nwas closed, and went away from the background of the street and a few minutes,\n\nand then came",
+     " started a few months, and went on to the door,\n\nshe turned to his house. He was a loud stone, and a frightful girl had held the\n\nworld from his own.\n\"Well, then,"
+    ],
+    "en_science": [
+     " 120 kg.\n\nReferences\n\nGeographical in the United States\nGlasgow\nRoman Council of North American\nNormal Royal Touring of Southern New York (net",
+     " 72,640. According to the Salamann-Wangsch theorem and the Dirac-Elliße-Schödinger theorem, the Richardson theorem and its Sun (19",
+     " 70° from the middle to the east in a wide range of food. Instruction of the military, the Belgian and Austrian Research Institute of Technology of Susseason ("
+    ],
+    "ru_prose": [
+     " был уволён, но уже в 1940 году был атакован и уволил его.\n\nУже был разбит в Гражданскую войну, а также в Грабентском парке. В 1860",
+     " в том числе, что, как и в конце концов, он начал «вотмировать» в свою «собственную и сдержанную работу.\nИсточник:\n\nМне кажется, что это очень интересно. В",
+     " стал бывать невесту. В 1840 году Скопиум-Венгрии был назначен в Бразилию в чине Скотты на 6 лет.\n\nСпустя три года, после 1"
+    ],
+    "ru_history": [
+     " была образована Майкл Гаррисон на североамериканском форуме.\n\nНа 2022 год в городе было создано несколько тысяч человек, среди которых Кит-Джорджа, а в 18",
+     " в Северной Германии было создано 137389 человек (в 1891 г. 2019), а всего — 1149 человек, в 5000 человек (среди них 3",
+     " на В. Доме был создан Спектаксберг, но затем он не стал членом Государственной комиссии по созданию в Бельгии. Спортсмена была выявлена. Вскоре Спека"
+    ],
+    "code": [
+     " a.group(b)\n\n# Take a subgroup of a group, but this is a group that contains a group of groups. The group of members can also be used for the groups in the group of subgroups.\n    def group_",
+     " a.get(b, c)\n    for i, y in range(5):\n        print(b'{0\\n{1}*{1000}}& {0\\2& 500}\\\\ & 0x\\\\\\",
+     " 0\n\n# This can happen to make sure that there is no such that it's only a little way\n# because the otherwise, but not just one of the two. If you want to see this, then it's not so much\n # but it"
+    ],
+    "arith": [
+     " 11000 # 91113\n\"$#2\\n\"\\n$\\n\\n\")\n\"\\$#3\\n\",$\\\\n'\\n+36 + 38,$#4",
+     " 620 + 600 .\nwe show a large scale factor @xmath77 , with @xmath39 and a factor @xcite , @xmath41 , where @xmath52 is the @xmath0-invariant .\nthis means",
+     " 0.15 + 34 = .4090 * 89 = (1.7 ) , (1 . )\n( 600 ) .\nit should be noted to have a lift of all three distinct lines in the"
+    ],
+    "identity": [
+     " a small family of such that its own, so that they are more than one family, but that is why we are not to say, but there exists a family of functions.\n\nTheorem 1 is called by the first family, the first is the first subgroup",
+     " highly efficient and efficient. For example: Accelerated Syntax: The Difficulty and the Discussion of Differential Equations: Coalysted Depends.\nEfficient Disco",
+     " a very useful tool for me and I am using it.\n\nThen the first term is a good answer for me. It seems to be a bit of my memory and a bit to me...\n\nI have to be able, but I didn't know"
+    ]
+   }
+  },
+  {
+   "sampler": "min_p0.05+norep3",
+   "temperature": 1.0,
+   "top_k": 0,
+   "min_p": 0.05,
+   "no_repeat_ngram_size": 3,
+   "judge_en": 1.9511782743335653,
+   "judge_ru": 1.0800353109277658,
+   "self_bpb": 1.2791123445251724,
+   "loops": 0.8095238095238095,
+   "distinct3": 0.8524371874573375,
+   "code_ok": 0.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 116.7,
+   "samples": {
+    "en_prose": [
+     " went to the stairs.\n\nOn the same time the door went out the hotel and saw that the ship were\n\nthen the king. The saddle was the dark-stairs of the glowing, and the\n",
+     " finished a lecture in the fresh.\n\nMaybe that did not give no goodness and that the man who had come from the\n\ncorning stairs and the man had ever done a mud and had taken his\n\nl",
+     " started a few months from the middle to the end,\n\nshe passed the door.\n\nAnd when the older brother saw a nutrition and a second of the\n\nyoung fair.\nSo, with an o"
+    ],
+    "en_science": [
+     " 1100 and the snowbottom was given up to 5000 west of the 20th century. The Earth is the only son of the Dutch-Shadow of the Snowblowing Sea,",
+     " 72,610. According to the Saltirouus 70937, Saltis of Saltia, and the High Schools' diesel (tomby and mirabi)",
+     " 70 seconds for the Australian period, which is very rapidly unusual. Instruction of the Hilbert Hydrophonic as award of the Lyhen-American Palacegnese Cult"
+    ],
+    "ru_prose": [
+     " перевернул в лихоенное место. К концу 1945 года он уехал к Лихоену. После того, как он был арестантом и охватывал 3,5 млн франков, то его",
+     " в том числе, что горький человек был схвачен, он видел его только на поле и горячен.\n\nНаполеон I\nВ 1506 году Валерий Курасов начал свою мать на",
+     " попросили взойти за куски, улыбаясь. Но он не понял о том, что все-таки придут для него, но для этого были пригнуты к себе, как это и стало, потому что они должны были у"
+    ],
+    "ru_history": [
+     " переименован в ГДР.\nВ 2001 году по очереди 49-го года, после объединения «Динамо», был возведён в состав ТС России в 1840 году, когда 4",
+     " в ходе экспонирования группу Мексиканского сельсовета НКВД СССР по делам герб.\n\nВ 2011—2000 годах в Чечнях прошёл атомный заём 3",
+     " на основании Дома мультипликационного соляра Харькова-Юрка был разработан печатный курс в тюрьмной книге «Особенник».\nВ 2019 году на баз"
+    ],
+    "code": [
+     " a.id\n  def __init__(self, a, b) : a = b[a]\n  \"\"\"\n  if b is a : (a) or b is the only integrable\n    a = a.adj(a)\n    a, c = a",
+     " a.get(a)\n\n\ndef get_hold(a):\n    if not a.browser in a.cache_by_le_cache:\n        # Check if a is a holdy (foo) iterator",
+     " 0\n\ndef test_items(a):\n    \"\"\"\n    Verify that the credential is a name of the cardested class of\n    items.\n    \"\"\"\n\n    def test_best_count(a1, b, 0"
+    ],
+    "arith": [
+     " 11000669 = 400101579 = \\frac{ 2\\pi}{2\\sin{3}} + 8 = 8630833 + 01,16 +",
+     " 7 - 8 . in fig . [ fig : fig : ] , we have found a flavor - controlled cavity ( with respect to the full mixed stage , the size of the ionization ) and the cavities . the",
+     " 0.15 + 1.5 .\n\n@article\n\nThe census is a second of the censer of 60 grammule or 63 grammar. The censa was fully cont"
+    ],
+    "identity": [
+     " a tensor product of such tensor product as input product, i.e. can be used to solve the input product.\n\nIn other words, we will start with this,\n\n\\begin{align} \\text{}\n\\text{,}\\\n\\",
+     " highly efficient and efficient. For example, if the upper bound of $i$ is not open to $i \\neq i$, and so that is not closed at $i0$ and is not convergent. This is a good idea to have a short",
+     " continuous.\n\nIndicence, every curve of a curve is a polynomial function that satisfies the polynomial. It is well-known that any polynomial x^2 x^3 is not continuous and it is called a polyncard x^4 \\qu"
+    ]
+   }
+  }
+ ],
+ "priming": [
+  {
+   "primer": "none",
+   "judge_en": 1.5382840920663055,
+   "judge_ru": 0.9320486435201221,
+   "self_bpb": 1.033111756757061,
+   "loops": 0.8095238095238095,
+   "distinct3": 0.7736150011557025,
+   "code_ok": 0.3333333333333333,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "samples": {
+    "en_prose": [
+     " went to the stairs.\n\nOn the same time he was now a few years later, and he was not to be a faster\n\nand a gaze. In his first place he was in the middle, but he had been in the\n",
+     " was opened, the next morning.\n\nThe next day, after the night, when she had been opened to the door, he\n\nwas closed, and went away from the background of the street and a few minutes,\n\nand then came",
+     " the other was the last time in the next time.\n\n“Then you have to do, sir?” he replied.\n\n“And I don’t know how you should do, sir. Have you been a good dear?”\n\n“"
+    ],
+    "en_science": [
+     " 120 kg.\n\nReferences\n\nGeographical in the United States\nGeography of the South Mountain",
+     " 72,640. According to the Salamann-Wangsch theorem and the Dirac-Elliotti equation of the Hamiltonian (1098) and the Hamiltonian (1070).\n",
+     " 70° from the middle to the east of a wide range of food. Instead, there is no need to be seen on the sandwich of the earth.\n\nAfter the earth was reaching a"
+    ],
+    "ru_prose": [
+     " был уволен, но уже в 1940 году был выставлен на Востоке.\n\nПосле 2021 года вновь получил своё название, а также в составе Добровольческой Государственной Депар",
+     " в том числе, что, как и в конце концов, он начал «вотмировать» в свою «собственную и сдержанную работу.\nВ течение первых 1680 года на 2000 году он переме",
+     " стал бывать невесту. В 1840 году Скопиум-Венгрии был назначен в Бразилию в чине Скопиума, где он был назначен на должности, но был переведён в"
+    ],
+    "ru_history": [
+     " была образована Майкл Гаррисон, затем основана в 1957 году в Виленском институте математики (в том числе в Вилимской школе, а также в Ленинградском университете).\n\nВ 1",
+     " в Северной Германии было создано 137389 человек (в 1963 г. 5039 человек), но не было 1248 человек. Вскоре после смерти 1964 года 3",
+     " на В. Доме был создан Спектаксберг, а также Спектаков. В настоящее время в Бразилии входит Гонконг — Спектаков.\n\nСоздание и развитие Спектакси"
+    ],
+    "code": [
+     " a.group(b)\n\n# Take a subgroup of a group, but this is a group that contains a group of groups. The group of groups in the group is\n    # the groups in which it is the group of groups.\n ",
+     " a.get(b, c)\n    if b:\n        a = b.get(a)\n    assert a[0] + b[1]\n    assert a[1] + b[2]\n\n    def test_package_failure_s",
+     " 0\n\n# This can happen to work.\n# The next is that it's only a little way to do it.\n#\ndef add(a, b):\n    print \"\\d\"\n    if a < b:\n        print \"\\s*"
+    ],
+    "arith": [
+     " 11000 # 41000\n# # 43100 - 4020 = 21010 # 68100\n# # 63000 + 190",
+     " 620 + 620 .\nwe show that for the @xmath40-bound and for the 25-bits , we show the two different types of @xmath38-bit pairs in fig .\n[ fig : b",
+     " 0.15 + 32 = 40.000 + 60.9 + 200.212 + 30 = 0.02 + 10.5 + 10.0 + "
+    ],
+    "identity": [
+     " a small family of such that its own, or, if it's not.\n\nThis is a simple example of the following:\n\n• If we don't know what the product is, you have to say, the product of the product and the product of the products",
+     " highly efficient and efficient.\nThe STRP is designed to operate a large system of STRPs. This is only a few years of development in the US and the STRP is designed to operate a large system of STR",
+     " a very useful tool for me.\nI've read the picture, but that's just what I wanted to do.\n\nI am going to think about it as an example of a very simple picture. The idea is to say, but this is"
+    ]
+   }
+  },
+  {
+   "primer": "style",
+   "judge_en": 1.567476135194788,
+   "judge_ru": 0.9062852637775399,
+   "self_bpb": 1.2388572280674057,
+   "loops": 0.9523809523809523,
+   "distinct3": 0.7957655373161637,
+   "code_ok": 0.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "samples": {
+    "en_prose": [
+     " went to the stairs. She had no dream,\n\ndrawn, and got up to her.\n\nAnd then he was sitting in the table, and said to be the king. She was still\n\nthem, but she could",
+     " took her head, and then began to go into the\n\nfirst streak of a fire with a firmer.\n\nShe was a little dress, and was still a great man who was to see him.\n\nThe next day she was",
+     " started a picture, and went on to the door,\n\nshe turned to his stones.\n\n\"The next day I saw that it was not to be a great deal of the dresses. The\n\nsquare of this was"
+    ],
+    "en_science": [
+     " 120 kg.\n\nReferences\n\nGeographical papers in the Buddhist\nPopulations in the Buddhism\nElectronics in New York City\nFrancis Micha",
+     " 12,000. According to the Singapore Roads in Brutefield, the Singapore is a territorial.\n\nDepartment of Culture\nThe songs are",
+     " 40 seconds, and the East of the Western Australian Sea. The Earth is now a small military, but is not the most important part of the earth, so there are no lightly waves of the E"
+    ],
+    "ru_prose": [
+     " приподнялся, но уже в 1940 году был вынужден отправить к власти. В 2013 году был приобретён новый альтернативный проект. В 1954 году был выявлен первый первый",
+     " в 2001 году был приглашён. Находясь на 40-летние дверью.\n\nВ 2001—2004 годах вновь стал первым дверью, а на 19",
+     " наступил в 238 году, после чего, когда я стал называть ему «добавочным» и вскоре стал награждён.\n\nУмер его отрывок на следующие:\n\n— Сейчас я сид"
+    ],
+    "ru_history": [
+     " был опубликован в газетах «Русский язык».\n\nНаграды\n1804 — Орденом Святого Георгия (род. 1863).\n2004 — Орденом С",
+     " в Москве был переименован в Берлин, в котором он работал в Бельгии. В июле 2010 года он стал одним из лидеров проекта «Получившийся» и «Нью-Йорк",
+     " на Украине внесли в список 50 стран, в том числе 84 тысяч человек.\n\nСудя по этому поводу в 2004 году, 73 тысяч человек стал популярным. В течение нескольких месяцев 1"
+    ],
+    "code": [
+     " a.__class__ = b\n\n\ndef __init__(self, test=None, parent=False):\n    self._set_test()\n    self._package.add_test('test-test-test', 401, 50",
+     " a.get(b, c)\n\n    # TODO(selecting a 2013/2014)\n    assert is_pop(c) == a['schema'],\n                    is_pop(c)\n    assert",
+     " 0\n\n\ndef test_method(a, a, b, a, b):\n    # pylint: disable=unused-argument\n    def test_parser(self):\n        self.assertEqual('test-parser',"
+    ],
+    "arith": [
+     " 16000 # TOG_CLOSE.\n#\n# Create a 32-bit ball in the first one.\n#\n# This is the first one, but I have to be able to get the answer",
+     " 62 - 1000.10 + 49 = 60 + 110.15 - 30 + 111000000 + 300.15 - 49 +",
+     " 40\n19 - 25 = 4\n19 - 4 = 8\n19 - 5 = 12\n20 - 4 = 6\n30 - 6 = 25\n19 - "
+    ],
+    "identity": [
+     " a library for Windows and is a Windows object, or is a Windows object for the user's parent/master.\nDefined to the Python-Google Customer for the Multiplying Memory.\nUtilizing the P",
+     " a tool used to create python. This can be done as a tool for a python python. The python function will also be called in this python.\nDefine a python function. This is a way to use a python function.\nDef",
+     " a very useful tool for me and I am using it.\n\nThen the first few worksheets, the last of a week.\n\nI think you have to be a good idea to understand the details on the problem, which I'm trying to"
+    ]
+   }
+  },
+  {
+   "primer": "fewshot",
+   "judge_en": 1.981617591941202,
+   "judge_ru": 1.0295249378087534,
+   "self_bpb": 1.284452444818757,
+   "loops": 0.7619047619047619,
+   "distinct3": 0.7104632830762734,
+   "code_ok": 0.3333333333333333,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "samples": {
+    "en_prose": [
+     " went to the stairs.\nThen, I was a gold, the girl of Mrs. Hartford, who was a gold, the girl of Mr. Richard Singleton's\n\ntrain.\n",
+     " took a street.\nThe drive of Harvard's sleep was open to a bank of the hall, and was\nsleeping at a street. The glow of a gold.\nThe driving pan",
+     " began a long-time, and went on to the door,\nsaid the balm.\nFreements of the duty of the troop were not awake-block, and the\nbrooker of the f"
+    ],
+    "en_science": [
+     " 120 degrees and the earth will be 3800 km, and the 49700kms of the earth would be 5600 km.\nA: 3000 km, 4",
+     " 75,000. According to the Schwartz equation, the Accordatus has been given a few years of success in the Earth.\n\nThe Schwartz equation is a 3D (19",
+     " 70° (30°)\nF: A, C, S = P.\nB: S = P.\n\nS: R is the pump of the earth from a bird of a circle (100�"
+    ],
+    "ru_prose": [
+     " подошёл вперёд.\nВопрос: Он открыл дверь и подошёл вперёд.\nНет, не слыхала его.\nОн был очень любопытен, что он не хотел.\nВопрос",
+     " вставал, и вставал в бабары, где он не стал.\nСтоит отметить, что он не стал с ним, но был на свежий год — он не стал с ним.\nСтоит отметить, что он",
+     " наступил в Риме. Вот, я вижу...\nНо вот это не видел. Но я смотрю, а какое-то время улыбнулся!\nКогда ты был сидит, он вынес его наступ"
+    ],
+    "ru_history": [
+     ". Спасо-Петербург, 1810 год.\nСписок книг. Сборник книг. Спасо-Петербург, 1811 год.\nВопрос: Белые",
+     " в Сент-Монсене (Сент-Ха) награждены на роль в спорной кампании и вскоре, как заслуженный финистр. Вскоре после смерти в 1970-х",
+     "\nКритика. Почему, это была сияющаяся, но не только не вовлечена, так и вовлечен. Стоит отметить, что он был санафил, но и не вовлечен.\n\n"
+    ],
+    "code": [
+     " a - b\n\n\n# Create a subtree with the subtrees\n# Create a subtree with a subtree with the subtrees.\n# Create a subtree with a subtree with an subt",
+     " a -b\n\ndef add_add_add_add(a, b):\n    print a\n    assert a == b.add_add_add_add_add_add('subject_add')\n    assert a < a\n\ndef add_add_",
+     " a - b\n\n\ndef add_add(b, b):\n    return a + b\n\n    def add_add(b):\n        if b < a:\n            print('Added a new module to the new module.'))\n    return a\n\ndef"
+    ],
+    "arith": [
+     " a\n    #  17.5 = 100\n#  18.9 = 40\n#  19.2 = 100\n#  19.6 = 100\n#  19.9 =",
+     " 1000\n\n0.25.0.0\n0.16.2\n0.36.2\n1.49.2\n1.49.2\n2.38.2\n2.49.3",
+     " 0\n\n# The following functions are used to be in\n    a,\n    a - b,\n    b - b.\n    a - b,\n    a - b.\n\ndef __init__(b, r, r, r, r, r, r):"
+    ],
+    "identity": [
+     " a tensor.\n  \"\"\"\n  # A tensor of a tensor of a tensor is a tensor with its a tensor\n  #    b = a\n  #   tensor_map = b\n  # A tensor that is an identity\n  if not isinstance(a, a, b)",
+     " an abstract set of a subspace.\n    It can be used to represent a subspace with a set of 2 bases\n    that is a subset of a subspace of a subset of a subset of 0\n    items,",
+     " called.__init__(a)"
+    ]
+   }
+  }
+ ],
+ "rerank": [
+  {
+   "n": 1,
+   "judge_self": 1.1226109512197362,
+   "judge_random": 1.1226109512197362,
+   "judge_noloop": 1.1226109512197362,
+   "prompts": 4
+  },
+  {
+   "n": 4,
+   "judge_self": 1.0529491804471274,
+   "judge_random": 1.2857372502647915,
+   "judge_noloop": 1.1782162675274523,
+   "prompts": 4
+  },
+  {
+   "n": 8,
+   "judge_self": 0.9286029942292091,
+   "judge_random": 1.440629268967116,
+   "judge_noloop": 1.1782162675274523,
+   "prompts": 4
+  }
+ ],
+ "vote": {
+  "probes": 50,
+  "votes": 8,
+  "acc_first": 0.02,
+  "acc_majority": 0.0,
+  "acc_any": 0.04,
+  "examples": [
+   {
+    "a": 59,
+    "b": 63,
+    "truth": 122,
+    "answers": [
+     12810,
+     722,
+     8015928,
+     220,
+     2028,
+     0,
+     0,
+     7280168
+    ]
+   },
+   {
+    "a": 15,
+    "b": 43,
+    "truth": 58,
+    "answers": [
+     1260,
+     720,
+     0,
+     2200,
+     2098,
+     0,
+     0,
+     7280000
+    ]
+   },
+   {
+    "a": 75,
+    "b": 72,
+    "truth": 147,
+    "answers": [
+     11600,
+     122,
+     8015,
+     1200,
+     0,
+     0,
+     0,
+     3280160
+    ]
+   },
+   {
+    "a": 61,
+    "b": 48,
+    "truth": 109,
+    "answers": [
+     12000,
+     722,
+     0,
+     2200,
+     2098,
+     0,
+     0,
+     72001
+    ]
+   },
+   {
+    "a": 71,
+    "b": 55,
+    "truth": 126,
+    "answers": [
+     11000,
+     6228,
+     0,
+     2200,
+     0,
+     0,
+     0,
+     2280000
+    ]
+   },
+   {
+    "a": 84,
+    "b": 37,
+    "truth": 121,
+    "answers": [
+     11000,
+     122,
+     0,
+     2200,
+     2098,
+     0,
+     0,
+     22000
+    ]
+   },
+   {
+    "a": 74,
+    "b": 27,
+    "truth": 101,
+    "answers": [
+     128,
+     1226,
+     0,
+     2500,
+     0,
+     0,
+     0,
+     3280168
+    ]
+   },
+   {
+    "a": 46,
+    "b": 27,
+    "truth": 73,
+    "answers": [
+     11000,
+     1228,
+     0,
+     2200,
+     0,
+     0,
+     0,
+     3280000
+    ]
+   },
+   {
+    "a": 22,
+    "b": 89,
+    "truth": 111,
+    "answers": [
+     11600,
+     721,
+     0,
+     1200,
+     0,
+     0,
+     0,
+     7200160
+    ]
+   },
+   {
+    "a": 42,
+    "b": 78,
+    "truth": 120,
+    "answers": [
+     1163566,
+     622,
+     0,
+     22001,
+     0,
+     0,
+     0,
+     32001
+    ]
+   }
+  ]
+ }
+}

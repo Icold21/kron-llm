@@ -1,0 +1,80 @@
+<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1b1b1b"><h1 style="font-size:20px;margin:18px 0 6px">Q10: примеры генерации, шаг 36 549 — настройки по вашему запросу</h1>
+<p style="margin:8px 0"><code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">temperature 1.0</code>, <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">top_p 0.95</code>, <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">top_k 10</code>, до 90 новых токенов, seed 42, чекпоинт шага <strong>36 549</strong> (9 938 886 параметров, 26 % эпохи).</p>
+<p style="margin:8px 0">Ваше замечание про <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">top_k 40</code> при словаре 8 192 верно: это отсекало всего 40 кандидатов из восьми тысяч, то есть практически ничего не делало, и распределение оставалось почти сырым. <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">top_p 0.95</code> с <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">top_k 10</code> — ограничение осмысленное.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Вопрос про EOT</h2>
+<p style="margin:8px 0">В корпусе <strong>1,028,370</strong> токенов EOT (id 8191, конец документа) — ровно по одному на документ, и он <strong>всегда</strong> был целью обучения: <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">encode_docs</code> дописывает его в конец каждого документа, а цель — следующий токен, поэтому последний токен документа предсказывает EOT. Так было и в сессиях 1–5, это не новое.</p>
+<p style="margin:8px 0"><code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">&lt;|eot|&gt;</code> (id 8190) — другой токен, конец реплики. В корпусе их <strong>296,661</strong>, и они приходят только из чат-документов (&lt;|system|&gt; — 63,744 штук). В сессии 4 их добавлял ещё и наш вставленный промпт — именно это мы и убрали.</p>
+<p style="margin:8px 0"><strong>Но на генерации EOT не появляется.</strong> Измерено по токенам, бюджет 300: <strong>0 из 6</strong> выборок остановились сами, все упёрлись в лимит. При 300 токенах бюджета модель тоже ни разу не выдала EOT. Причина арифметическая: EOT — это 0.044 % всех целей (один на ~2 300 токенов), и на 26 % эпохи такой редкий класс ещё не закрепился. Практический вывод: останавливать генерацию по EOT пока нельзя, нужен <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">max_new_tokens</code>.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Примеры</h2>
+<h3 style="font-size:15px;margin:18px 0 6px">Once upon a time</h3>
+<p style="margin:8px 0"><em>EN · художественный</em></p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">Once upon a time,
+
+and a few years, and we are not aware of that,
+
+and that’s not the same thing,
+
+and the more,
+
+After all, it’s just the same thing’s notion,
+
+And if you’re not, you’ll have been aware of that,
+
+and I’ll be the same thing as your own.
+
+To all,</pre>
+<h3 style="font-size:15px;margin:18px 0 6px">The derivative of x^2 is</h3>
+<p style="margin:8px 0"><em>EN · математика</em></p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">The derivative of x^2 is a function with the derivative, and we are not the derivative of x^2, which means that for x\in x\cap\in x\otimes y^2\in x\otimes z^2\otimes y^2\otimes \otimes \cap(x\cap\cap(x\cap\cap(x\cap\cap(x\</pre>
+<h3 style="font-size:15px;margin:18px 0 6px">def quicksort(arr):</h3>
+<p style="margin:8px 0"><em>EN · код</em></p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">def quicksort(arr):
+    if len(arr) &lt;= 1:
+        return arr
+    else:
+        return asts.findsort(arr)
+
+
+def test_canvass_frame_frame_frame_frame_frame_frame_frame_frame_frame_frame_frame_frame_frame_frame_frame_frame_</pre>
+<h3 style="font-size:15px;margin:18px 0 6px">The photo of a black hole was made by</h3>
+<p style="margin:8px 0"><em>EN · энциклопедическое</em></p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">The photo of a black hole was made by a brief moon, and a black hole was the first time a glass of the black hole to the sun's face. The sun was now a black hole, which is called a black hole. In some cases, the black hole had two white holes.
+
+From 2 to 8 of the black hole, and the black hole would be the most massive of its black hole. It is not the case</pre>
+<h3 style="font-size:15px;margin:18px 0 6px">What is the capital of France?</h3>
+<p style="margin:8px 0"><em>EN · вопрос-ответ</em></p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">What is the capital of France?
+The capital of France is a partner of a
+such that this capital is an important partner of an
+civilist painter, the person who has been being a
+general partner of the world.
+A girl who has not been being an important partner of
+the world, and the person who has been being a
+general partner of the world, was a partner of
+the partner of the world</pre>
+<h3 style="font-size:15px;margin:18px 0 6px">Однажды в маленьком городе</h3>
+<p style="margin:8px 0"><em>RU · художественный</em></p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">Однажды в маленьком городе, в которой в 1056 килитмами в Балтийском училище было временно захвачено по городам, по которому они находились в северном монастыре.
+
+Устройство
+
+С 1954 года до н. э. в Балтийском училище в северном монастыре, с 22</pre>
+<h3 style="font-size:15px;margin:18px 0 6px">Производная функции x^2 равна</h3>
+<p style="margin:8px 0"><em>RU · математика</em></p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">Производная функции x^2 равна, если она не имеет значения, так что она не будет иметь значения, если она является в зависимости от других.
+
+Современные значения
+Современные значения
+Если же они не делается, то в данной области можно получить значение для того, что все равны. Такое отношение можно быть для того, что они не являются значениями:
+
+Все все равно, а на них не могут быть</pre>
+<h3 style="font-size:15px;margin:18px 0 6px">Чёрная дыра — это</h3>
+<p style="margin:8px 0"><em>RU · энциклопедическое</em></p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">Чёрная дыра — это наследственное название герба, который при этом уверен, что в этой местности и как на этом гербе, не имея на этом скотках в этом иных условиях, он не был задумчивым, что наследственное название герба.
+
+Существование герба
+Герб был использован в качестве герба для обозначения герба, в котором использовался</pre>
+<h2 style="font-size:17px;margin:18px 0 6px">Поправка к предыдущему письму</h2>
+<p style="margin:8px 0">В прошлом письме я написал, что остановились сами 8 из 8 примеров. Это неверно: я сравнивал длину в символах, а при бюджете 90 токенов так не отличить законченный текст от упёршегося в лимит. Правильное измерение — по токенам при бюджете 300: <strong>0 из 6</strong>. Извините за неточность.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Итог</h2>
+<ul style="margin:8px 0 8px 22px;padding:0"><li style="margin:3px 0">язык и орфография держатся, связность — на уровне фразы;</li><li style="margin:3px 0">настроения/фактов нет; код синтаксически похож, но не работает;</li><li style="margin:3px 0">с <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">top_p 0.95</code> / <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">top_k 10</code> текст стал заметно менее случайным, но и беднее — модель чаще повторяет одну конструкцию.</li></ul></div>

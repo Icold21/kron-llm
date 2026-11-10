@@ -1,0 +1,38 @@
+{
+  "per_language": {
+    "en": {
+      "n": 30,
+      "answer_line": 20,
+      "first_row": 30
+    },
+    "ru": {
+      "n": 30,
+      "answer_line": 21,
+      "first_row": 29
+    }
+  },
+  "answer_line": 41,
+  "first_row": 59,
+  "total": 60,
+  "examples": [
+    {
+      "prompt": "Add 583 and 693 column by column.",
+      "want": 1276,
+      "got": "Add the columns from the units:\nunits: 3 + 3 = 6 -> write 6\ntens: 8 + 9 = 17 -> write 7, carry 1\nhundreds: 5 + 6 + 1 = 12 -> write 2, carry 1\nthousands: 1 -> write 1\nSo 583 + 693 = 1276.\n\nAnswer: 1276<|eot|><issue_start>username_0: I have a [Geometric Methods](https://gis.stackexchange.com/questions",
+      "ok": true
+    },
+    {
+      "prompt": "What is 921 - 314?",
+      "want": 607,
+      "got": "Subtract the columns from the units:\nunits: 1 - 0 is less than 4 -> borrow: 11 - 4 = 7, borrow 1\ntens: 2 - 1 - 1 = 0\nhundreds: 9 - 3 = 6\nSo 921 - 314 = 607.\n\nAnswer: 607<|eot|>The Bayesian Foundation (BFF) is a 1996 book by the Bayesian Foundation, published in 1996. It is a 1996 book by the Bayesia",
+      "ok": true
+    },
+    {
+      "prompt": "Multiply 943 by 7 digit by digit.",
+      "want": 6601,
+      "got": "Multiply one digit at a time, starting from the units:\nunits: 3 * 7 = 21 -> write 1, carry 2\ntens: 4 * 7 + 2 = 27 -> write 7, carry 2\nhundreds: 9 * 7 + 2 = 67 -> write 7, carry 6\ncarry: 6 -> write 6\nSo 943 * 7 = 6771.\n\nAnswer: 6771<|eot|><issue_start>username_0: I have a [Geometric Methods](https",
+      "ok": false
+    }
+  ],
+  "step": 88936
+}

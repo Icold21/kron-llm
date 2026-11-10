@@ -1,0 +1,63 @@
+{
+ "winner": "best+last",
+ "alpha": 0.5,
+ "bpb": 1.1334337479760799,
+ "candidates": [
+  {
+   "label": "best_prev+best",
+   "a": "data\\kaggle_out\\archive\\best_035000.pt",
+   "b": "data\\kaggle_out\\q10\\best.pt",
+   "alpha": 0.5,
+   "bpb": 1.136751178462344,
+   "detail": {
+    "all": {
+     "bpb": 1.136751178462344,
+     "bytes": 1932427
+    },
+    "en": {
+     "bpb": 1.3853314317386152,
+     "bytes": 945781
+    },
+    "ru": {
+     "bpb": 0.8984666462959088,
+     "bytes": 986646
+    }
+   },
+   "ckpt": "C:\\Users\\Icold\\AppData\\Local\\Temp\\tmpxzczypgv\\best_prev+best.pt",
+   "rel_distance": {
+    "embed": 0.3199919826225588,
+    "embed_up": 0.1291588146614836,
+    "blocks": 0.10812450429221417,
+    "norm_f": 0.01825122042905548
+   }
+  },
+  {
+   "label": "best+last",
+   "a": "data\\kaggle_out\\q10\\best.pt",
+   "b": "data\\kaggle_out\\q10\\last.pt",
+   "alpha": 0.5,
+   "bpb": 1.1334337479760799,
+   "detail": {
+    "all": {
+     "bpb": 1.1334337479760799,
+     "bytes": 1932427
+    },
+    "en": {
+     "bpb": 1.3810955785429773,
+     "bytes": 945781
+    },
+    "ru": {
+     "bpb": 0.8960295991979057,
+     "bytes": 986646
+    }
+   },
+   "ckpt": "C:\\Users\\Icold\\AppData\\Local\\Temp\\tmpxzczypgv\\best+last.pt",
+   "rel_distance": {
+    "embed": 0.11065111201903301,
+    "embed_up": 0.027608608520583038,
+    "blocks": 0.05121180015361544,
+    "norm_f": 0.0023367222998013156
+   }
+  }
+ ]
+}

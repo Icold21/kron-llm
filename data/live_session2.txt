@@ -1,0 +1,16 @@
+﻿
+      [mem] rss 23.7 GB | cuda 0.19 GB (reserved 15.35)
+  [val] step 15000 | loss 2.1816 | ppl 8.86 | bpb 0.852
+  [val] step 15000 | loss 2.1816 | ppl 8.86 | bpb 0.852
+step 15050 | loss 3.1095 | ppl 22.41 | gnorm 1.713 | 2676 ms/step
+      [mem] rss 23.8 GB | cuda 0.19 GB (reserved 15.35)
+step 15050 | loss 3.1095 | ppl 22.41 | gnorm 1.713 | 2676 ms/step
+      [mem] rss 23.8 GB | cuda 0.19 GB (reserved 15.35)
+step 15100 | loss 3.1406 | ppl 23.12 | gnorm 1.553 | 2527 ms/step
+      [mem] rss 23.8 GB | cuda 0.19 GB (reserved 15.35)
+step 15100 | loss 3.1406 | ppl 23.12 | gnorm 1.553 | 2527 ms/step
+      [mem] rss 23.8 GB | cuda 0.19 GB (reserved 15.35)
+step 15150 | loss 3.1299 | ppl 22.87 | gnorm 1.585 | 2528 ms/step
+      [mem] rss 23.8 GB | cuda 0.19 GB (reserved 15.35)
+step 15150 | loss 3.1299 | ppl 22.87 | gnorm 1.585 | 2528 ms/step
+      [mem] rss 23.8 GB | cuda 0.19 GB (reserved 15.35)

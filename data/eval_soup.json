@@ -1,0 +1,90 @@
+{
+  "ckpt": "data\\kaggle_out\\q10\\soup.pt",
+  "step": 43895,
+  "device": "cuda",
+  "seq": 256,
+  "continuation": {
+    "blocks": 64,
+    "bpb": 1.0890217999920118,
+    "per_language": {
+      "en": 1.2563690747265641,
+      "ru": 0.9441635206472206
+    },
+    "counts": {
+      "en": 40,
+      "ru": 24
+    }
+  },
+  "ranking": {
+    "prefixes": 64,
+    "distractors": 8,
+    "accuracy": 0.375,
+    "mean_rank": 2.578125,
+    "chance_accuracy": 0.1111111111111111
+  },
+  "arithmetic": {
+    "n": 60,
+    "exact_match": 0.016666666666666666,
+    "examples": [
+      {
+        "prompt": "51 - 29 = ",
+        "got": "200000",
+        "want": 22,
+        "ok": false
+      },
+      {
+        "prompt": "93 + 16 = ",
+        "got": "100000",
+        "want": 109,
+        "ok": false
+      },
+      {
+        "prompt": "78 - 22 = ",
+        "got": "200000",
+        "want": 56,
+        "ok": false
+      },
+      {
+        "prompt": "84 + 17 = ",
+        "got": "100000",
+        "want": 101,
+        "ok": false
+      },
+      {
+        "prompt": "14 - 21 = ",
+        "got": "100000",
+        "want": -7,
+        "ok": false
+      },
+      {
+        "prompt": "63 + 18 = ",
+        "got": "10 + 18",
+        "want": 81,
+        "ok": false
+      },
+      {
+        "prompt": "21 - 80 = ",
+        "got": "100000",
+        "want": -59,
+        "ok": false
+      },
+      {
+        "prompt": "17 + 82 = ",
+        "got": "12 + 12",
+        "want": 99,
+        "ok": false
+      }
+    ]
+  },
+  "longform": {
+    "samples": 24,
+    "repeat_4gram": 0.07240437158469946,
+    "distinct_2": 0.849867724867725,
+    "examples": [
+      "abla} for more details.\n\"\"\"\n\nfrom __future__ import absolute_import, division_argument, division_address\n\nimport numpy as np\nimport os\n\n# Note that the RFC's name does not contain a module",
+      "able-to-consuming-existing-digest-information-for-protocol-digest-out-of-protocol-breaking-deprecated\nmessage-word to an authentication-check-all-write protocol",
+      "abular authentication.cgi-1} for the Python code\n\n\"\"\"Test Session Initialization Protocol.\n\nDocumented in RFC 2543.\n[Superceded by 3260]\n\n\nThis module",
+      "ab_lab} for HTTP.\n\"\"\"\n\n\nfrom __future__ import absolute_import, division\n\nfrom __future__ import absolute_import, division\n\nfrom __future__ import absolute_import\nfrom __future__ import absolute"
+    ]
+  }
+}

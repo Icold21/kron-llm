@@ -1,0 +1,159 @@
+{
+ "math_en": {
+  "domain": "math",
+  "lang": "en",
+  "budget_MB": 365.4,
+  "sources": [
+   {
+    "source": "openmathinstruct2",
+    "rows": 171926,
+    "MB": 224.5,
+    "kept_rows": 88676,
+    "kept_MB": 70.1,
+    "survival": 0.516,
+    "rows_to_fill_cap": null,
+    "cap_MB": 73.1
+   },
+   {
+    "source": "metamathqa",
+    "rows": 313847,
+    "MB": 224.5,
+    "kept_rows": 289252,
+    "kept_MB": 187.5,
+    "survival": 0.922,
+    "rows_to_fill_cap": 112877,
+    "cap_MB": 73.1
+   },
+   {
+    "source": "orca_math",
+    "rows": 199465,
+    "MB": 223.3,
+    "kept_rows": 127004,
+    "kept_MB": 105.9,
+    "survival": 0.637,
+    "rows_to_fill_cap": 86163,
+    "cap_MB": 73.1
+   },
+   {
+    "source": "mathinstruct",
+    "rows": 245153,
+    "MB": 169.9,
+    "kept_rows": 215265,
+    "kept_MB": 114.6,
+    "survival": 0.878,
+    "rows_to_fill_cap": 137511,
+    "cap_MB": 73.1
+   },
+   {
+    "source": "gsm8k",
+    "rows": 7473,
+    "MB": 3.9,
+    "kept_rows": 7400,
+    "kept_MB": 3.8,
+    "survival": 0.99,
+    "rows_to_fill_cap": null,
+    "cap_MB": 73.1
+   },
+   {
+    "source": "hendrycks_math_algebra",
+    "rows": 1743,
+    "MB": 0.9,
+    "kept_rows": 1654,
+    "kept_MB": 0.7,
+    "survival": 0.949,
+    "rows_to_fill_cap": null,
+    "cap_MB": 73.1
+   },
+   {
+    "source": "hendrycks_math_geometry",
+    "rows": 868,
+    "MB": 1.0,
+    "kept_rows": 419,
+    "kept_MB": 0.3,
+    "survival": 0.483,
+    "rows_to_fill_cap": null,
+    "cap_MB": 73.1
+   },
+   {
+    "source": "hendrycks_math_numbertheory",
+    "rows": 869,
+    "MB": 0.6,
+    "kept_rows": 775,
+    "kept_MB": 0.4,
+    "survival": 0.892,
+    "rows_to_fill_cap": null,
+    "cap_MB": 73.1
+   },
+   {
+    "source": "arith_en",
+    "rows": 700000,
+    "MB": 81.8,
+    "kept_rows": 700000,
+    "kept_MB": 81.8,
+    "survival": 1.0,
+    "rows_to_fill_cap": 625041,
+    "cap_MB": 73.1
+   }
+  ],
+  "usable_MB": 565.1,
+  "with_cap_MB": 367.7
+ },
+ "qa_sites_en": {
+  "domain": "qa_sites",
+  "lang": "en",
+  "budget_MB": 108.8,
+  "sources": [
+   {
+    "source": "stackexchange",
+    "rows": 121840,
+    "MB": 178.2,
+    "kept_rows": 77081,
+    "kept_MB": 69.7,
+    "survival": 0.633,
+    "rows_to_fill_cap": 72135,
+    "cap_MB": 65.2
+   },
+   {
+    "source": "eli5",
+    "rows": 135849,
+    "MB": 178.2,
+    "kept_rows": 104091,
+    "kept_MB": 80.0,
+    "survival": 0.766,
+    "rows_to_fill_cap": 84990,
+    "cap_MB": 65.2
+   },
+   {
+    "source": "reddit_qa",
+    "rows": 92452,
+    "MB": 178.2,
+    "kept_rows": 52684,
+    "kept_MB": 40.4,
+    "survival": 0.57,
+    "rows_to_fill_cap": null,
+    "cap_MB": 65.2
+   }
+  ],
+  "usable_MB": 190.1,
+  "with_cap_MB": 170.8
+ },
+ "general_en": {
+  "domain": "general",
+  "lang": "en",
+  "budget_MB": 26.1,
+  "sources": [
+   {
+    "source": "dolly",
+    "rows": 13877,
+    "MB": 10.2,
+    "kept_rows": 12180,
+    "kept_MB": 6.2,
+    "survival": 0.878,
+    "rows_to_fill_cap": null,
+    "cap_MB": 47.0
+   }
+  ],
+  "usable_MB": 6.2,
+  "with_cap_MB": 6.2
+ }
+}

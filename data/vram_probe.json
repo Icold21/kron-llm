@@ -1,0 +1,47 @@
+[
+  {
+    "params": 9938886,
+    "batch": 2,
+    "seq": 512,
+    "ok": true,
+    "peak_gb": 5.45,
+    "reserved_gb": 5.71,
+    "shape": "Q10  d512 L25 h8"
+  },
+  {
+    "params": 9938886,
+    "batch": 4,
+    "seq": 512,
+    "ok": false,
+    "peak_gb": NaN,
+    "reserved_gb": NaN,
+    "shape": "Q10  d512 L25 h8"
+  },
+  {
+    "params": 10842982,
+    "batch": 2,
+    "seq": 512,
+    "ok": false,
+    "peak_gb": NaN,
+    "reserved_gb": NaN,
+    "shape": "Q11  d640 L25 h8"
+  },
+  {
+    "params": 11937478,
+    "batch": 2,
+    "seq": 512,
+    "ok": false,
+    "peak_gb": NaN,
+    "reserved_gb": NaN,
+    "shape": "Q12  d768 L25 h12"
+  },
+  {
+    "params": 17649036,
+    "batch": 2,
+    "seq": 512,
+    "ok": false,
+    "peak_gb": NaN,
+    "reserved_gb": NaN,
+    "shape": "Q12b d512 L50 h8"
+  }
+]

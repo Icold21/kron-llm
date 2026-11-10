@@ -1,0 +1,4 @@
+epoch corpus and anneal bin verified ready at 2026-10-31 18:42:16
+corpus: icold21/kron-corpus-2b
+anneal: icold21/kron-q10a-anneal-bin
+verified by scripts/verify_datasets.py (each seen ready at least once)

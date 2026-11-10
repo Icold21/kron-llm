@@ -1,0 +1,113 @@
+{
+ "ckpt": "data\\kaggle_out\\q10\\soup.pt",
+ "step": 35115,
+ "max_new_tokens": 56,
+ "seeds": 3,
+ "samplers": [
+  {
+   "sampler": "recipe k8 rp1.1",
+   "temperature": 1.0,
+   "top_k": 8,
+   "repetition_penalty": 1.1,
+   "judge_en": 1.962306776425459,
+   "judge_ru": 0.8175198804984453,
+   "self_bpb": 1.2471495413667566,
+   "loops": 0.9047619047619048,
+   "distinct3": 0.8293327088532847,
+   "code_ok": 0.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 41.9,
+   "samples": {
+    "en_prose": [
+     " went to the\n\nglasses, and was still in the house. Then the girl came out at her.\n\n“I’ll see the mother,” he said. “My friend is a very young man,\n\nyou know, I’m",
+     " took her back, the next held on the top left. She was still aware of her mother's handling the door, with a little gleam in the maids.\n\nDuring the next day she began to have an army-b",
+     " the windows\nand was not in the house of the house that she had never given it.\nThe door was a long time and a few minutes, but there is one one\nof the door to the house, where the boats were so fully\n"
+    ],
+    "en_science": [
+     " 120 degrees and is a 10000.\n• ##### The West Circle\nPhone: 113.568.5763.193\nLoad the Pyth",
+     " 72,600. According to the Salamado Roomeric River, the Salamado Roomeric River (SNL) is 10.\n\nThe salt-sh",
+     " 70° (38,50 ±10) is a very faint. Instruction of the Holy Care Palm is the Earth at the Pennsylvania.\nSomewhere in this area"
+    ],
+    "ru_prose": [
+     " был удостоен своей женитьбы на прежней службе в 1940 году.\n\nКнига была опубликована при Международном астрономическом институте, в 1940 году, когда была опубликов",
+     " в 20 км к юго-востоку. На протяжении всего мира 1993 г. в Бразилии было сформировано 100 тысяч человек. По оценке этого, 1994 года 3",
+     " нанесли ему его за руку, но он не стал смотреть ее.\n\nИ он, видя с себя в голове, сказал: «Боже мой, да я вам...» — «Вот ты, да я вам, да ты вас"
+    ],
+    "ru_history": [
+     " была образована Майкл Гаррисон, затем учредилась в Венской университете для школы.\n\nУчреждения и развитие школы — это школа, которая является одним из основных учебных учреждений, но,",
+     " в городе был включён в состав Камчатского района Камчатки.\n\nВ 1957 году в Бразилии было образовано 411 050 человек (до 2010 года). В 19",
+     " на Украине в Северо-Западной Бухте, на территории которой был открыт первый Новгород. На территории современных городов в составе района входил Северный Бухтаж, с 1983 года — 2"
+    ],
+    "code": [
+     " a.group(b, b)\n\n\n# Add the number of subgroups to this list\nexcept:\n    import pkg24863\n    def _add_dict():\n        d = d.add_description('Dis",
+     " a.get(b, c)\n    for i, b in range(b):\n        print(b*10)\n        print(b*i + i*11)\n\n    return a\n\n\ndef test_device_sync_dev",
+     " 0\n\n# Find a function to get the same arguments as that it's a string.\n\ndef add_function(args, tx1: tx2: 300, fn: 100000"
+    ],
+    "arith": [
+     " 11000.59 = 4001015311000.02 = 25001005681516000.34 + 15 + 4",
+     " 620 + 620.5 = 34968.0 + 117.5 + 30 + 620.5 = 50680.0 - 170 .\n\nS",
+     " 0.15 + 34 = .209 - 38 = 0.5 + .209 - 32 = 0.2209 + 30 = 0.15 + 30 = "
+    ],
+    "identity": [
+     " a small thing. But I think you can get somewhere from the idea of a small object that is called its own. I have a little bit of my minds, and I am trying to find the best thing in which I have to read my own.\n\n",
+     " a compact function, and it is useful to say if there is a compact function that can be defined in terms of the derivatives.\n\nIf you have a particular set of functions, then the product is called a linear function. This is just an elementwise function.\n",
+     " continuous.\n\nLet $X$ be a finite field space such that $y$ is compact. If $Z(x)$ is open, then it satisfies the condition (i) for every $\\mathbb{Z} \\geq 0 \\to"
+    ]
+   }
+  },
+  {
+   "sampler": "recipe+top_p0.9",
+   "temperature": 1.0,
+   "top_k": 8,
+   "top_p": 0.9,
+   "repetition_penalty": 1.1,
+   "judge_en": 1.5057413497726866,
+   "judge_ru": 0.8486962667209168,
+   "self_bpb": 1.0856290708900798,
+   "loops": 0.9047619047619048,
+   "distinct3": 0.7713531261485821,
+   "code_ok": 0.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "seconds": 41.9,
+   "samples": {
+    "en_prose": [
+     " went to the\n\nglasses, and was still in the house.\n\n\"When I saw that I came to my bow, I had been at the door.\n\n\"Here was my daughter,\" I said, \"and he",
+     " was a fool.\n\n“I'm not going to do,” she answered.\n\n“Well, my dear mother is a very young maid.”\n\nThey stretched into a loud, flicking down the",
+     " the windows\nand was not in the house of the house. The girl had no hurry, for\nthe fifth of its mouth-turns.\n\"Does the house have been a fire of a fresh mouth"
+    ],
+    "en_science": [
+     " 120 kg.\n\nIn the 1940s the Metropolitan River was awarded the Democratic Football League. It was also the first of the 1950s,",
+     " 12,600. According to the Schrödinger equation, a series of the earth is given by a given number, and the two terms are the same; the earth's length is 150 degrees (i.",
+     " 4000 km from the milk, which is a miley-policy and is not an unfolding fire in the milk. Their balance, the fire, has been replaced by"
+    ],
+    "ru_prose": [
+     " был удостоен своей женитьбы на прежней службе в 1940 году.\n\nКнига была опубликована в 1956 году, когда в 1963 году вышла книга, а 1",
+     " в 2006 году был приглашён.\n\nВ 1977 году в Караганды, где он стал первым заместителем кандидата физических наук в Венеции, было принято решение на 13",
+     " нанесли ему его за руку, но он не стал смотреть ее.\n\nИ он, видя с себя в голове, сказал: «Боже мой, да я вам...» — «Вот ты, да я вам, да ты вас"
+    ],
+    "ru_history": [
+     " была образована Майкл Гаррисон, затем учредившаяся в 1974 году.\n\nУчреждения и развитие\nКарьера\nКарьера — это один из крупнейших учебных заведений. На",
+     " в городе был переименован в Бразилию, где он работал на Бразилии.\n\nДостопримечательности\nСостояние отечественной иконописи — 1000 000 3",
+     " на основе «Система» было создано в 1970-х годах.\n\nКомандиры\n«Система» и «Система», «Система» были основана на «Оскар» (), а"
+    ],
+    "code": [
+     " a.__index__.get('b')\n\n\nclass MetaType:\n    \"\"\"Reply a new class that allows you to create a new class that hasn't been built\n    from the middle-size of the old name.\n\n    Reply",
+     " a.get(b, c)\n    for i, b in range(b):\n        print(b, b), b = c\n\n    assert_equal(c, c, a)\n    assert_equal(b, a, b)\n    assert_equ",
+     " 0\n\n# Find a function to get the same arguments as that it's a string.\n\ndef add_function(args, t, args=None):\n    \"\"\"Add the function to get the same arguments as that it's"
+    ],
+    "arith": [
+     " 126 + 25 = 140\n1.15 = 100 - 25 = 25 = 130\n0.15 = 30 = 30 + 15 = 4",
+     " 620 + 620.5 = 34968.0 + 150.5 + 30 + 620.5 = 50680.0 + 150.5 + ",
+     " 0.15 + 34 = 0.90 * 8 + 38.7 .200 .212 .200 .200 .230 .465.283 .465"
+    ],
+    "identity": [
+     " a small family of such kinds, and there are no real numbers.\n• ##### Statistics: 02-23-10-10\n\nThe most common example is the first-order method, the first is the first-order",
+     " a compact function, and it is useful to say if there is a compact function that can be defined in terms of the derivatives.\n\nIf you have a particular set of functions, then the product is called a linear function. This is just an elementary function.\n",
+     " a function of the form\n(1, 2, 3) = \\frac{\\mathrm{d}}{\\mathrm{d} \\mathrm{d}}{dt} = \\frac{\\mathrm{d}}{dt} = \\frac{\\mathrm{d"
+    ]
+   }
+  }
+ ]
+}

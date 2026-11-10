@@ -1,0 +1,83 @@
+{
+  "val_fraction": 0.02,
+  "total_bytes": 170667344,
+  "est_total_tokens": 46176212.60618448,
+  "by_bucket": {
+    "en/code": {
+      "docs": 1329,
+      "bytes": 14308451
+    },
+    "en/cs": {
+      "docs": 272,
+      "bytes": 4323751
+    },
+    "en/encyclopedic": {
+      "docs": 1955,
+      "bytes": 7721734
+    },
+    "en/humour": {
+      "docs": 1,
+      "bytes": 19407
+    },
+    "en/identity": {
+      "docs": 264,
+      "bytes": 129704
+    },
+    "en/literature": {
+      "docs": 124,
+      "bytes": 9437715
+    },
+    "en/logic": {
+      "docs": 229,
+      "bytes": 2540686
+    },
+    "en/math": {
+      "docs": 3479,
+      "bytes": 21103664
+    },
+    "en/ml": {
+      "docs": 3887,
+      "bytes": 9724574
+    },
+    "en/science": {
+      "docs": 650,
+      "bytes": 14126739
+    },
+    "ru/cs": {
+      "docs": 40,
+      "bytes": 473226
+    },
+    "ru/encyclopedic": {
+      "docs": 4140,
+      "bytes": 44550650
+    },
+    "ru/identity": {
+      "docs": 264,
+      "bytes": 195912
+    },
+    "ru/literature": {
+      "docs": 2154,
+      "bytes": 23923832
+    },
+    "ru/logic": {
+      "docs": 65,
+      "bytes": 1959542
+    },
+    "ru/math": {
+      "docs": 301,
+      "bytes": 10578256
+    },
+    "ru/ml": {
+      "docs": 18,
+      "bytes": 203390
+    },
+    "ru/science": {
+      "docs": 186,
+      "bytes": 5346111
+    }
+  },
+  "tokens_by_language": {
+    "en": 28603505.31367844,
+    "ru": 17572707.292506043
+  }
+}

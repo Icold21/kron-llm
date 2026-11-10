@@ -1,0 +1,90 @@
+{
+  "ckpt": "E:\\kron_out\\session9\\q10a\\last.pt",
+  "step": 73636,
+  "device": "cpu",
+  "seq": 256,
+  "continuation": {
+    "blocks": 64,
+    "bpb": 1.1556121507638168,
+    "per_language": {
+      "en": 1.3256332674228506,
+      "ru": 1.001658788912989
+    },
+    "counts": {
+      "en": 40,
+      "ru": 24
+    }
+  },
+  "ranking": {
+    "prefixes": 64,
+    "distractors": 8,
+    "accuracy": 0.3125,
+    "mean_rank": 2.921875,
+    "chance_accuracy": 0.1111111111111111
+  },
+  "arithmetic": {
+    "n": 60,
+    "exact_match": 0.0,
+    "examples": [
+      {
+        "prompt": "51 - 29 = ",
+        "got": "10, заём ",
+        "want": 22,
+        "ok": false
+      },
+      {
+        "prompt": "93 + 16 = ",
+        "got": "10 -> write ",
+        "want": 109,
+        "ok": false
+      },
+      {
+        "prompt": "78 - 22 = ",
+        "got": "21, заём ",
+        "want": 56,
+        "ok": false
+      },
+      {
+        "prompt": "84 + 17 = ",
+        "got": "112\n\nОт",
+        "want": 101,
+        "ok": false
+      },
+      {
+        "prompt": "14 - 21 = ",
+        "got": "1, заём 1",
+        "want": -7,
+        "ok": false
+      },
+      {
+        "prompt": "63 + 18 = ",
+        "got": "16 -> write ",
+        "want": 81,
+        "ok": false
+      },
+      {
+        "prompt": "21 - 80 = ",
+        "got": "20, заём ",
+        "want": -59,
+        "ok": false
+      },
+      {
+        "prompt": "17 + 82 = ",
+        "got": "172\n\nОт",
+        "want": 99,
+        "ok": false
+      }
+    ]
+  },
+  "longform": {
+    "samples": 24,
+    "repeat_4gram": 0.06830601092896176,
+    "distinct_2": 0.8558201058201057,
+    "examples": [
+      "wisted} for details.\n\"\"\"\n\nfrom http import html\n\ndef _contain_foo(status, source_name, module):\n  \"\"\"Returns the source name for the module.\n\n  This module contains the module",
+      "wisted} for more details.\n\nAutomatic Requirements for Linear Control Structures\n\nLastly, if the functionality of a L{twisted} is valid.\n\"\"\"\nlanguages = ['description'], 'ref",
+      "ypers} for the Core Memory Exchange.\n\"\"\"\n\n\ndef _direct(*args, *args):\n    \"\"\"Return the given argumentation of the object.  If true, use the\n    arguments in this module.\n\n    .. versionadded:",
+      "itle} for details.\n\"\"\"\n\tif __name__ == '__main__':\n\t\ttry:\n\t\t\t\tfilename = \"%s\" % content, content = content[deprecated].get_control()\n\n\t\telse:\n\t\t\t\t"
+    ]
+  }
+}

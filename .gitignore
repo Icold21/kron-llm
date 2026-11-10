@@ -82,3 +82,15 @@ data/q10_epoch_done.flag
 # reproducible from the Hub sources plus the arithmetic generator.
 data/sft/
 data/report_sft.md
+
+# Working copies of the same corpora made while probing the mix (GBs,
+# reproducible: build_sft.py, subset_mix.py, tokenizer probes).  Ignoring them
+# keeps "git add -A" a safe way to accept the day's work.
+data/sft_probe/
+data/bilingual/mix_decay/
+data/vocab_probe/
+data/code_now/
+data/seen/
+data/_chk24b/
+data/_chk24c/
+data/_sft_meta_remote/

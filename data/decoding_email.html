@@ -1,0 +1,31 @@
+<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1b1b1b"><h1 style="font-size:20px;margin:18px 0 6px">Переставил на T=1.0, top_k=8, rp 1.1 — вот что видно</h1>
+<p style="margin:8px 0">Справедливо. Поставил вашу рецептуру по умолчанию в <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">scripts/sample_q10.py</code> и в ноутбуке (и убрал свои пер-промптовые костыли: у кода было T=0.5, у арифметики T=0.2 — из-за них сравнение было нечестным). Ниже один прогон, шаг 23 463, T=1.0, top_k=8, repetition penalty 1.1.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Сэмплы</h2>
+<p style="margin:8px 0"><strong>«The Moon orbits the Earth at a distance of»</strong></p>
+<blockquote style="margin:10px 0;padding:8px 12px;border-left:3px solid #cfcfcf;color:#444">the Earth's Latitude is about 1000%, and 18% of its Latitude is more than 2.7%.<br><br>Multi-latitudinal island, but this can be thought to be the same for a population as in the world's midpoint.<br><br><strong>Interaction</strong><br>The America</blockquote>
+<p style="margin:8px 0"><strong>«She opened the door and»</strong></p>
+<blockquote style="margin:10px 0;padding:8px 12px;border-left:3px solid #cfcfcf;color:#444">he had a work, a dancy of a fleeous shade. He then strove to the door of a block, and lifted to him in the way of the middle.<br><br>«You must have any wish!» cried Helenberg; sitting on the brows of the…</blockquote>
+<p style="margin:8px 0"><strong>«Он открыл дверь и»</strong></p>
+<blockquote style="margin:10px 0;padding:8px 12px;border-left:3px solid #cfcfcf;color:#444">не было вполне. Идя с ним, и он спасти его: «Кто-с, — вот, — и ты, — да!» Ах, что ж? Смотрюте, а что ж? Смотрюте, и вы, и задуматься, чтобы мне вновь выйдем.</blockquote>
+<p style="margin:8px 0"><strong>«def add(a, b):\n    return»</strong></p>
+<blockquote style="margin:10px 0;padding:8px 12px;border-left:3px solid #cfcfcf;color:#444">b<br><code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">#    # 1  # 7 0  #    #   2  # 3 0  # 8 1  # …</code></blockquote>
+<p style="margin:8px 0"><strong>«17 + 25 =»</strong></p>
+<blockquote style="margin:10px 0;padding:8px 12px;border-left:3px solid #cfcfcf;color:#444">22.<br>### 0.24 / ### 6.2 / ### 8.2 …</blockquote>
+<p style="margin:8px 0"><strong>«KronLLM is»</strong></p>
+<blockquote style="margin:10px 0;padding:8px 12px;border-left:3px solid #cfcfcf;color:#444">omorphic to the image and is also defined on the curve.<br>### History<br>The image is given by an element of a curve in which the image is a map with the plane…</blockquote>
+<p style="margin:8px 0"><strong>Формат диалога</strong> → «ульдечный оттенок, где нет в этом смысле… вам было бы менять… мне надо ли мне приходится говорить!..» и дальше «вам вам».</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Что это говорит</h2>
+<p style="margin:8px 0">При T=1.0/top_k=8 картина честнее и жёстче, чем была у меня:</p>
+<ul style="margin:8px 0 8px 22px;padding:0"><li style="margin:3px 0"><strong>Проза</strong> стала живее по слогу — появились заголовки, названия, тире в диалогах.</li></ul>
+<p style="margin:8px 0">Но связность держится 1–2 предложения, потом уходит.</p>
+<ul style="margin:8px 0 8px 22px;padding:0"><li style="margin:3px 0"><strong>Русский</strong> лучше держит форму диалога, но появляются петли на служебных словах</li></ul>
+<p style="margin:8px 0">(«вам вам», «Смотрюте… Смотрюте»). Это цена rp 1.1 вместо 1.2: слабее выдавливание повторов.</p>
+<ul style="margin:8px 0 8px 22px;padding:0"><li style="margin:3px 0"><strong>Код на top_k=8 разваливается</strong> — уходит в <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px"># 1 # 7 0 # 8 1</code>. При T=0.8/top_k=40</li></ul>
+<p style="margin:8px 0">он выдавал синтаксически возможный генератор. То есть узкий top_k снимает «шаблонность» кода: модель выбирает из восьми вариантов, а среди них нет продолжения, которое держит отступы и синтаксис.</p>
+<ul style="margin:8px 0 8px 22px;padding:0"><li style="margin:3px 0"><strong>Арифметика</strong> — «22.» вместо 42, дальше заголовки. Формат есть, счёта нет.</li><li style="margin:3px 0"><strong>Identity</strong> — «omorphic to the image…», то есть на этой температуре слайс не</li></ul>
+<p style="margin:8px 0">вытягивается вообще. Через 100 промптов посчитаем честно, долей попаданий.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Что с этим делать</h2>
+<p style="margin:8px 0">Не менять рецептуру, а зафиксировать два режима и не путать их:</p>
+<table style="border-collapse:collapse;margin:12px 0;font-size:13px;font-family:-apple-system,Segoe UI,Arial,sans-serif"><thead><tr><th style="border:1px solid #cfcfcf;padding:5px 9px;background:#f2f4f7;text-align:left">режим</th><th style="border:1px solid #cfcfcf;padding:5px 9px;background:#f2f4f7;text-align:left">для чего</th></tr></thead><tbody><tr><td style="border:1px solid #cfcfcf;padding:5px 9px;text-align:left">T=1.0, top_k=8, rp 1.1</td><td style="border:1px solid #cfcfcf;padding:5px 9px;text-align:left">измерение модели: то, что она реально умеет</td></tr><tr><td style="border:1px solid #cfcfcf;padding:5px 9px;text-align:left">T=0.8, top_k=40, rp 1.2</td><td style="border:1px solid #cfcfcf;padding:5px 9px;text-align:left">демонстрация для статьи, если нужен более гладкий пример</td></tr></tbody></table>
+<p style="margin:8px 0">Обе цифры я теперь привожу рядом, а в таблицах пишу, при каких настройках снят сэмпл. Для кода отдельно отмечу: до конца эпохи узкий top_k, похоже, останется плохим режимом — это не баг модели, а следствие того, что код требует длинной согласованной структуры, которую 10M держит хуже, чем прозу.</p>
+<p style="margin:8px 0">Ещё вариант, если захотите смягчить именно код: <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">top_k=8</code> для прозы и <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">top_p=0.9</code> для кода — но это уже подгонка под домен, и в статье её надо называть подгонкой.</p></div>

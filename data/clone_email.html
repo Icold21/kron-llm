@@ -1,0 +1,20 @@
+<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1b1b1b"><h1 style="font-size:20px;margin:18px 0 6px">Клонирование на рабочий стол</h1>
+<p style="margin:8px 0">Репозиторий публичный, токен и логин не нужны. В PowerShell:</p>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">cd $env:USERPROFILE\Desktop
+git clone https://github.com/Icold21/kron-llm.git
+cd kron-llm</pre>
+<p style="margin:8px 0">Текущая вершина <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">main</code> — <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">56a3cd1</code>. Проверил доступ с этой машины: <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">git ls-remote</code> отвечает.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Дальше</h2>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">pip install -r requirements.txt
+jupyter notebook notebooks/q10_playground.ipynb</pre>
+<p style="margin:8px 0">Ноутбук запускать из корня клона — он ищет <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">kronllm/</code> рядом с рабочей директорией.</p>
+<h2 style="font-size:17px;margin:18px 0 6px">Если что-то не так</h2>
+<ul style="margin:8px 0 8px 22px;padding:0"><li style="margin:3px 0"><strong><code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">git</code> не установлен</strong>: <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">winget install -e --id Git.Git</code>, потом заново</li></ul>
+<p style="margin:8px 0">открыть PowerShell (PATH обновится только в новом окне).</p>
+<ul style="margin:8px 0 8px 22px;padding:0"><li style="margin:3px 0"><strong>Рабочий стол уехал в OneDrive</strong>: тогда <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">cd "$env:USERPROFILE\OneDrive\Desktop"</code></li></ul>
+<p style="margin:8px 0">вместо первой строки.</p>
+<ul style="margin:8px 0 8px 22px;padding:0"><li style="margin:3px 0"><strong>Нужна не последняя версия, а конкретная</strong>: добавить <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">--branch main</code> не</li></ul>
+<p style="margin:8px 0">поможет, ветка одна; если понадобится откат — <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">git log --oneline</code> и <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">git checkout 56a3cd1</code>.</p>
+<ul style="margin:8px 0 8px 22px;padding:0"><li style="margin:3px 0"><strong>Хочется сразу и код, и окружение одной командой</strong>:</li></ul>
+<pre style="background:#f6f8fa;border:1px solid #e1e4e8;padding:10px;overflow-x:auto;font-size:12px;font-family:Consolas,Menlo,monospace">cd $env:USERPROFILE\Desktop; git clone https://github.com/Icold21/kron-llm.git; cd kron-llm; pip install -r requirements.txt</pre>
+<p style="margin:8px 0">Про чекпоинт напомню: весов в репозитории нет, это отдельный шаг — либо <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">kaggle datasets download icold21/kron-q10-ckpt -p data/kaggle_ckpt --unzip</code> (нужен <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">kaggle.json</code>), либо скопировать <code style="background:#f2f4f7;padding:1px 4px;font-family:Consolas,Menlo,monospace;font-size:12px">last.pt</code> с рабочей машины.</p></div>

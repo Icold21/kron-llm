@@ -1,0 +1,130 @@
+{
+ "code_en": {
+  "domain": "code",
+  "lang": "en",
+  "budget_MB": 174.0,
+  "sources": [
+   {
+    "source": "opencodereasoning",
+    "rows": 11618,
+    "MB": 71.1,
+    "kept_rows": 11,
+    "kept_MB": 0.0,
+    "survival": 0.001,
+    "rows_to_fill_cap": null,
+    "cap_MB": 44.7
+   },
+   {
+    "source": "opencodeinstruct",
+    "rows": 69612,
+    "MB": 122.2,
+    "kept_rows": 27660,
+    "kept_MB": 31.9,
+    "survival": 0.397,
+    "rows_to_fill_cap": null,
+    "cap_MB": 44.7
+   },
+   {
+    "source": "magicoder_evol",
+    "rows": 57883,
+    "MB": 122.2,
+    "kept_rows": 17754,
+    "kept_MB": 19.0,
+    "survival": 0.307,
+    "rows_to_fill_cap": null,
+    "cap_MB": 44.7
+   },
+   {
+    "source": "magicoder",
+    "rows": 54035,
+    "MB": 122.2,
+    "kept_rows": 7873,
+    "kept_MB": 10.3,
+    "survival": 0.146,
+    "rows_to_fill_cap": null,
+    "cap_MB": 44.7
+   },
+   {
+    "source": "self_oss_instruct",
+    "rows": 50504,
+    "MB": 64.5,
+    "kept_rows": 37844,
+    "kept_MB": 39.0,
+    "survival": 0.749,
+    "rows_to_fill_cap": null,
+    "cap_MB": 44.7
+   },
+   {
+    "source": "codealpaca",
+    "rows": 17042,
+    "MB": 5.2,
+    "kept_rows": 16972,
+    "kept_MB": 5.0,
+    "survival": 0.996,
+    "rows_to_fill_cap": null,
+    "cap_MB": 44.7
+   },
+   {
+    "source": "python_code_18k",
+    "rows": 18396,
+    "MB": 9.4,
+    "kept_rows": 17629,
+    "kept_MB": 7.5,
+    "survival": 0.958,
+    "rows_to_fill_cap": null,
+    "cap_MB": 44.7
+   }
+  ],
+  "usable_MB": 112.7,
+  "with_cap_MB": 112.7
+ },
+ "qa_en": {
+  "domain": "qa",
+  "lang": "en",
+  "budget_MB": 191.4,
+  "sources": [
+   {
+    "source": "openorca",
+    "rows": 164277,
+    "MB": 235.2,
+    "kept_rows": 102282,
+    "kept_MB": 83.2,
+    "survival": 0.623,
+    "rows_to_fill_cap": null,
+    "cap_MB": 86.1
+   },
+   {
+    "source": "openhermes",
+    "rows": 162459,
+    "MB": 235.2,
+    "kept_rows": 91244,
+    "kept_MB": 63.9,
+    "survival": 0.562,
+    "rows_to_fill_cap": null,
+    "cap_MB": 86.1
+   },
+   {
+    "source": "squad_v2",
+    "rows": 0,
+    "MB": 0.0,
+    "kept_rows": 0,
+    "kept_MB": 0.0,
+    "survival": 0.0,
+    "rows_to_fill_cap": null,
+    "cap_MB": 86.1
+   },
+   {
+    "source": "hotpotqa",
+    "rows": 16655,
+    "MB": 2.3,
+    "kept_rows": 16655,
+    "kept_MB": 2.3,
+    "survival": 1.0,
+    "rows_to_fill_cap": null,
+    "cap_MB": 86.1
+   }
+  ],
+  "usable_MB": 149.4,
+  "with_cap_MB": 149.4
+ }
+}

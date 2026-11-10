@@ -1,0 +1,132 @@
+{
+  "d": 512,
+  "layers": 25,
+  "batch": 1,
+  "seq": 512,
+  "mode": "auto",
+  "fwd_gb": 3.83,
+  "peak_gb": 5.444,
+  "live_gb": 0.102,
+  "sites": [
+    {
+      "site": "kron.py:121 rms_norm_matrix",
+      "gb": 0.931,
+      "blocks": 37
+    },
+    {
+      "site": "kron.py:120 rms_norm_matrix",
+      "gb": 0.629,
+      "blocks": 77
+    },
+    {
+      "site": "kron.py:824 prelude",
+      "gb": 0.629,
+      "blocks": 25
+    },
+    {
+      "site": "kron.py:844 prelude",
+      "gb": 0.556,
+      "blocks": 7
+    },
+    {
+      "site": "kron.py:802 prelude",
+      "gb": 0.315,
+      "blocks": 1
+    },
+    {
+      "site": "kron.py:827 prelude",
+      "gb": 0.302,
+      "blocks": 12
+    },
+    {
+      "site": "model.py:580 apply",
+      "gb": 0.184,
+      "blocks": 350
+    },
+    {
+      "site": "model.py:51 forward",
+      "gb": 0.161,
+      "blocks": 304
+    },
+    {
+      "site": "<module.py:1053>",
+      "gb": 0.04,
+      "blocks": 1003
+    },
+    {
+      "site": "model.py:748 call",
+      "gb": 0.04,
+      "blocks": 100
+    },
+    {
+      "site": "kron.py:801 prelude",
+      "gb": 0.016,
+      "blocks": 2
+    },
+    {
+      "site": "model.py:703 _ffn_half",
+      "gb": 0.013,
+      "blocks": 25
+    },
+    {
+      "site": "model.py:1106 _embed_tokens",
+      "gb": 0.009,
+      "blocks": 3
+    },
+    {
+      "site": "kron.py:366 initial_state",
+      "gb": 0.004,
+      "blocks": 1
+    },
+    {
+      "site": "kron.py:113 cached_eye",
+      "gb": 0.001,
+      "blocks": 1
+    },
+    {
+      "site": "<probe_memory_sites.py:89>",
+      "gb": 0.0,
+      "blocks": 1
+    },
+    {
+      "site": "<probe_memory_sites.py:90>",
+      "gb": 0.0,
+      "blocks": 1
+    },
+    {
+      "site": "kron.py:796 prelude",
+      "gb": 0.0,
+      "blocks": 1
+    },
+    {
+      "site": "kron.py:337 sigma_values",
+      "gb": 0.0,
+      "blocks": 150
+    },
+    {
+      "site": "kron.py:808 prelude",
+      "gb": 0.0,
+      "blocks": 1
+    },
+    {
+      "site": "kron.py:839 prelude",
+      "gb": 0.0,
+      "blocks": 1
+    },
+    {
+      "site": "kron.py:852 prelude",
+      "gb": 0.0,
+      "blocks": 1
+    },
+    {
+      "site": "model.py:1183 _chunked_loss",
+      "gb": 0.0,
+      "blocks": 1
+    },
+    {
+      "site": "kron.py:95 rope_frequencies",
+      "gb": 0.0,
+      "blocks": 2
+    }
+  ]
+}

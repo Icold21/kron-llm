@@ -1,0 +1,62 @@
+{
+  "d": 512,
+  "layers": 25,
+  "batch": 1,
+  "seq": 512,
+  "mode": "auto",
+  "fwd_gb": 3.83,
+  "peak_gb": 5.444,
+  "live_gb": 0.102,
+  "sites": [
+    {
+      "site": "?",
+      "gb": 0.04,
+      "blocks": 406
+    },
+    {
+      "site": "<module.py:1053>",
+      "gb": 0.04,
+      "blocks": 1003
+    },
+    {
+      "site": "model.py:1106 _embed_tokens",
+      "gb": 0.009,
+      "blocks": 1
+    },
+    {
+      "site": "model.py:1133 _logits",
+      "gb": 0.009,
+      "blocks": 1
+    },
+    {
+      "site": "kron.py:366 initial_state",
+      "gb": 0.004,
+      "blocks": 1
+    },
+    {
+      "site": "kron.py:113 cached_eye",
+      "gb": 0.001,
+      "blocks": 1
+    },
+    {
+      "site": "<probe_memory_sites.py:89>",
+      "gb": 0.0,
+      "blocks": 1
+    },
+    {
+      "site": "<probe_memory_sites.py:90>",
+      "gb": 0.0,
+      "blocks": 1
+    },
+    {
+      "site": "model.py:1183 _chunked_loss",
+      "gb": 0.0,
+      "blocks": 1
+    },
+    {
+      "site": "kron.py:95 rope_frequencies",
+      "gb": 0.0,
+      "blocks": 2
+    }
+  ]
+}

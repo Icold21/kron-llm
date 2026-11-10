@@ -1,0 +1,282 @@
+{
+ "math_en": {
+  "prod_8192": {
+   "records": 1200,
+   "bytes": 1237858,
+   "tokens": 481435,
+   "bytes_per_token": 2.571184064307747,
+   "chars_per_token": 2.5689573878093617,
+   "tokens_per_record_median": 339,
+   "tokens_per_record_p90": 712,
+   "fits_512": 0.7725,
+   "bytes_fit_512": 0.5937926644251602
+  },
+  "probe_8192": {
+   "records": 1200,
+   "bytes": 1237858,
+   "tokens": 439460,
+   "bytes_per_token": 2.816770582078005,
+   "chars_per_token": 2.8143312246848406,
+   "tokens_per_record_median": 308,
+   "tokens_per_record_p90": 656,
+   "fits_512": 0.8208333333333333,
+   "bytes_fit_512": 0.6611485323841668
+  },
+  "probe_16384": {
+   "records": 1200,
+   "bytes": 1237858,
+   "tokens": 418027,
+   "bytes_per_token": 2.9611915019843216,
+   "chars_per_token": 2.958627074327735,
+   "tokens_per_record_median": 290,
+   "tokens_per_record_p90": 628,
+   "fits_512": 0.8391666666666666,
+   "bytes_fit_512": 0.6873518610373727
+  }
+ },
+ "math_ru": {
+  "prod_8192": {
+   "records": 1200,
+   "bytes": 1947111,
+   "tokens": 465677,
+   "bytes_per_token": 4.181247946538051,
+   "chars_per_token": 2.5762857087637996,
+   "tokens_per_record_median": 339,
+   "tokens_per_record_p90": 670,
+   "fits_512": 0.785,
+   "bytes_fit_512": 0.6198085265811759
+  },
+  "probe_8192": {
+   "records": 1200,
+   "bytes": 1947111,
+   "tokens": 447514,
+   "bytes_per_token": 4.350949914416085,
+   "chars_per_token": 2.680847973471221,
+   "tokens_per_record_median": 329,
+   "tokens_per_record_p90": 652,
+   "fits_512": 0.8125,
+   "bytes_fit_512": 0.6569122150714571
+  },
+  "probe_16384": {
+   "records": 1200,
+   "bytes": 1947111,
+   "tokens": 405615,
+   "bytes_per_token": 4.8003919973373765,
+   "chars_per_token": 2.9577727648139245,
+   "tokens_per_record_median": 296,
+   "tokens_per_record_p90": 577,
+   "fits_512": 0.8558333333333333,
+   "bytes_fit_512": 0.7252878752161536
+  }
+ },
+ "code_en": {
+  "prod_8192": {
+   "records": 1200,
+   "bytes": 2739661,
+   "tokens": 918886,
+   "bytes_per_token": 2.981502602063803,
+   "chars_per_token": 2.980142259213874,
+   "tokens_per_record_median": 659,
+   "tokens_per_record_p90": 1272,
+   "fits_512": 0.2966666666666667,
+   "bytes_fit_512": 0.14709484129605815
+  },
+  "probe_8192": {
+   "records": 1200,
+   "bytes": 2739661,
+   "tokens": 813145,
+   "bytes_per_token": 3.3692158225162796,
+   "chars_per_token": 3.3676785813108365,
+   "tokens_per_record_median": 581,
+   "tokens_per_record_p90": 1127,
+   "fits_512": 0.395,
+   "bytes_fit_512": 0.22166793628846782
+  },
+  "probe_16384": {
+   "records": 1200,
+   "bytes": 2739661,
+   "tokens": 760462,
+   "bytes_per_token": 3.6026270872180333,
+   "chars_per_token": 3.6009833495953774,
+   "tokens_per_record_median": 544,
+   "tokens_per_record_p90": 1030,
+   "fits_512": 0.4475,
+   "bytes_fit_512": 0.2658697554186449
+  }
+ },
+ "code_ru": {
+  "prod_8192": {
+   "records": 1200,
+   "bytes": 1133078,
+   "tokens": 297940,
+   "bytes_per_token": 3.8030408807142377,
+   "chars_per_token": 3.1448043230180573,
+   "tokens_per_record_median": 190,
+   "tokens_per_record_p90": 513,
+   "fits_512": 0.9,
+   "bytes_fit_512": 0.731388306895024
+  },
+  "probe_8192": {
+   "records": 1200,
+   "bytes": 1133078,
+   "tokens": 262521,
+   "bytes_per_token": 4.316142327661406,
+   "chars_per_token": 3.5690973293565085,
+   "tokens_per_record_median": 168,
+   "tokens_per_record_p90": 450,
+   "fits_512": 0.9383333333333334,
+   "bytes_fit_512": 0.8197149710787783
+  },
+  "probe_16384": {
+   "records": 1200,
+   "bytes": 1133078,
+   "tokens": 245071,
+   "bytes_per_token": 4.623468301022969,
+   "chars_per_token": 3.823230818823933,
+   "tokens_per_record_median": 157,
+   "tokens_per_record_p90": 418,
+   "fits_512": 0.9608333333333333,
+   "bytes_fit_512": 0.8755540218766934
+  }
+ },
+ "qa_en": {
+  "prod_8192": {
+   "records": 1200,
+   "bytes": 3150529,
+   "tokens": 968108,
+   "bytes_per_token": 3.254315634206101,
+   "chars_per_token": 3.2469569510839698,
+   "tokens_per_record_median": 614,
+   "tokens_per_record_p90": 1795,
+   "fits_512": 0.44083333333333335,
+   "bytes_fit_512": 0.1482322492508401
+  },
+  "probe_8192": {
+   "records": 1200,
+   "bytes": 3150529,
+   "tokens": 867465,
+   "bytes_per_token": 3.6318802487708437,
+   "chars_per_token": 3.6236678136870077,
+   "tokens_per_record_median": 559,
+   "tokens_per_record_p90": 1598,
+   "fits_512": 0.47,
+   "bytes_fit_512": 0.16838251607904578
+  },
+  "probe_16384": {
+   "records": 1200,
+   "bytes": 3150529,
+   "tokens": 781390,
+   "bytes_per_token": 4.031954593736803,
+   "chars_per_token": 4.022837507518653,
+   "tokens_per_record_median": 504,
+   "tokens_per_record_p90": 1427,
+   "fits_512": 0.5075,
+   "bytes_fit_512": 0.19569475475388418
+  }
+ },
+ "qa_ru": {
+  "prod_8192": {
+   "records": 1200,
+   "bytes": 2835326,
+   "tokens": 545406,
+   "bytes_per_token": 5.198560338536796,
+   "chars_per_token": 3.097620854922755,
+   "tokens_per_record_median": 238,
+   "tokens_per_record_p90": 950,
+   "fits_512": 0.6858333333333333,
+   "bytes_fit_512": 0.31649482281755253
+  },
+  "probe_8192": {
+   "records": 1200,
+   "bytes": 2835326,
+   "tokens": 568759,
+   "bytes_per_token": 4.985109686176394,
+   "chars_per_token": 2.9704338744529757,
+   "tokens_per_record_median": 253,
+   "tokens_per_record_p90": 1007,
+   "fits_512": 0.6783333333333333,
+   "bytes_fit_512": 0.30628400402634476
+  },
+  "probe_16384": {
+   "records": 1200,
+   "bytes": 2835326,
+   "tokens": 493434,
+   "bytes_per_token": 5.746109915409153,
+   "chars_per_token": 3.4238844506053496,
+   "tokens_per_record_median": 222,
+   "tokens_per_record_p90": 865,
+   "fits_512": 0.7183333333333334,
+   "bytes_fit_512": 0.356418274300733
+  }
+ },
+ "sites_en": {
+  "prod_8192": {
+   "records": 1200,
+   "bytes": 2403503,
+   "tokens": 753809,
+   "bytes_per_token": 3.18847745251118,
+   "chars_per_token": 3.1853015817004042,
+   "tokens_per_record_median": 421,
+   "tokens_per_record_p90": 1459,
+   "fits_512": 0.5808333333333333,
+   "bytes_fit_512": 0.26388275779144027
+  },
+  "probe_8192": {
+   "records": 1200,
+   "bytes": 2403503,
+   "tokens": 693038,
+   "bytes_per_token": 3.468068129020342,
+   "chars_per_token": 3.4646137729821453,
+   "tokens_per_record_median": 382,
+   "tokens_per_record_p90": 1346,
+   "fits_512": 0.61,
+   "bytes_fit_512": 0.28845356132278593
+  },
+  "probe_16384": {
+   "records": 1200,
+   "bytes": 2403503,
+   "tokens": 630389,
+   "bytes_per_token": 3.8127299175588405,
+   "chars_per_token": 3.8089322624601634,
+   "tokens_per_record_median": 348,
+   "tokens_per_record_p90": 1215,
+   "fits_512": 0.6408333333333334,
+   "bytes_fit_512": 0.31766633950529705
+  }
+ },
+ "sites_ru": {
+  "prod_8192": {
+   "records": 1200,
+   "bytes": 380195,
+   "tokens": 72859,
+   "bytes_per_token": 5.218229731399004,
+   "chars_per_token": 3.586269369604304,
+   "tokens_per_record_median": 59,
+   "tokens_per_record_p90": 79,
+   "fits_512": 1.0,
+   "bytes_fit_512": 1.0
+  },
+  "probe_8192": {
+   "records": 1200,
+   "bytes": 380195,
+   "tokens": 74151,
+   "bytes_per_token": 5.127307790859192,
+   "chars_per_token": 3.523782551819935,
+   "tokens_per_record_median": 60,
+   "tokens_per_record_p90": 81,
+   "fits_512": 1.0,
+   "bytes_fit_512": 1.0
+  },
+  "probe_16384": {
+   "records": 1200,
+   "bytes": 380195,
+   "tokens": 67216,
+   "bytes_per_token": 5.656316948345632,
+   "chars_per_token": 3.8873482504165673,
+   "tokens_per_record_median": 55,
+   "tokens_per_record_p90": 73,
+   "fits_512": 1.0,
+   "bytes_fit_512": 1.0
+  }
+ }
+}

@@ -1,0 +1,110 @@
+{
+ "ckpt": "data/kaggle_out/q10/last.pt",
+ "step": 35115,
+ "max_new_tokens": 12,
+ "seeds": 1,
+ "priming": [
+  {
+   "primer": "none",
+   "judge_en": 1.3688805666054302,
+   "judge_ru": 1.019069498040984,
+   "self_bpb": 1.499588586066681,
+   "loops": 0.0,
+   "distinct3": 0.9660098522167487,
+   "code_ok": 1.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "samples": {
+    "en_prose": [
+     " went to the stairs.\n\nOn the same"
+    ],
+    "en_science": [
+     " 120 kg.\n\nReferences\n\n"
+    ],
+    "ru_prose": [
+     " был уволен, но уже в 194"
+    ],
+    "ru_history": [
+     " была образована Майкл Гаррисон, затем"
+    ],
+    "code": [
+     " a.group(b)\n\n# Take a"
+    ],
+    "arith": [
+     " 11000 # 4100"
+    ],
+    "identity": [
+     " a small family of such that its own, or, if"
+    ]
+   }
+  },
+  {
+   "primer": "style",
+   "judge_en": 1.397553225688425,
+   "judge_ru": 0.731239137091864,
+   "self_bpb": 1.7300634993415105,
+   "loops": 0.0,
+   "distinct3": 0.9714822099052387,
+   "code_ok": 0.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "samples": {
+    "en_prose": [
+     " went to the stairs. She had no dream"
+    ],
+    "en_science": [
+     " 120 kg.\n\nReferences\n\n"
+    ],
+    "ru_prose": [
+     " приподнялся, но уже в 194"
+    ],
+    "ru_history": [
+     " был опубликован в газетах «Русский язык"
+    ],
+    "code": [
+     " a.__class__ = b\n\n\ndef __init"
+    ],
+    "arith": [
+     " 16000 # TOG_C"
+    ],
+    "identity": [
+     " a library for Windows and is a Windows object, or"
+    ]
+   }
+  },
+  {
+   "primer": "fewshot",
+   "judge_en": 1.392443145133538,
+   "judge_ru": 1.015574886869054,
+   "self_bpb": 1.515210096248026,
+   "loops": 0.14285714285714285,
+   "distinct3": 0.9537815126050421,
+   "code_ok": 1.0,
+   "arith_ok": 0.0,
+   "identity_ok": 0.0,
+   "samples": {
+    "en_prose": [
+     " went to the stairs.\nThen, I"
+    ],
+    "en_science": [
+     " 120 degrees and the earth will be "
+    ],
+    "ru_prose": [
+     " подошёл вперёд.\nВопрос:"
+    ],
+    "ru_history": [
+     ". Спасо-Петербург, "
+    ],
+    "code": [
+     " a - b\n\n\n# Create a subt"
+    ],
+    "arith": [
+     " a\n    #  17.5 = 10"
+    ],
+    "identity": [
+     " a tensor.\n  \"\"\"\n  # A tensor of a tensor"
+    ]
+   }
+  }
+ ]
+}
