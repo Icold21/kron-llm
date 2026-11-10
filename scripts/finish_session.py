@@ -523,13 +523,20 @@ def finish_one(session: int, start_step: int | None, hours: float, out: Path,
     done = state.get(KERNEL) or {}
     same_step = bool(step) and int(done.get("step") or 0) == int(step)
     if same_step:
+        # Only a step that is still unfinished counts as an attempt.  A watch on
+        # a repeating trigger re-runs every 15 minutes by design, and counting
+        # those harmless re-runs made a finished session look like a loop: on
+        # 2026-11-09 that stopped a watch three minutes after it had already
+        # mailed the report.
         attempts = int(done.get("attempts") or 0)
-        if attempts >= 3 and not done.get("pushed"):
+        unfinished = not (done.get("published") and done.get("reported"))
+        if unfinished and attempts >= 3 and not done.get("pushed"):
             say(f"step {step:,} has been retried {attempts} times without "
                 f"getting past the report: stopping the watch so it cannot "
                 f"loop.  Read this log, fix the failure, re-arm", session)
             return None
-        done["attempts"] = attempts + 1
+        if unfinished:
+            done["attempts"] = attempts + 1
     else:
         done = {"step": int(step or 0), "attempts": 1, "pushed": False}
     state[KERNEL] = done
