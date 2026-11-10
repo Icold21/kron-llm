@@ -8,7 +8,7 @@
   "enable_gpu": true,
   "enable_internet": true,
   "dataset_sources": [
-    "icold21/kron-llm-code-v24",
+    "icold21/kron-llm-code-v23",
     "icold21/kron-sft-corpus",
     "icold21/kron-s10-ckpt"
   ],

@@ -30,9 +30,15 @@ DST = Path("kaggle/s10b")
 PATCHES = [
     ("'--exp', 'S10'", "'--exp', 'S10b'"),
     ("'/kaggle/working/s10'", "'/kaggle/working/s10b'"),
-    ("if _step < 108507:", "if _step < 3900:"),
+    # S10 now runs 4,800 steps, so the inherited overrides and the guard move
+    # with it; S10b keeps its own 8,000-step schedule from the experiment.
+    ("'--override', 'training.max_steps=4800',\n"
+     "       '--override', 'training.schedule_steps=4800',",
+     "'--override', 'training.max_steps=8000',\n"
+     "       '--override', 'training.schedule_steps=8000',"),
+    ("if _step < 108507:", "if _step < 4700:"),
     ("f'109,507 (>=108,507 accepted): this is a stale dataset version -- '",
-     "f'4,000 (>=3,900 accepted): this is not the S10 checkpoint -- '"),
+     "f'4,800 (>=4,700 accepted): this is not the S10 checkpoint -- '"),
     ("f're-push S10 once kron-q10-ckpt shows the new version')",
      "f'publish S10 first, then push S10b')"),
     ("'/kaggle/input has no last.pt: S10 starts from the '\n"

@@ -16,5 +16,5 @@ rem be short by (7.6 h of work against an 8 h cap).
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 cd /d "C:\Users\Icold\Desktop\kron_llm"
-"C:\Users\Icold\AppData\Local\Programs\Python\Python311\python.exe" -u scripts\finish_session.py --kernel icold21/kron-q10a-decay-pass --push-dir kaggle/q10a --session 15 --start-step 98895 --total-steps 109507 --chain 2 --minutes-plan 480,40 --hours 12 --then-push-dir kaggle/s10 --then-minutes 180 >> data\finish_session15.stdout.log 2>&1
+"C:\Users\Icold\AppData\Local\Programs\Python\Python311\python.exe" -u scripts\finish_session.py --kernel icold21/kron-q10a-decay-pass --push-dir kaggle/q10a --session 15 --start-step 98895 --total-steps 109507 --chain 2 --minutes-plan 480,40 --hours 12 --then-push-dir kaggle/s10 --then-minutes 205 >> data\finish_session15.stdout.log 2>&1
 echo [watch ended with %ERRORLEVEL%] >> data\finish_session15.stdout.log
