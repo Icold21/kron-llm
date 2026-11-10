@@ -43,6 +43,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 KERNEL = "icold21/kron-q10-10m-bilingual-pretraining"
 CKPT_SLUG = "icold21/kron-q10-ckpt"
+CKPT_TITLE = "Kron Q10 checkpoint"
 STAGE = Path(r"E:\kron_ckpt_stage")
 MAIL = (Path.home() / ".config" / "opencode" / "skills" / "email-control"
         / "scripts" / "mail.py")
@@ -133,7 +134,7 @@ def publish_ckpt(info: dict, session: int) -> bool:
         if name in info and "error" not in info[name]:
             shutil.copyfile(info[name]["path"], STAGE / name)
     (STAGE / "dataset-metadata.json").write_text(json.dumps({
-        "title": "Kron Q10 checkpoint", "id": CKPT_SLUG,
+        "title": CKPT_TITLE, "id": CKPT_SLUG,
         "licenses": [{"name": "other"}]}), encoding="utf-8")
     step = info["last.pt"]["step"]
     local_bytes = (STAGE / "last.pt").stat().st_size
@@ -141,6 +142,11 @@ def publish_ckpt(info: dict, session: int) -> bool:
     say(f"uploading step {step:,} as a new version of {CKPT_SLUG}", session)
     r = kaggle("datasets", "version", "-p", str(STAGE), "--dir-mode", "zip",
                "-m", f"session {session}: step {step:,}")
+    if r.returncode != 0:
+        # A checkpoint dataset that does not exist yet cannot take a version:
+        # the first fine-tuned model has to create it.
+        say("  no such dataset yet: creating it", session)
+        r = kaggle("datasets", "create", "-p", str(STAGE), "--dir-mode", "zip")
     tail = ((r.stdout or "") + (r.stderr or "")).strip().splitlines()
     say(f"  upload exit {r.returncode}: {tail[-1][:120] if tail else '-'}", session)
     if r.returncode != 0:
@@ -682,10 +688,19 @@ def main() -> None:
                          "the budget is then computed from the clock so the "
                          "session cannot run past that hour (empty = use the "
                          "minutes plan for that slot)")
+    ap.add_argument("--ckpt-slug", default=None,
+                    help="dataset the checkpoint is published to (default: the "
+                         "pretraining checkpoint; SFT publishes its own)")
+    ap.add_argument("--ckpt-title", default=None,
+                    help="title to use if that dataset has to be created")
     args = ap.parse_args()
 
     if args.kernel:
         globals()["KERNEL"] = args.kernel
+    if args.ckpt_slug:
+        globals()["CKPT_SLUG"] = args.ckpt_slug
+    if args.ckpt_title:
+        globals()["CKPT_TITLE"] = args.ckpt_title
     globals()["PUSH_DIR"] = Path(args.push_dir)
     if args.total_steps:
         globals()["EPOCH_STEPS"] = args.total_steps

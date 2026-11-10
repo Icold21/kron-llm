@@ -157,8 +157,12 @@ def load_tokenizer(cfg: Mapping[str, Any]):
     if not tok_path.exists():
         # The meta may carry the build machine's path (data/bilingual/...).  On
         # Kaggle the bins and the tokenizer sit together in /kaggle/input/<ds>,
-        # so fall back to the file next to the meta.
-        candidate = Path(dc.get("data_dir", "data")) / tok_path.name
+        # so fall back to the file next to the meta.  A meta written on Windows
+        # holds backslashes, which are not separators on POSIX -- Path().name is
+        # then the whole string, so the last component is taken under either
+        # separator instead.
+        name = str(tok_path).replace("\\", "/").rsplit("/", 1)[-1]
+        candidate = Path(dc.get("data_dir", "data")) / name
         if candidate.exists():
             tok_path = candidate
     return BPETokenizer(tok_path, meta["vocab_size"],

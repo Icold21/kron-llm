@@ -33,6 +33,21 @@ PATCHES = [
      "open('/kaggle/working/s10/results.json')"),
     ("copying the 5.7 GB bin costs ~10 min, so 690 left no room",
      "copying the 1.1 GB SFT bin costs ~2 min, so 690 left no room"),
+    # The meta written on Windows carries an absolute path
+    # (C:\...\data\sft\tokenizer.json).  On Linux the backslash is not a
+    # separator, so Path(...).name is the whole string and load_tokenizer's
+    # "file next to the meta" fallback looks for a name that cannot exist; the
+    # first S10 run died on exactly that.  Rewrite the field after the copy.
+    ("print('kronllm', kronllm.__file__)",
+     "print('kronllm', kronllm.__file__)\n"
+     "\n"
+     "import json as _json\n"
+     "_meta_path = os.path.join(DATA, 'tokenizer_meta.json')\n"
+     "_meta = _json.load(open(_meta_path, encoding='utf-8'))\n"
+     "_meta['tokenizer'] = os.path.join(DATA, 'tokenizer.json')\n"
+     "with open(_meta_path, 'w', encoding='utf-8') as _fh:\n"
+     "    _json.dump(_meta, _fh, indent=1)\n"
+     "print('tokenizer ->', _meta['tokenizer'])"),
     # 4,800 steps, not 4,000, so the pass fills the hour the decay leaves in
     # the weekly GPU quota rather than idling until the Saturday reset.  Passed
     # as overrides because the mounted code dataset (v23) still carries 4,000.
@@ -122,7 +137,7 @@ def main() -> None:
                                      encoding="utf-8")
 
     meta = {
-        "id": "icold21/kron-s10-sft",
+        "id": "icold21/kron-s10-supervised-fine-tuning",
         "title": "Kron S10 supervised fine-tuning",
         "code_file": "train.ipynb",
         "language": "python",
