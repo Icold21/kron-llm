@@ -1,0 +1,336 @@
+{
+  "ckpt": "E:/kron_out/s10_ckpt/last.pt",
+  "step": 4521,
+  "params": 9938886,
+  "bench": {
+    "arc_easy": {
+      "acc": 0.335,
+      "n": 200,
+      "chance": 0.25,
+      "examples": [
+        {
+          "ctx": "Which technology was developed most recently?",
+          "choices": [
+            "cellular telephone",
+            "television",
+            "refrigerator",
+            "airplane"
+          ],
+          "scores": [
+            -27.94,
+            -18.11,
+            -20.33,
+            -18.96
+          ],
+          "pred": 1,
+          "gold": 0
+        },
+        {
+          "ctx": "A student hypothesizes that algae are producers. Which question will best help the student determine if this is correct?",
+          "choices": [
+            "Do algae consume other organisms?",
+            "Which organisms consume algae?",
+            "Do algae use sunlight to make food?",
+            "Could an ecosystem survive without algae?"
+          ],
+          "scores": [
+            -39.02,
+            -30.54,
+            -46.93,
+            -45.26
+          ],
+          "pred": 1,
+          "gold": 2
+        },
+        {
+          "ctx": "Soccer players use their muscle systems to kick a ball into a goal. What organ system coordinates the muscles?",
+          "choices": [
+            "The nervous system",
+            "The endocrine system",
+            "The respiratory system",
+            "The circulatory system"
+          ],
+          "scores": [
+            -13.82,
+            -26.18,
+            -18.87,
+            -22.39
+          ],
+          "pred": 0,
+          "gold": 0
+        },
+        {
+          "ctx": "Planets in the solar system are in constant motion. What factor has the greatest effect on the orbits of the planets?",
+          "choices": [
+            "the size of the planets",
+            "gravitational pull of the Sun",
+            "the composition of the planets",
+            "electromagnetic radiation from the Sun"
+          ],
+          "scores": [
+            -22.68,
+            -38.33,
+            -26.28,
+            -33.45
+          ],
+          "pred": 0,
+          "gold": 1
+        },
+        {
+          "ctx": "How is a pond different from a lake?",
+          "choices": [
+            "Ponds have moving water.",
+            "Ponds are smaller and shallower.",
+            "Ponds are not surrounded by land.",
+            "Ponds have a different amount of salt."
+          ],
+          "scores": [
+            -32.33,
+            -33.66,
+            -30.76,
+            -30.41
+          ],
+          "pred": 3,
+          "gold": 1
+        },
+        {
+          "ctx": "A substance with a mass of 10 g is heated to produce two new substances. The mass of the first new substance is 9.3 g and the mass of the second new substance i",
+          "choices": [
+            "heat transfer",
+            "physical change",
+            "law of conservation of mass",
+            "law of conservation of energy"
+          ],
+          "scores": [
+            -20.55,
+            -22.82,
+            -33.78,
+            -34.23
+          ],
+          "pred": 0,
+          "gold": 2
+        }
+      ]
+    },
+    "arc_challenge": {
+      "acc": 0.235,
+      "n": 200,
+      "chance": 0.25,
+      "examples": [
+        {
+          "ctx": "Juan and LaKeisha roll a few objects down a ramp. They want to see which object rolls the farthest. What should they do so they can repeat their investigation?",
+          "choices": [
+            "Put the objects in groups.",
+            "Change the height of the ramp.",
+            "Choose different objects to roll.",
+            "Record the details of the investigation."
+          ],
+          "scores": [
+            -33.03,
+            -27.83,
+            -34.83,
+            -30.34
+          ],
+          "pred": 1,
+          "gold": 3
+        },
+        {
+          "ctx": "High-pressure systems stop air from rising into the colder regions of the atmosphere where water can condense. What will most likely result if a high-pressure s",
+          "choices": [
+            "fog",
+            "rain",
+            "drought",
+            "tornado"
+          ],
+          "scores": [
+            -20.52,
+            -15.14,
+            -19.8,
+            -17.87
+          ],
+          "pred": 1,
+          "gold": 2
+        },
+        {
+          "ctx": "Students visited the Morris W. Offit telescope located at the Maryland Space Grant Observatory in Baltimore. They learned about the stars, planets, and moon. Th",
+          "choices": [
+            "The sun revolves around Earth.",
+            "Earth rotates around the sun.",
+            "The sun revolves on its axis.",
+            "Earth rotates on its axis."
+          ],
+          "scores": [
+            -24.18,
+            -28.79,
+            -31.71,
+            -35.16
+          ],
+          "pred": 0,
+          "gold": 3
+        },
+        {
+          "ctx": "Which topic area would be the best to research to find ways of reducing environmental problems caused by humans?",
+          "choices": [
+            "converting sunlight into electricity",
+            "looking for new coal reserves",
+            "finding reservoirs that contain oil",
+            "converting forests into farmland"
+          ],
+          "scores": [
+            -34.75,
+            -41.67,
+            -48.62,
+            -37.06
+          ],
+          "pred": 0,
+          "gold": 0
+        },
+        {
+          "ctx": "One year, the oak trees in a park began producing more acorns than usual. The next year, the population of chipmunks in the park also increased. Which best expl",
+          "choices": [
+            "Shady areas increased.",
+            "Food sources increased.",
+            "Oxygen levels increased.",
+            "Available water increased."
+          ],
+          "scores": [
+            -37.67,
+            -26.46,
+            -30.7,
+            -34.52
+          ],
+          "pred": 1,
+          "gold": 1
+        },
+        {
+          "ctx": "Which characteristic of a cheetah is more likely to be learned rather than inherited?",
+          "choices": [
+            "speed",
+            "a spotted coat",
+            "hunting strategies",
+            "claws that do not retract"
+          ],
+          "scores": [
+            -14.5,
+            -32.13,
+            -24.77,
+            -43.29
+          ],
+          "pred": 0,
+          "gold": 2
+        }
+      ]
+    },
+    "openbookqa": {
+      "acc": 0.145,
+      "n": 200,
+      "chance": 0.25,
+      "examples": [
+        {
+          "ctx": "Frilled sharks and angler fish live far beneath the surface of the ocean, which is why they are known as",
+          "choices": [
+            "Deep sea animals",
+            "fish",
+            "Long Sea Fish",
+            "Far Sea Animals"
+          ],
+          "scores": [
+            -25.56,
+            -5.66,
+            -22.98,
+            -32.26
+          ],
+          "pred": 1,
+          "gold": 0
+        },
+        {
+          "ctx": "Gas can fill any container it is given, and liquid",
+          "choices": [
+            "is standard weight and size",
+            "is the opposite of variable",
+            "only needs a few",
+            "uses what it needs"
+          ],
+          "scores": [
+            -31.84,
+            -23.12,
+            -19.6,
+            -21.09
+          ],
+          "pred": 2,
+          "gold": 3
+        },
+        {
+          "ctx": "When birds migrate south for the winter, they do it because",
+          "choices": [
+            "they are genetically called to",
+            "their children ask for them to",
+            "it is important to their happiness",
+            "they decide to each year"
+          ],
+          "scores": [
+            -23.02,
+            -23.75,
+            -25.08,
+            -26.67
+          ],
+          "pred": 0,
+          "gold": 0
+        },
+        {
+          "ctx": "If a person walks in the opposite direction of a compass arrow they are walking",
+          "choices": [
+            "west",
+            "north",
+            "east",
+            "south"
+          ],
+          "scores": [
+            -9.02,
+            -8.3,
+            -8.2,
+            -8.49
+          ],
+          "pred": 2,
+          "gold": 3
+        },
+        {
+          "ctx": "An example of lots kinetic energy would be",
+          "choices": [
+            "Drinking a cold glass of water",
+            "A snail moving across the sidewalk",
+            "sitting without moving anywhere",
+            "An aircraft taking a trip"
+          ],
+          "scores": [
+            -38.08,
+            -46.41,
+            -28.41,
+            -41.14
+          ],
+          "pred": 2,
+          "gold": 3
+        },
+        {
+          "ctx": "Which organism cannot specialize?",
+          "choices": [
+            "mammal",
+            "plant",
+            "fish",
+            "protozoa"
+          ],
+          "scores": [
+            -19.8,
+            -16.45,
+            -14.76,
+            -25.66
+          ],
+          "pred": 2,
+          "gold": 3
+        }
+      ]
+    }
+  },
+  "our": {},
+  "bpb": {}
+}

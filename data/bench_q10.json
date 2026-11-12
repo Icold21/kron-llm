@@ -1,0 +1,981 @@
+{
+  "ckpt": "E:/kron_out/q10_ckpt/last.pt",
+  "step": 109507,
+  "params": 9938886,
+  "bench": {
+    "hellaswag": {
+      "acc": 0.345,
+      "n": 200,
+      "chance": 0.25,
+      "examples": [
+        {
+          "ctx": "Roof shingle removal: A man is sitting on a roof. he",
+          "choices": [
+            "is using wrap to wrap a pair of skis.",
+            "is ripping level tiles off.",
+            "is holding a rubik's cube.",
+            "starts pulling up roofing on a roof."
+          ],
+          "scores": [
+            -51.24,
+            -41.87,
+            -47.77,
+            -39.43
+          ],
+          "pred": 3,
+          "gold": 3
+        },
+        {
+          "ctx": "Clean and jerk: A lady walks to a barbell. She bends down and grabs the pole. the lady",
+          "choices": [
+            "swings and lands in her arms.",
+            "pulls the barbell forward.",
+            "pulls a rope attached to the barbell.",
+            "stands and lifts the weight over her head."
+          ],
+          "scores": [
+            -27.73,
+            -23.61,
+            -35.24,
+            -38.22
+          ],
+          "pred": 1,
+          "gold": 3
+        },
+        {
+          "ctx": "Canoeing: Two women in a child are shown in a canoe while a man pulls the canoe while standing in the water, with other individuals visible in the background. t",
+          "choices": [
+            "are then shown paddling down a river in a boat while a woman talks.",
+            "are driving the canoe, they go down the river flowing side to side.",
+            "sit in a canoe while the man paddles.",
+            "walking go down the rapids, while the man in his helicopter almost falls and goes out of canoehood."
+          ],
+          "scores": [
+            -81.79,
+            -70.59,
+            -33.96,
+            -116.48
+          ],
+          "pred": 2,
+          "gold": 2
+        },
+        {
+          "ctx": "High jump: A boy is running down a track. the boy",
+          "choices": [
+            "runs into a car.",
+            "gets in a mat.",
+            "lifts his body above the height of a pole.",
+            "stands on his hands and springs."
+          ],
+          "scores": [
+            -17.72,
+            -23.24,
+            -43.38,
+            -28.92
+          ],
+          "pred": 0,
+          "gold": 2
+        },
+        {
+          "ctx": "High jump: The boy lifts his body above the height of a pole. The boy lands on his back on to a red mat. the boy",
+          "choices": [
+            "turns his body around on the mat.",
+            "gets up from the mat.",
+            "continues to lift his body over the pole.",
+            "wiggles out of the mat."
+          ],
+          "scores": [
+            -30.28,
+            -24.78,
+            -25.12,
+            -30.41
+          ],
+          "pred": 1,
+          "gold": 1
+        },
+        {
+          "ctx": "High jump: The boy lands on his back on to a red mat. The boy gets up from the mat. the boy",
+          "choices": [
+            "starts doing spins.",
+            "celebrates by clapping and flexing both arms.",
+            "is dancing on the mat.",
+            "does jump jacks on his stick."
+          ],
+          "scores": [
+            -28.92,
+            -56.34,
+            -21.8,
+            -46.63
+          ],
+          "pred": 2,
+          "gold": 1
+        }
+      ]
+    },
+    "arc_easy": {
+      "acc": 0.305,
+      "n": 200,
+      "chance": 0.25,
+      "examples": [
+        {
+          "ctx": "Which technology was developed most recently?",
+          "choices": [
+            "cellular telephone",
+            "television",
+            "refrigerator",
+            "airplane"
+          ],
+          "scores": [
+            -26.1,
+            -15.93,
+            -18.24,
+            -17.46
+          ],
+          "pred": 1,
+          "gold": 0
+        },
+        {
+          "ctx": "A student hypothesizes that algae are producers. Which question will best help the student determine if this is correct?",
+          "choices": [
+            "Do algae consume other organisms?",
+            "Which organisms consume algae?",
+            "Do algae use sunlight to make food?",
+            "Could an ecosystem survive without algae?"
+          ],
+          "scores": [
+            -38.89,
+            -33.01,
+            -46.94,
+            -44.28
+          ],
+          "pred": 1,
+          "gold": 2
+        },
+        {
+          "ctx": "Soccer players use their muscle systems to kick a ball into a goal. What organ system coordinates the muscles?",
+          "choices": [
+            "The nervous system",
+            "The endocrine system",
+            "The respiratory system",
+            "The circulatory system"
+          ],
+          "scores": [
+            -13.27,
+            -23.25,
+            -19.06,
+            -19.89
+          ],
+          "pred": 0,
+          "gold": 0
+        },
+        {
+          "ctx": "Planets in the solar system are in constant motion. What factor has the greatest effect on the orbits of the planets?",
+          "choices": [
+            "the size of the planets",
+            "gravitational pull of the Sun",
+            "the composition of the planets",
+            "electromagnetic radiation from the Sun"
+          ],
+          "scores": [
+            -17.08,
+            -36.93,
+            -20.37,
+            -33.0
+          ],
+          "pred": 0,
+          "gold": 1
+        },
+        {
+          "ctx": "How is a pond different from a lake?",
+          "choices": [
+            "Ponds have moving water.",
+            "Ponds are smaller and shallower.",
+            "Ponds are not surrounded by land.",
+            "Ponds have a different amount of salt."
+          ],
+          "scores": [
+            -33.61,
+            -33.42,
+            -30.9,
+            -32.88
+          ],
+          "pred": 2,
+          "gold": 1
+        },
+        {
+          "ctx": "A substance with a mass of 10 g is heated to produce two new substances. The mass of the first new substance is 9.3 g and the mass of the second new substance i",
+          "choices": [
+            "heat transfer",
+            "physical change",
+            "law of conservation of mass",
+            "law of conservation of energy"
+          ],
+          "scores": [
+            -16.91,
+            -21.28,
+            -29.17,
+            -30.0
+          ],
+          "pred": 0,
+          "gold": 2
+        }
+      ]
+    },
+    "arc_challenge": {
+      "acc": 0.215,
+      "n": 200,
+      "chance": 0.25,
+      "examples": [
+        {
+          "ctx": "Juan and LaKeisha roll a few objects down a ramp. They want to see which object rolls the farthest. What should they do so they can repeat their investigation?",
+          "choices": [
+            "Put the objects in groups.",
+            "Change the height of the ramp.",
+            "Choose different objects to roll.",
+            "Record the details of the investigation."
+          ],
+          "scores": [
+            -32.39,
+            -25.12,
+            -32.06,
+            -27.51
+          ],
+          "pred": 1,
+          "gold": 3
+        },
+        {
+          "ctx": "High-pressure systems stop air from rising into the colder regions of the atmosphere where water can condense. What will most likely result if a high-pressure s",
+          "choices": [
+            "fog",
+            "rain",
+            "drought",
+            "tornado"
+          ],
+          "scores": [
+            -19.29,
+            -15.21,
+            -16.76,
+            -16.57
+          ],
+          "pred": 1,
+          "gold": 2
+        },
+        {
+          "ctx": "Students visited the Morris W. Offit telescope located at the Maryland Space Grant Observatory in Baltimore. They learned about the stars, planets, and moon. Th",
+          "choices": [
+            "The sun revolves around Earth.",
+            "Earth rotates around the sun.",
+            "The sun revolves on its axis.",
+            "Earth rotates on its axis."
+          ],
+          "scores": [
+            -24.31,
+            -25.18,
+            -29.69,
+            -31.54
+          ],
+          "pred": 0,
+          "gold": 3
+        },
+        {
+          "ctx": "Which topic area would be the best to research to find ways of reducing environmental problems caused by humans?",
+          "choices": [
+            "converting sunlight into electricity",
+            "looking for new coal reserves",
+            "finding reservoirs that contain oil",
+            "converting forests into farmland"
+          ],
+          "scores": [
+            -34.03,
+            -38.74,
+            -45.02,
+            -33.47
+          ],
+          "pred": 3,
+          "gold": 0
+        },
+        {
+          "ctx": "One year, the oak trees in a park began producing more acorns than usual. The next year, the population of chipmunks in the park also increased. Which best expl",
+          "choices": [
+            "Shady areas increased.",
+            "Food sources increased.",
+            "Oxygen levels increased.",
+            "Available water increased."
+          ],
+          "scores": [
+            -32.84,
+            -24.88,
+            -29.6,
+            -30.28
+          ],
+          "pred": 1,
+          "gold": 1
+        },
+        {
+          "ctx": "Which characteristic of a cheetah is more likely to be learned rather than inherited?",
+          "choices": [
+            "speed",
+            "a spotted coat",
+            "hunting strategies",
+            "claws that do not retract"
+          ],
+          "scores": [
+            -14.5,
+            -29.43,
+            -24.95,
+            -38.42
+          ],
+          "pred": 0,
+          "gold": 2
+        }
+      ]
+    },
+    "piqa": {
+      "acc": 0.53,
+      "n": 200,
+      "chance": 0.5,
+      "examples": [
+        {
+          "ctx": "How do I ready a guinea pig cage for it's new occupants?",
+          "choices": [
+            "Provide the guinea pig with a cage full of a few inches of bedding made of ripped paper strips, you will also need to supply it with a water bottle and a food dish.",
+            "Provide the guinea pig with a cage full of a few inches of bedding made of ripped jeans material, you will also need to supply it with a water bottle and a food dish."
+          ],
+          "scores": [
+            -158.58,
+            -169.86
+          ],
+          "pred": 0,
+          "gold": 0
+        },
+        {
+          "ctx": "dresser",
+          "choices": [
+            "replace drawer with bobby pin ",
+            "finish, woodgrain with  bobby pin "
+          ],
+          "scores": [
+            -51.37,
+            -80.89
+          ],
+          "pred": 0,
+          "gold": 1
+        },
+        {
+          "ctx": "To fight Ivan Drago in Rocky for sega master system.",
+          "choices": [
+            "Drago isn't in this game because it was released before Rocky IV.",
+            "You have to defeat Apollo Creed and Clubber Lang first."
+          ],
+          "scores": [
+            -62.96,
+            -79.09
+          ],
+          "pred": 0,
+          "gold": 1
+        },
+        {
+          "ctx": "Make outdoor pillow.",
+          "choices": [
+            "Blow into tin can and tie with rubber band.",
+            "Blow into trash bag and tie with rubber band."
+          ],
+          "scores": [
+            -65.07,
+            -66.9
+          ],
+          "pred": 0,
+          "gold": 1
+        },
+        {
+          "ctx": "ice box",
+          "choices": [
+            "will turn into a cooler if you add water to it",
+            "will turn into a cooler if you add soda to it"
+          ],
+          "scores": [
+            -54.39,
+            -60.3
+          ],
+          "pred": 0,
+          "gold": 0
+        },
+        {
+          "ctx": "Remove soap scum from shower door.",
+          "choices": [
+            "Rub hard with bed sheets, then rinse.",
+            "Rub hard with dryer sheets, then rinse."
+          ],
+          "scores": [
+            -59.37,
+            -61.8
+          ],
+          "pred": 0,
+          "gold": 1
+        }
+      ]
+    },
+    "winogrande": {
+      "acc": 0.52,
+      "n": 200,
+      "chance": 0.5,
+      "examples": [
+        {
+          "ctx": "Sarah was a much better surgeon than Maria so ",
+          "choices": [
+            "Sarah always got the easier cases.",
+            "Maria always got the easier cases."
+          ],
+          "scores": [
+            -51.21,
+            -51.67
+          ],
+          "pred": 0,
+          "gold": 1
+        },
+        {
+          "ctx": "Sarah was a much better surgeon than Maria so ",
+          "choices": [
+            "Sarah always got the harder cases.",
+            "Maria always got the harder cases."
+          ],
+          "scores": [
+            -50.34,
+            -50.81
+          ],
+          "pred": 0,
+          "gold": 0
+        },
+        {
+          "ctx": "They were worried the wine would ruin the bed and the blanket, but the ",
+          "choices": [
+            "blanket was't ruined.",
+            "bed was't ruined."
+          ],
+          "scores": [
+            -34.93,
+            -33.47
+          ],
+          "pred": 1,
+          "gold": 1
+        },
+        {
+          "ctx": "Terry tried to bake the eggplant in the toaster oven but the ",
+          "choices": [
+            "eggplant was too big.",
+            "toaster was too big."
+          ],
+          "scores": [
+            -26.35,
+            -31.56
+          ],
+          "pred": 0,
+          "gold": 0
+        },
+        {
+          "ctx": "At night, Jeffrey always stays up later than Hunter to watch TV because ",
+          "choices": [
+            "Jeffrey wakes up late.",
+            "Hunter wakes up late."
+          ],
+          "scores": [
+            -33.85,
+            -34.38
+          ],
+          "pred": 0,
+          "gold": 0
+        },
+        {
+          "ctx": "The cat of Sarah has some mouth problems, so she takes it to see Maria. ",
+          "choices": [
+            "Sarah is a responsible cat owner.",
+            "Maria is a responsible cat owner."
+          ],
+          "scores": [
+            -41.82,
+            -42.08
+          ],
+          "pred": 0,
+          "gold": 0
+        }
+      ]
+    },
+    "openbookqa": {
+      "acc": 0.145,
+      "n": 200,
+      "chance": 0.25,
+      "examples": [
+        {
+          "ctx": "Frilled sharks and angler fish live far beneath the surface of the ocean, which is why they are known as",
+          "choices": [
+            "Deep sea animals",
+            "fish",
+            "Long Sea Fish",
+            "Far Sea Animals"
+          ],
+          "scores": [
+            -24.69,
+            -5.93,
+            -19.59,
+            -30.12
+          ],
+          "pred": 1,
+          "gold": 0
+        },
+        {
+          "ctx": "Gas can fill any container it is given, and liquid",
+          "choices": [
+            "is standard weight and size",
+            "is the opposite of variable",
+            "only needs a few",
+            "uses what it needs"
+          ],
+          "scores": [
+            -32.37,
+            -23.77,
+            -19.63,
+            -21.28
+          ],
+          "pred": 2,
+          "gold": 3
+        },
+        {
+          "ctx": "When birds migrate south for the winter, they do it because",
+          "choices": [
+            "they are genetically called to",
+            "their children ask for them to",
+            "it is important to their happiness",
+            "they decide to each year"
+          ],
+          "scores": [
+            -25.31,
+            -26.14,
+            -23.74,
+            -26.29
+          ],
+          "pred": 2,
+          "gold": 0
+        },
+        {
+          "ctx": "If a person walks in the opposite direction of a compass arrow they are walking",
+          "choices": [
+            "west",
+            "north",
+            "east",
+            "south"
+          ],
+          "scores": [
+            -8.63,
+            -7.97,
+            -7.72,
+            -7.78
+          ],
+          "pred": 2,
+          "gold": 3
+        },
+        {
+          "ctx": "An example of lots kinetic energy would be",
+          "choices": [
+            "Drinking a cold glass of water",
+            "A snail moving across the sidewalk",
+            "sitting without moving anywhere",
+            "An aircraft taking a trip"
+          ],
+          "scores": [
+            -40.64,
+            -49.15,
+            -30.13,
+            -41.12
+          ],
+          "pred": 2,
+          "gold": 3
+        },
+        {
+          "ctx": "Which organism cannot specialize?",
+          "choices": [
+            "mammal",
+            "plant",
+            "fish",
+            "protozoa"
+          ],
+          "scores": [
+            -17.47,
+            -15.72,
+            -15.49,
+            -20.18
+          ],
+          "pred": 2,
+          "gold": 3
+        }
+      ]
+    },
+    "boolq": {
+      "acc": 0.36,
+      "n": 200,
+      "chance": 0.5,
+      "examples": [
+        {
+          "ctx": "All biomass goes through at least some of these steps: it needs to be grown, collected, dried, fermented, distilled, and burned. All of these steps require reso",
+          "choices": [
+            "yes",
+            "no"
+          ],
+          "scores": [
+            -12.21,
+            -7.0
+          ],
+          "pred": 1,
+          "gold": 1
+        },
+        {
+          "ctx": "Property tax or 'house tax' is a local tax on buildings, along with appurtenant land. It is and imposed on the Possessor (not the custodian of property as per 1",
+          "choices": [
+            "yes",
+            "no"
+          ],
+          "scores": [
+            -12.57,
+            -9.04
+          ],
+          "pred": 1,
+          "gold": 0
+        },
+        {
+          "ctx": "Phantom pain sensations are described as perceptions that an individual experiences relating to a limb or an organ that is not physically part of the body. Limb",
+          "choices": [
+            "yes",
+            "no"
+          ],
+          "scores": [
+            -13.13,
+            -9.59
+          ],
+          "pred": 1,
+          "gold": 0
+        },
+        {
+          "ctx": "Harry Potter and the Escape from Gringotts is an indoor steel roller coaster at Universal Studios Florida, a theme park located within the Universal Orlando Res",
+          "choices": [
+            "yes",
+            "no"
+          ],
+          "scores": [
+            -12.39,
+            -8.89
+          ],
+          "pred": 1,
+          "gold": 0
+        },
+        {
+          "ctx": "Hydroxyzine preparations require a doctor's prescription. The drug is available in two formulations, the pamoate and the dihydrochloride or hydrochloride salts.",
+          "choices": [
+            "yes",
+            "no"
+          ],
+          "scores": [
+            -17.91,
+            -12.61
+          ],
+          "pred": 1,
+          "gold": 0
+        },
+        {
+          "ctx": "Barq's /ˈbɑːrks/ is an American soft drink. Its brand of root beer is notable for having caffeine. Barq's, created by Edward Barq and bottled since the turn of ",
+          "choices": [
+            "yes",
+            "no"
+          ],
+          "scores": [
+            -13.23,
+            -9.28
+          ],
+          "pred": 1,
+          "gold": 1
+        }
+      ]
+    },
+    "mmlu": {
+      "acc": 0.21,
+      "n": 200,
+      "chance": 0.25,
+      "examples": [
+        {
+          "ctx": "Find the degree for the given field extension Q(sqrt(2), sqrt(3), sqrt(18)) over Q.",
+          "choices": [
+            "0",
+            "4",
+            "2",
+            "6"
+          ],
+          "scores": [
+            -6.33,
+            -6.33,
+            -5.27,
+            -7.31
+          ],
+          "pred": 2,
+          "gold": 1
+        },
+        {
+          "ctx": "Let p = (1, 2, 5, 4)(2, 3) in S_5 . Find the index of <p> in S_5.",
+          "choices": [
+            "8",
+            "2",
+            "24",
+            "120"
+          ],
+          "scores": [
+            -8.12,
+            -6.08,
+            -10.33,
+            -11.16
+          ],
+          "pred": 1,
+          "gold": 2
+        },
+        {
+          "ctx": "Find all zeros in the indicated finite field of the given polynomial with coefficients in that field. x^5 + 3x^3 + x^2 + 2x in Z_5",
+          "choices": [
+            "0",
+            "1",
+            "0,1",
+            "0,4"
+          ],
+          "scores": [
+            -7.18,
+            -6.85,
+            -14.36,
+            -15.89
+          ],
+          "pred": 1,
+          "gold": 3
+        },
+        {
+          "ctx": "Statement 1 | A factor group of a non-Abelian group is non-Abelian. Statement 2 | If K is a normal subgroup of H and H is a normal subgroup of G, then K is a no",
+          "choices": [
+            "True, True",
+            "False, False",
+            "True, False",
+            "False, True"
+          ],
+          "scores": [
+            -17.02,
+            -17.57,
+            -15.88,
+            -18.52
+          ],
+          "pred": 2,
+          "gold": 1
+        },
+        {
+          "ctx": "Find the product of the given polynomials in the given polynomial ring. f(x) = 4x - 5, g(x) = 2x^2 - 4x + 2 in Z_8[x].",
+          "choices": [
+            "2x^2 + 5",
+            "6x^2 + 4x + 6",
+            "0",
+            "x^2 + 1"
+          ],
+          "scores": [
+            -14.95,
+            -20.01,
+            -6.39,
+            -11.51
+          ],
+          "pred": 2,
+          "gold": 1
+        },
+        {
+          "ctx": "Statement 1 | If a group has an element of order 15 it must have at least 8 elements of order 15. Statement 2 | If a group has more than 8 elements of order 15,",
+          "choices": [
+            "True, True",
+            "False, False",
+            "True, False",
+            "False, True"
+          ],
+          "scores": [
+            -18.61,
+            -18.63,
+            -16.99,
+            -19.98
+          ],
+          "pred": 2,
+          "gold": 0
+        }
+      ]
+    },
+    "lambada": {
+      "acc": 0.005,
+      "n": 200,
+      "chance": 0.0,
+      "examples": [
+        {
+          "prompt": " , feeling stunned . like this is some sort of sign . but as i stare at harlin , his mouth curved in a confident grin , i do n't care about ",
+          "want": "signs",
+          "got": "100% of the time . the mouth cur",
+          "ok": false
+        },
+        {
+          "prompt": "need to change . we wo n't be that long . '' shane gripped her arm and started leading her to the dock . `` i can make it there on my own , ",
+          "want": "shane",
+          "got": "100000000000",
+          "ok": false
+        },
+        {
+          "prompt": "rrell could respond , leila 's voice rose from inside the house . `` no insurance ? '' she wailed . `` what do you mean you do n't have any ",
+          "want": "insurance",
+          "got": "ingenuity ? '' the tax doll",
+          "ok": false
+        },
+        {
+          "prompt": "s value than the others ' . for all helen knew , miss mabel had a lot more years to live than she did . `` not going to happen , '' replied ",
+          "want": "helen",
+          "got": "100 years ago .\nthese are the",
+          "ok": false
+        },
+        {
+          "prompt": " `` do n't put those on me , '' i whispered . `` please . '' sergei looked at me , surprised by my low , raspy please , but he put down the ",
+          "want": "chains",
+          "got": "100000000000",
+          "ok": false
+        },
+        {
+          "prompt": "erfered . she was so angry that she immediately said , once they were out of earshot of basha , `` you do n't mean anything to me anymore , ",
+          "want": "hastin",
+          "got": "100% of the time '' .\nthese",
+          "ok": false
+        }
+      ]
+    }
+  },
+  "our": {
+    "step": 109507,
+    "drills": {
+      "en/en_adds": {
+        "ok": 3,
+        "n": 3,
+        "first_row": 3
+      },
+      "en/en_subs": {
+        "ok": 3,
+        "n": 3,
+        "first_row": 3
+      },
+      "en/en_muls": {
+        "ok": 3,
+        "n": 3,
+        "first_row": 3
+      },
+      "ru/ru_adds": {
+        "ok": 3,
+        "n": 3,
+        "first_row": 3
+      },
+      "ru/ru_subs": {
+        "ok": 3,
+        "n": 3,
+        "first_row": 3
+      },
+      "ru/ru_muls": {
+        "ok": 3,
+        "n": 3,
+        "first_row": 3
+      }
+    },
+    "bare": {
+      "n": 20,
+      "ok": 2,
+      "examples": [
+        {
+          "q": "2 * 5 =",
+          "want": "10",
+          "got": "20<|eot|># Как",
+          "ok": false
+        },
+        {
+          "q": "70 - 16 =",
+          "want": "54",
+          "got": "36<|eot|># Как",
+          "ok": false
+        },
+        {
+          "q": "8 * 8 =",
+          "want": "64",
+          "got": "100<|eot|>#",
+          "ok": false
+        },
+        {
+          "q": "90 - 35 =",
+          "want": "55",
+          "got": "10<|eot|># Как",
+          "ok": false
+        },
+        {
+          "q": "49 + 52 =",
+          "want": "101",
+          "got": "122<|eot|>#",
+          "ok": false
+        },
+        {
+          "q": "3 * 4 =",
+          "want": "12",
+          "got": "20<|eot|># Как",
+          "ok": false
+        }
+      ]
+    },
+    "chat": [
+      {
+        "system": "You are KronLLM, a compact bilingual model.",
+        "user": "Who are you?",
+        "answer": "Yes! You can also find out online formats such as \"Will-Down Break\" or \"Can't Snippet\" in any way, but they're very lucky and"
+      },
+      {
+        "system": "You are KronLLM, a compact bilingual model.",
+        "user": "What is the capital of France?",
+        "answer": "The capital of France is a 2019-presenture in the United States.<|eot|>376 + 584 = 989\n724 - 411 = "
+      },
+      {
+        "system": "You are a helpful assistant that answers in Russian.",
+        "user": "Сколько будет 2 + 2?",
+        "answer": "Чтобы решить эту проблему, делайте функцию в Python, иначе говоря, получается что-то так же, как это делаю. Вот пример кода:\n[code]\n   "
+      },
+      {
+        "system": "You are a helpful assistant.",
+        "user": "Name three colours.",
+        "answer": "Here's a recipe for the ingredient that I can use in my favorite lips:\n\nIngredients:\n- 1 cups all-purpose flavors,"
+      },
+      {
+        "system": "Ты — полезный ассистент.",
+        "user": "Назови три цвета.",
+        "answer": "180<|eot|>59 + 726 = 438\n850 - 492 = 366\n809 + 532 = 1364\n7"
+      }
+    ],
+    "generation": [
+      {
+        "prompt": "The Roman Empire was one of the largest and longest-lasting empires in history, and",
+        "text": " the country's population had a significant impact on the region.\nDespite the rise of all European countries, both Austria and the Borough of Latin America and the Persian Government had been united with the Roman Empire"
+      },
+      {
+        "prompt": "def quicksort(items):",
+        "text": "\n    \"\"\"Make a dictionary with the list of features for each item.\"\"\"\n\n    def _post_binding_data():\n        return itertoolsettings[-1] or {} if it is None else None\n\n# 3.5.4. Message"
+      },
+      {
+        "prompt": "Фотосинтез — это процесс, при котором растения",
+        "text": ", в зависимости от количества блюда и их размера.\nМатерия\nВ составе фермента и татуировки водянистого покрытия используется плавный камень. Закреплять его можно при помощи специальных гликемов. В некоторых местах для"
+      },
+      {
+        "prompt": "Once upon a time, in a small village by the sea,",
+        "text": " we find that\ntheir lords were filled with violent cries, and they stood in a small\nlong-term room. Their mothers were well dressed with their hands and\nchatting, and they were still watching their shipping ro"
+      }
+    ],
+    "repeat": {
+      "distinct1": 0.7984496124031008,
+      "distinct2": 0.9765625,
+      "repeat_4gram": 0.0
+    }
+  },
+  "bpb": {
+    "pretrain_val": 1.0842020783265993,
+    "sft_val": 0.977270469601075
+  }
+}
