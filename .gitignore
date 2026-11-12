@@ -94,3 +94,9 @@ data/seen/
 data/_chk24b/
 data/_chk24c/
 data/_sft_meta_remote/
+
+# Mixed SFT+pretrain corpus and probe artefacts (1.3 GB, rebuilt by scripts/)
+data/sft_mix/
+data/playground_smoke.ipynb
+data/bench_smoke*.json
+data/*.flag
