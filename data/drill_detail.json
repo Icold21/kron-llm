@@ -1,0 +1,58 @@
+{
+  "step": 4521,
+  "families": {
+    "en/en_adds": {
+      "n": 5,
+      "ok": 5,
+      "first_row": 5,
+      "fails": []
+    },
+    "en/en_subs": {
+      "n": 5,
+      "ok": 5,
+      "first_row": 5,
+      "fails": []
+    },
+    "en/en_muls": {
+      "n": 5,
+      "ok": 4,
+      "first_row": 5,
+      "fails": [
+        {
+          "question": "Multiply 359 by 8 digit by digit.",
+          "want": 2872,
+          "got": "Multiply one digit at a time, starting from the units:\nunits: 9 * 8 = 72 -> write 2, carry 7\ntens: 5 * 8 + 7 = 49 -> write 9, carry 4\nhundreds: 3 * 8 + 4 = 29 -> write 9, carry 2\ncarry: 2 -> write 2\nSo 359 * 8 = 2992.\n\nAnswer: 2992<|eot|><|system|>elicate<|eot"
+        }
+      ]
+    },
+    "ru/ru_adds": {
+      "n": 5,
+      "ok": 5,
+      "first_row": 5,
+      "fails": []
+    },
+    "ru/ru_subs": {
+      "n": 5,
+      "ok": 5,
+      "first_row": 5,
+      "fails": []
+    },
+    "ru/ru_muls": {
+      "n": 5,
+      "ok": 4,
+      "first_row": 5,
+      "fails": [
+        {
+          "question": "Умножь 596 на 9 по разрядам.",
+          "want": 5364,
+          "got": "Умножаем по одной цифре, начиная с единиц:\nединицы: 6 * 9 = 54 -> пишем 4, запоминаем 5\nдесятки: 9 * 9 + 5 = 87 -> пишем 7, запоминаем 8\nсотни: 5 * 9 + 8 = 51 -> пишем 1, запоминаем 5\nперенос: 5 -> пишем 5\nЗначит, 596 * 9 = 5174.\n\nОтвет: 5174<|eot|><|system|>e"
+        }
+      ]
+    }
+  },
+  "total": {
+    "n": 30,
+    "ok": 28,
+    "share": 0.9333333333333333
+  }
+}

@@ -72,7 +72,11 @@ def main() -> None:
     print(f"[load] step {step:,}")
 
     bare = eval_samples.arithmetic(model, tok, args.device, n=args.n)
-    drill = drill_mod.run(model, tok, arith, build_sft, args.n // 2)
+    # 90 tokens truncates a three-digit column drill before its answer line:
+    # the rows are ~110-130 tokens, so the metric scored 0/60 on generation
+    # that was arithmetically right up to the cut (2026-11-12).
+    drill = drill_mod.run(model, tok, arith, build_sft, args.n // 2,
+                          max_new_tokens=200)
     total = max(1, drill["total"])
     format_ok = sum(1 for e in drill["examples"]
                     if e["got"].lstrip().startswith(DRILL_HEADS)) / max(

@@ -1,7 +1,14 @@
 {
   "icold21/kron-q10a-decay-pass": {
-    "step": 98895,
-    "attempts": 3,
+    "step": 109507,
+    "attempts": 1,
+    "pushed": true,
+    "published": true,
+    "reported": true
+  },
+  "icold21/kron-s10-supervised-fine-tuning": {
+    "step": 4521,
+    "attempts": 2,
     "pushed": false,
     "published": true,
     "reported": true

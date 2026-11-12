@@ -87,6 +87,9 @@ def first_row_ok(text: str) -> bool:
 def run(model, tok, arith, build_sft, per_lang: int, seed: int = 11,
         max_new_tokens: int = 90) -> dict:
     rng = random.Random(seed)
+    # The caller may put the model on the GPU; the prompt must follow it, or
+    # torch.embedding raises 'found at least two devices'.
+    device = next(model.parameters()).device
     out: dict = {"per_language": {}, "answer_line": 0, "first_row": 0,
                  "total": 0, "examples": []}
     for lang in ("en", "ru"):
@@ -103,7 +106,7 @@ def run(model, tok, arith, build_sft, per_lang: int, seed: int = 11,
                  "content": f"{cot}\n\n{word} {answer}"},
             ]
             _, prompt = build_sft.render(messages)
-            ids = torch.tensor([tok.encode(prompt)])
+            ids = torch.tensor([tok.encode(prompt)], device=device)
             gen = model.generate(ids, max_new_tokens=max_new_tokens,
                                  temperature=0.0,
                                  top_k=1, top_p=1.0, repetition_penalty=1.0)
