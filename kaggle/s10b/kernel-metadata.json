@@ -9,7 +9,7 @@
   "enable_internet": true,
   "dataset_sources": [
     "icold21/kron-llm-code-v23",
-    "icold21/kron-sft-corpus",
+    "icold21/kron-sft-mix",
     "icold21/kron-s10-ckpt"
   ],
   "competition_sources": [],

@@ -30,15 +30,24 @@ DST = Path("kaggle/s10b")
 PATCHES = [
     ("'--exp', 'S10'", "'--exp', 'S10b'"),
     ("'/kaggle/working/s10'", "'/kaggle/working/s10b'"),
-    # S10 now runs 4,800 steps, so the inherited overrides and the guard move
-    # with it; S10b keeps its own 8,000-step schedule from the experiment.
+    # The corpus is S10's with 10 % pretraining documents mixed in as plain text
+    # (scripts/mix_sft_pretrain.py): S10 cost 0.139 bpb of general language, and a
+    # second pass on the pure SFT corpus would deepen exactly that.
+    ("find_dataset('kron-sft-corpus', 'train.bpe.bin')",
+     "find_dataset('kron-sft-mix', 'train.bpe.bin')"),
+    # One session is one complete anneal: 660 minutes is 14,558 steps at 2.72 s,
+    # which is what the platform allows in one kernel (720 is the cap and the
+    # output has to be published before it).
     ("'--override', 'training.max_steps=4800',\n"
      "       '--override', 'training.schedule_steps=4800',",
-     "'--override', 'training.max_steps=8000',\n"
-     "       '--override', 'training.schedule_steps=8000',"),
-    ("if _step < 108507:", "if _step < 4700:"),
+     "'--override', 'training.max_steps=14558',\n"
+     "       '--override', 'training.schedule_steps=14558',"),
+    # S10 stopped at step 4,521 of 4,800 -- the 205-minute budget ended the pass,
+    # not the step count -- so the guard has to accept the run that exists, or
+    # S10b refuses the only checkpoint it is allowed to continue from.
+    ("if _step < 108507:", "if _step < 4500:"),
     ("f'109,507 (>=108,507 accepted): this is a stale dataset version -- '",
-     "f'4,800 (>=4,700 accepted): this is not the S10 checkpoint -- '"),
+     "f'4,521 (>=4,500 accepted): this is not the S10 checkpoint -- '"),
     ("f're-push S10 once kron-q10-ckpt shows the new version')",
      "f'publish S10 first, then push S10b')"),
     ("'/kaggle/input has no last.pt: S10 starts from the '\n"
@@ -47,19 +56,20 @@ PATCHES = [
      "                            'it cannot start from scratch'"),
 ]
 
-HEADER = """# KronLLM S10b — second supervised fine-tuning pass
+HEADER = """# KronLLM S10b — supervised fine-tuning on the mixed corpus
 
-Continues from S10's checkpoint (weights only, fresh AdamW) for 8,000 more steps
-x 16,384 tokens = 131M tokens.  With S10's 65.5M that is 197M tokens of the
-502.7M-token corpus: 39 %, 19.8 tokens per parameter.
+Continues from S10's checkpoint (weights only, fresh AdamW) for one anneal of
+14,558 steps x 16,384 tokens = **238M tokens** of the mixed corpus: the SFT set
+plus 10 % pretraining documents, copied in as plain text so that the loss on them
+is the pretraining loss.
 
-Why a second pass exists: 4,000 steps is a verdict probe, not a recipe.  If S10
-learns the drill format and exact-match arithmetic is still zero, the limit is
-capacity, not data -- and this pass is not launched.  If the loss is still
-falling at step 4,000 and arithmetic has moved, this is what makes it trained.
+Why the mix: S10 (78.6M SFT tokens) bought 0.146 bpb on its own held-out bin and
+cost **0.139 bpb on general text** (1.0842 -> 1.2236).  A second pass on the pure
+SFT corpus would deepen exactly that, so a tenth of every batch is ordinary
+prose -- no ``<|system|>``, no ``<|user|>``, no prompt for the mask to hide.
 
-Learning rate 1e-5 -> 1e-6 over the 8,000 steps (an order of magnitude below
-S10's: the format is already there), 50 warmup steps.  Checkpoints every 500.
+Learning rate 1e-5 -> 1e-6 over 14,558 steps (an order of magnitude below S10's:
+the format is already there), 50 warmup steps.  Checkpoints every 500.
 """.splitlines(keepends=True)
 
 
@@ -84,7 +94,7 @@ def main() -> None:
         for i, line in enumerate(lines):
             if line.strip().startswith("MINUTES ="):
                 # 8,000 steps x ~2.7 s including the every-100-step evaluation.
-                lines[i] = ("MINUTES = 380   # 8,000 steps ~ 6.3 h; the platform "
+                lines[i] = ("MINUTES = 660   # 14,558 steps ~ 11 h; the platform "
                             "cap is 720 min\n")
                 applied["MINUTES"] = applied.get("MINUTES", 0) + 1
         cell["source"] = lines
@@ -110,7 +120,7 @@ def main() -> None:
         # last.pt, and mounting both makes the init glob a coin toss.
         "dataset_sources": [
             f"icold21/kron-llm-code-v{args.code_version}",
-            "icold21/kron-sft-corpus",
+            "icold21/kron-sft-mix",
             "icold21/kron-s10-ckpt",
         ],
         "competition_sources": [],
