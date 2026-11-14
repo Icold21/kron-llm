@@ -108,7 +108,7 @@ def main() -> None:
                                      encoding="utf-8")
 
     meta = {
-        "id": "icold21/kron-s10b-sft-pass2",
+        "id": "icold21/kron-s10b-second-sft-pass",
         "title": "Kron S10b second SFT pass",
         "code_file": "train.ipynb",
         "language": "python",
