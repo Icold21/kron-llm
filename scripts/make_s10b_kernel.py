@@ -76,6 +76,8 @@ the format is already there), 50 warmup steps.  Checkpoints every 500.
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--code-version", type=int, default=24)
+    ap.add_argument("--budget-minutes", type=int, default=0,
+                    help="fixed session budget instead of the 22:30 deadline")
     args = ap.parse_args()
 
     nb = json.loads((SRC / "train.ipynb").read_text(encoding="utf-8"))
@@ -93,23 +95,34 @@ def main() -> None:
         lines = src.splitlines(keepends=True)
         for i, line in enumerate(lines):
             if line.strip().startswith("MINUTES ="):
-                # 8,000 steps x ~2.7 s including the every-100-step evaluation.
-                lines[i] = (
-                    "from datetime import datetime, timezone\n"
-                    "# 22:30 MSK = 19:30 UTC.  The kernel can sit in the queue for an\n"
-                    "# hour, so the budget is taken from the clock when it starts, not\n"
-                    "# from the push time: whatever the queue does, the session ends by\n"
-                    "# 22:30.  Twelve minutes are held back for the dataset copy and for\n"
-                    "# the checkpoint to be written and published before the end.\n"
-                    "DEADLINE_UTC = datetime(2026, 11, 14, 19, 30, tzinfo=timezone.utc)\n"
-                    "_left = (DEADLINE_UTC - datetime.now(timezone.utc)).total_seconds() / 60\n"
-                    "if _left < 25:\n"
-                    "    raise SystemExit(f'only {_left:.0f} min left before 22:30: not starting')\n"
-                    "MINUTES = max(5, int(_left) - 12)\n"
-                    "# One anneal for the session, so the LR schedule fits what actually\n"
-                    "# runs (2.72 s/step, measured on S10) instead of ending mid-decay.\n"
-                    "_STEPS = max(200, int(MINUTES * 60 / 2.72))\n"
-                    "print('budget', MINUTES, 'min ->', _STEPS, 'steps by the 22:30 deadline')\n")
+                if args.budget_minutes:
+                    # A fixed budget is the right shape when the run is a single
+                    # episode ("one and a half hours"): the clock at start is the
+                    # only thing that decides how long it trains, and a late start
+                    # shortens the session instead of cancelling it.
+                    lines[i] = (
+                        f"MINUTES = {int(args.budget_minutes)}\n"
+                        "# One anneal for the session, so the LR schedule fits what\n"
+                        "# actually runs (2.72 s/step, measured on S10).\n"
+                        "_STEPS = max(200, int(MINUTES * 60 / 2.72))\n"
+                        "print('budget', MINUTES, 'min ->', _STEPS, 'steps')\n")
+                else:
+                    lines[i] = (
+                        "from datetime import datetime, timezone\n"
+                        "# 22:30 MSK = 19:30 UTC.  The kernel can sit in the queue for an\n"
+                        "# hour, so the budget is taken from the clock when it starts, not\n"
+                        "# from the push time: whatever the queue does, the session ends by\n"
+                        "# 22:30.  Twelve minutes are held back for the dataset copy and for\n"
+                        "# the checkpoint to be written and published before the end.\n"
+                        "DEADLINE_UTC = datetime(2026, 11, 14, 19, 30, tzinfo=timezone.utc)\n"
+                        "_left = (DEADLINE_UTC - datetime.now(timezone.utc)).total_seconds() / 60\n"
+                        "if _left < 25:\n"
+                        "    raise SystemExit(f'only {_left:.0f} min left before 22:30: not starting')\n"
+                        "MINUTES = max(5, int(_left) - 12)\n"
+                        "# One anneal for the session, so the LR schedule fits what actually\n"
+                        "# runs (2.72 s/step, measured on S10) instead of ending mid-decay.\n"
+                        "_STEPS = max(200, int(MINUTES * 60 / 2.72))\n"
+                        "print('budget', MINUTES, 'min ->', _STEPS, 'steps by the 22:30 deadline')\n")
                 applied["MINUTES"] = applied.get("MINUTES", 0) + 1
         cell["source"] = lines
 
