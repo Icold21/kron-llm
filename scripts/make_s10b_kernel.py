@@ -40,8 +40,8 @@ PATCHES = [
     # output has to be published before it).
     ("'--override', 'training.max_steps=4800',\n"
      "       '--override', 'training.schedule_steps=4800',",
-     "'--override', 'training.max_steps=14558',\n"
-     "       '--override', 'training.schedule_steps=14558',"),
+     "'--override', f'training.max_steps={_STEPS}',\n"
+     "       '--override', f'training.schedule_steps={_STEPS}',"),
     # S10 stopped at step 4,521 of 4,800 -- the 205-minute budget ended the pass,
     # not the step count -- so the guard has to accept the run that exists, or
     # S10b refuses the only checkpoint it is allowed to continue from.
@@ -94,8 +94,22 @@ def main() -> None:
         for i, line in enumerate(lines):
             if line.strip().startswith("MINUTES ="):
                 # 8,000 steps x ~2.7 s including the every-100-step evaluation.
-                lines[i] = ("MINUTES = 660   # 14,558 steps ~ 11 h; the platform "
-                            "cap is 720 min\n")
+                lines[i] = (
+                    "from datetime import datetime, timezone\n"
+                    "# 22:30 MSK = 19:30 UTC.  The kernel can sit in the queue for an\n"
+                    "# hour, so the budget is taken from the clock when it starts, not\n"
+                    "# from the push time: whatever the queue does, the session ends by\n"
+                    "# 22:30.  Twelve minutes are held back for the dataset copy and for\n"
+                    "# the checkpoint to be written and published before the end.\n"
+                    "DEADLINE_UTC = datetime(2026, 11, 14, 19, 30, tzinfo=timezone.utc)\n"
+                    "_left = (DEADLINE_UTC - datetime.now(timezone.utc)).total_seconds() / 60\n"
+                    "if _left < 25:\n"
+                    "    raise SystemExit(f'only {_left:.0f} min left before 22:30: not starting')\n"
+                    "MINUTES = max(5, int(_left) - 12)\n"
+                    "# One anneal for the session, so the LR schedule fits what actually\n"
+                    "# runs (2.72 s/step, measured on S10) instead of ending mid-decay.\n"
+                    "_STEPS = max(200, int(MINUTES * 60 / 2.72))\n"
+                    "print('budget', MINUTES, 'min ->', _STEPS, 'steps by the 22:30 deadline')\n")
                 applied["MINUTES"] = applied.get("MINUTES", 0) + 1
         cell["source"] = lines
 
