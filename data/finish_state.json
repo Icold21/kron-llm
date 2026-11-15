@@ -12,5 +12,12 @@
     "pushed": false,
     "published": true,
     "reported": true
+  },
+  "icold21/kron-s10b-second-sft-pass": {
+    "step": 12198,
+    "attempts": 1,
+    "pushed": false,
+    "published": true,
+    "reported": true
   }
 }
