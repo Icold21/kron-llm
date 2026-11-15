@@ -30,6 +30,12 @@ DST = Path("kaggle/s10b")
 PATCHES = [
     ("'--exp', 'S10'", "'--exp', 'S10b'"),
     ("'/kaggle/working/s10'", "'/kaggle/working/s10b'"),
+    # The last cell prints results.json through a different literal, so the
+    # run-dir patch above misses it: without this the training completes, writes
+    # its checkpoint and then dies on FileNotFoundError, and Kaggle reports a
+    # finished session as ERROR (2026-11-15).
+    ("open('/kaggle/working/s10/results.json')",
+     "open('/kaggle/working/s10b/results.json')"),
     # The corpus is S10's with 10 % pretraining documents mixed in as plain text
     # (scripts/mix_sft_pretrain.py): S10 cost 0.139 bpb of general language, and a
     # second pass on the pure SFT corpus would deepen exactly that.

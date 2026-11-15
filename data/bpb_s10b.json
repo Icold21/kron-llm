@@ -1,0 +1,7 @@
+{
+  "ckpt": "E:/kron_out/s10b_ckpt/last.pt",
+  "step": 12198,
+  "blocks": 512,
+  "pretrain_val": 1.1623,
+  "sft_val": 0.8084
+}
