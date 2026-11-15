@@ -1,0 +1,26 @@
+{
+  "bin": "C:\\Users\\Icold\\Desktop\\kron_llm\\data\\sft\\val.bpe.bin",
+  "blocks": 512,
+  "models": {
+    "S10": {
+      "step": 4521,
+      "bpb": 0.8319,
+      "se": 0.0099
+    },
+    "S10b": {
+      "step": 12198,
+      "bpb": 0.8088,
+      "se": 0.0098
+    }
+  },
+  "difference": {
+    "mean": -0.0231,
+    "se": 0.00033,
+    "ci95": [
+      -0.02375,
+      -0.02245
+    ],
+    "share_blocks_better": 1.0
+  },
+  "verdict": "real"
+}
