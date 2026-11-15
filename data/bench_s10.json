@@ -1,11 +1,11 @@
 {
-  "ckpt": "E:\\kron_out\\s10_ckpt\\last.pt",
+  "ckpt": "E:/kron_out/s10_ckpt/last.pt",
   "step": 4521,
   "params": 9938886,
   "bench": {
     "hellaswag": {
-      "acc": 0.3333333333333333,
-      "n": 6,
+      "acc": 0.335,
+      "n": 200,
       "chance": 0.25,
       "examples": [
         {
@@ -113,8 +113,8 @@
       ]
     },
     "arc_easy": {
-      "acc": 0.16666666666666666,
-      "n": 6,
+      "acc": 0.335,
+      "n": 200,
       "chance": 0.25,
       "examples": [
         {
@@ -222,8 +222,8 @@
       ]
     },
     "arc_challenge": {
-      "acc": 0.3333333333333333,
-      "n": 6,
+      "acc": 0.235,
+      "n": 200,
       "chance": 0.25,
       "examples": [
         {
@@ -331,8 +331,8 @@
       ]
     },
     "piqa": {
-      "acc": 0.3333333333333333,
-      "n": 6,
+      "acc": 0.55,
+      "n": 200,
       "chance": 0.5,
       "examples": [
         {
@@ -416,8 +416,8 @@
       ]
     },
     "winogrande": {
-      "acc": 0.6666666666666666,
-      "n": 6,
+      "acc": 0.45,
+      "n": 200,
       "chance": 0.5,
       "examples": [
         {
@@ -501,8 +501,8 @@
       ]
     },
     "openbookqa": {
-      "acc": 0.16666666666666666,
-      "n": 6,
+      "acc": 0.145,
+      "n": 200,
       "chance": 0.25,
       "examples": [
         {
@@ -610,8 +610,8 @@
       ]
     },
     "boolq": {
-      "acc": 0.3333333333333333,
-      "n": 6,
+      "acc": 0.355,
+      "n": 200,
       "chance": 0.5,
       "examples": [
         {
@@ -695,8 +695,8 @@
       ]
     },
     "mmlu": {
-      "acc": 0.0,
-      "n": 6,
+      "acc": 0.235,
+      "n": 200,
       "chance": 0.25,
       "examples": [
         {
@@ -804,8 +804,8 @@
       ]
     },
     "lambada": {
-      "acc": 0.0,
-      "n": 6,
+      "acc": 0.005,
+      "n": 200,
       "chance": 0.0,
       "examples": [
         {
@@ -927,55 +927,55 @@
       {
         "system": "You are KronLLM, a compact bilingual model.",
         "user": "Who are you?",
-        "answer": "After writing to read, we might use the given information.\nSome of them are written in 1995 and they are written in 2007. This means that the following text is not ans"
+        "answer": "Your experience is great.\n\nLook at the story and understand what they are describing. It is a dedicated piece of information that discusses how your stories are described in one another. The"
       },
       {
         "system": "You are KronLLM, a compact bilingual model.",
         "user": "What is the capital of France?",
-        "answer": "The capital of France is the highest part of the country in France, and it is the largest count of its nationals, France, and the United States. It has the lives of both v"
+        "answer": "The capital of France is 1200-794 = 6300.\nAnd the capital of France is 5800-6300 = 1600"
       },
       {
         "system": "You are a helpful assistant that answers in Russian.",
         "user": "Сколько будет 2 + 2?",
-        "answer": "Давайте поразмышляем над вопросом с несколькими вариантами ответов.\n1:0 =<|eot|><!-- IFAIKMOTH-CLINQUY<|eot|>"
+        "answer": "Давайте подумаем над вопросом с несколькими вариантами ответов шаг за шагом.\nВарианты ответа: (A) 10% от 3/4. (B) "
       },
       {
         "system": "You are a helpful assistant.",
         "user": "Name three colours.",
-        "answer": "Sure! Here's a quick sentence for the task:\n\n1. \"Title:\"\n2. \"Blue: \"Width: 3\"\n3. \"Angle: \""
+        "answer": "Certainly! Here is a simple Python program to solve this problem:\n```python\ndef fibonacci_code(color):\n    if color == '#':\n        return 0\n\n   "
       },
       {
         "system": "Ты — полезный ассистент.",
         "user": "Назови три цвета.",
-        "answer": "```python\nout = {'a': 2, 'b': 1}\nprint(f'{::-4}, {:: -3})')\n```<|eot|># Converting the square root"
+        "answer": "16 цветов, 40 цвета и 24 цвета.\n35 цветов, 80 цветов и 70 цвета.\nСколько цветов и скобок нужно будет найти"
       }
     ],
     "generation": [
       {
         "prompt": "The Roman Empire was one of the largest and longest-lasting empires in history, and",
-        "text": " the United States residents were 260 and 397.\n#### 260\nThe answer is: 260<|eot|><|system|> +<|eot|><|assistant|>We are given that \"their mission is to a group of people who have been wounded.\" Here's a simple"
+        "text": " it was still 21,500 miles in the United States. This is because the Disaster Empires were made in the country and had a total of 3,600 mileages, and the Ottoman Empire was now considered an average for the entire"
       },
       {
         "prompt": "def quicksort(items):",
-        "text": "\n    \"\"\"Returns a list of strings where the last item is in the list.\"\"\"\n\n    sorted_list = sorted([string for char in items if isinstance(element, int)])\n    return sorted_list\n```<|eot|><|system|>error the function to"
+        "text": "\n    \"\"\"\n    Returns the sorted list of items sorted by the new list.\n\n    :param item: A string containing a sorted list of strings.\n    :return: A list of sorted list of items sorted by the new list.\n    \"\"\"\n    #"
       },
       {
         "prompt": "Фотосинтез — это процесс, при котором растения",
-        "text": " являются разнообразными, а по-разному их вредны для того, чтобы облегчить работу. На самом деле это может быть очень полезным способом, например, выпекать много воды, чтобы убрать его, что может привести к изменению климата, а"
+        "text": " вырезают вверх. Начнем с упаковки на оленье вверху, и все, что вы не можете.<|eot|><|system|>er (Small)<|eot|><|assistant|>Let's assume the total number of females in the array is 15"
       },
       {
         "prompt": "Once upon a time, in a small village by the sea,",
-        "text": " there are 30 - 2 = 18 puppies in the city.\nTo find out how many puppies are in the town, we add up all the total number of puppy puppies: 40 + 60 + 95 + "
+        "text": " we find that he has 480 people in total.\nThe answer is: 2<|eot|><|system|>eloma (rounds)<|eot|><|assistant|>To find the rate of work in a street, you can use the following formula:\nArea = Time × Speed × time"
       }
     ],
     "repeat": {
-      "distinct1": 0.8045112781954887,
-      "distinct2": 0.9848484848484849,
-      "repeat_4gram": 0.0
+      "distinct1": 0.6934306569343066,
+      "distinct2": 0.9044117647058824,
+      "repeat_4gram": 0.048
     }
   },
   "bpb": {
-    "pretrain_val": 1.3792698784224984,
-    "sft_val": 0.8603968561203267
+    "pretrain_val": 1.2236244918030919,
+    "sft_val": 0.8309953921962691
   }
 }

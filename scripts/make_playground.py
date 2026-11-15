@@ -138,16 +138,25 @@ for label, path in (("S10 (fine-tuned)", ROOT / "data" / "bench_s10.json"),
     for task, res in data["bench"].items():
         if "error" in res:
             continue
-        rows.append({"task": task, label: round(res["acc"], 3),
+        rows.append({"task": task, "model": label, "value": round(res["acc"], 3),
                      "n": res["n"], "chance": res["chance"]})
 
-table = pd.DataFrame(rows)
+# One row per task.  A pivot on (task, chance, n) split every task in two as
+# soon as the two files carried different sample counts, and the halves then
+# showed NaN for the model that was missing from that tuple -- which is exactly
+# how a 6-item smoke run overwrote the 200-item file and looked like data.
+merged: dict[str, dict] = {}
+for row in rows:
+    cur = merged.setdefault(row["task"], {"chance": row["chance"], "n": 0})
+    cur["n"] = max(cur["n"], row["n"])
+    cur[row["model"]] = row["value"]
+table = pd.DataFrame([
+    {"task": task, **vals,
+     "S10 vs chance": (vals.get("S10 (fine-tuned)", float("nan")) - vals["chance"]),
+     "Q10A vs chance": (vals.get("Q10A (decay end)", float("nan")) - vals["chance"])}
+    for task, vals in sorted(merged.items())]).round(3)
 if not table.empty:
-    wide = table.pivot_table(index=["task", "chance", "n"], values=["S10 (fine-tuned)", "Q10A (decay end)"],
-                             aggfunc="first").reset_index()
-    wide["S10 vs chance"] = (wide["S10 (fine-tuned)"] - wide["chance"]).round(3)
-    wide["Q10A vs chance"] = (wide["Q10A (decay end)"] - wide["chance"]).round(3)
-    display(wide.sort_values("task").reset_index(drop=True))
+    display(table)
 """)
 
 code(r"""
@@ -480,7 +489,11 @@ import subprocess
 RUN_N = 200
 RUN_BLOCKS = 512
 ckpt_path = CKPTS["S10  (fine-tuned, step 4 521)"]
-out_json = ROOT / "data" / "bench_s10.json"
+# A short run writes to its own file.  Executing the notebook end to end once
+# ran this cell with RUN_N = 6 and silently overwrote the 200-item results with
+# a six-item smoke, which is how the table grew NaN columns.
+out_json = (ROOT / "data" / ("bench_s10.json" if RUN_N >= 200
+                              else f"bench_s10_n{RUN_N}.json"))
 cmd = [sys.executable, "-u", str(ROOT / "scripts" / "bench_current.py"),
        "--ckpt", str(ckpt_path), "--n", str(RUN_N), "--blocks", str(RUN_BLOCKS),
        "--out", str(out_json)]
