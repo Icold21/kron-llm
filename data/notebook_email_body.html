@@ -1,0 +1,22 @@
+<div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; font-size: 14px; line-height: 1.5;">
+<p>Ноутбук с полной батареей тестов приложен: <code>kron_playground.ipynb</code> (28 ячеек).</p>
+<p><b>Что внутри</b></p>
+<ul>
+<li>раздел 1 &mdash; девять стандартных бенчмарков (hellaswag, arc, piqa, winogrande,
+openbookqa, boolq, mmlu, lambada) для S10 и Q10A, с линией случая на графике;</li>
+<li>раздел 2 &mdash; bits per byte по двум удержанным бинам;</li>
+<li>раздел 3 &mdash; наши тесты: столбики по семействам, голая форма с примерами ошибок,
+чат, метрики повторов, свободная генерация;</li>
+<li>раздел 4 &mdash; четыре интерактивные панели: генерация (T, top_k, top_p, штраф),
+чат с транскриптом, арифметический тренажёр с вердиктом RIGHT/WRONG от Python,
+инспектор токенизатора;</li>
+<li>раздел 5 &mdash; перезапуск батареи одной кнопкой;</li>
+<li>разделы 6&ndash;7 &mdash; кривая претрейна и выводы о том, что модель может и чего нет.</li>
+</ul>
+<p><b>Как открыть</b>: положить в папку проекта и запустить
+<code>jupyter lab notebooks/kron_playground.ipynb</code>, либо открыть в VS Code.
+Нужен <code>ipywidgets</code> (уже установлен) и два чекпойнта:
+<code>E:/kron_out/s10_ckpt/last.pt</code> и <code>E:/kron_out/q10_ckpt/last.pt</code>.</p>
+<p>Ноутбук собран скриптом <code>scripts/make_playground.py</code> &mdash; правки лучше
+делать в нём, а не в JSON.</p>
+</div>
