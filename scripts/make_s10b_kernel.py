@@ -77,7 +77,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--code-version", type=int, default=24)
     ap.add_argument("--budget-minutes", type=int, default=0,
-                    help="fixed session budget instead of the 22:30 deadline")
+                    help="fixed session budget instead of a deadline")
+    ap.add_argument("--deadline-utc", default="2026-11-14T19:30:00",
+                    help="wall-clock deadline in UTC; 19:30 UTC is 22:30 MSK")
     args = ap.parse_args()
 
     nb = json.loads((SRC / "train.ipynb").read_text(encoding="utf-8"))
@@ -114,7 +116,8 @@ def main() -> None:
                         "# from the push time: whatever the queue does, the session ends by\n"
                         "# 22:30.  Twelve minutes are held back for the dataset copy and for\n"
                         "# the checkpoint to be written and published before the end.\n"
-                        "DEADLINE_UTC = datetime(2026, 11, 14, 19, 30, tzinfo=timezone.utc)\n"
+                        f"DEADLINE_UTC = datetime.fromisoformat('{args.deadline_utc}')"
+                        ".replace(tzinfo=timezone.utc)\n"
                         "_left = (DEADLINE_UTC - datetime.now(timezone.utc)).total_seconds() / 60\n"
                         "if _left < 25:\n"
                         "    raise SystemExit(f'only {_left:.0f} min left before 22:30: not starting')\n"
